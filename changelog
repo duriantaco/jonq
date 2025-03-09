@@ -1,0 +1,14 @@
+# Changelog
+
+## [v0.0.1] - Current 
+- Prototype implementation
+- Initial public release
+- SQL-like query syntax for JSON files
+- Support for field selection, filtering, sorting, and limiting results
+- Support for aggregation functions (sum, avg, count, max, min)
+- Support for nested JSON traversal with dot notation
+- Support for array indexing with [n] syntax
+- Support for complex boolean expressions with AND, OR, and parentheses
+- Support for grouping and aggregation with GROUP BY
+- Support for handling special characters in field names
+- Comprehensive test suite

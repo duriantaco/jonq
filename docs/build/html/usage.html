@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Usage &#8212; jonq 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=12dfc556" />
+    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="API Reference" href="api.html" />
+    <link rel="prev" title="Installation" href="installation.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="usage">
+<h1>Usage<a class="headerlink" href="#usage" title="Link to this heading">¶</a></h1>
+<section id="basic-usage">
+<h2>Basic Usage<a class="headerlink" href="#basic-usage" title="Link to this heading">¶</a></h2>
+<p>jonq provides a command-line interface for querying JSON files using a SQL-like syntax.</p>
+<p>The basic syntax is:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>&lt;path/to/json_file&gt;<span class="w"> </span><span class="s2">&quot;&lt;query&gt;&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="query-syntax">
+<h2>Query Syntax<a class="headerlink" href="#query-syntax" title="Link to this heading">¶</a></h2>
+<p>The query syntax follows a simplified SQL format:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">select</span><span class="w"> </span><span class="o">&lt;</span><span class="n">fields</span><span class="o">&gt;</span><span class="w"> </span><span class="p">[</span><span class="k">if</span><span class="w"> </span><span class="o">&lt;</span><span class="n">condition</span><span class="o">&gt;</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="k">group</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="o">&lt;</span><span class="n">fields</span><span class="o">&gt;</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="n">sort</span><span class="w"> </span><span class="o">&lt;</span><span class="n">field</span><span class="o">&gt;</span><span class="w"> </span><span class="p">[</span><span class="k">asc</span><span class="o">|</span><span class="k">desc</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="k">limit</span><span class="p">]]</span>
+</pre></div>
+</div>
+<p>Where:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;fields&gt;</span></code> - Comma-separated list of fields to select or aggregations</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">if</span> <span class="pre">&lt;condition&gt;</span></code> - Optional filtering condition</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">group</span> <span class="pre">by</span> <span class="pre">&lt;fields&gt;</span></code> - Optional grouping by one or more fields</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sort</span> <span class="pre">&lt;field&gt;</span></code> - Optional field to sort by</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">asc|desc</span></code> - Optional sort direction (default: asc)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">limit</span></code> - Optional integer to limit the number of results</p></li>
+</ul>
+</section>
+<section id="field-selection">
+<h2>Field Selection<a class="headerlink" href="#field-selection" title="Link to this heading">¶</a></h2>
+<p>To select all fields:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select *&quot;</span>
+</pre></div>
+</div>
+<p>To select specific fields:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age&quot;</span>
+</pre></div>
+</div>
+<p>Nested fields can be accessed using dot notation:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, profile.age, profile.address.city&quot;</span>
+</pre></div>
+</div>
+<p>Array elements can be accessed using square brackets:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, orders[0].item&quot;</span>
+</pre></div>
+</div>
+<p>You can use quotes for fields with spaces or special characters:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select &#39;first name&#39;, address.&#39;street address&#39;&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="filtering">
+<h2>Filtering<a class="headerlink" href="#filtering" title="Link to this heading">¶</a></h2>
+<p>Filter results using the <code class="docutils literal notranslate"><span class="pre">if</span></code> keyword:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age if age &gt; 30&quot;</span>
+</pre></div>
+</div>
+<p>Combine conditions with <code class="docutils literal notranslate"><span class="pre">and</span></code> and <code class="docutils literal notranslate"><span class="pre">or</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age if age &gt; 25 and city = &#39;New York&#39;&quot;</span>
+jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age if age &gt; 30 or city = &#39;Los Angeles&#39;&quot;</span>
+</pre></div>
+</div>
+<p>Use parentheses for complex expressions:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age if (age &gt; 30 and city = &#39;Chicago&#39;) or (age &lt; 25 and city = &#39;New York&#39;)&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="sorting-and-limiting">
+<h2>Sorting and Limiting<a class="headerlink" href="#sorting-and-limiting" title="Link to this heading">¶</a></h2>
+<p>Sort results by a field:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age sort age&quot;</span>
+</pre></div>
+</div>
+<p>Sort in descending order:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age sort age desc&quot;</span>
+</pre></div>
+</div>
+<p>Limit the number of results:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age sort age desc 5&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="aggregation-functions">
+<h2>Aggregation Functions<a class="headerlink" href="#aggregation-functions" title="Link to this heading">¶</a></h2>
+<p>jonq supports several aggregation functions:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">sum()</span></code> - Calculate the sum of values</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">avg()</span></code> - Calculate the average of values</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">count()</span></code> - Count the number of items</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">max()</span></code> - Find the maximum value</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">min()</span></code> - Find the minimum value</p></li>
+</ul>
+<p>Examples:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select sum(age) as total_age&quot;</span>
+jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select avg(age) as average_age&quot;</span>
+jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select count(*) as user_count&quot;</span>
+jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select max(orders.price) as highest_price&quot;</span>
+jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select min(orders.price) as lowest_price&quot;</span>
+</pre></div>
+</div>
+<p>You can use aliases with the <code class="docutils literal notranslate"><span class="pre">as</span></code> keyword:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select count(*) as total_users&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="grouping">
+<h2>Grouping<a class="headerlink" href="#grouping" title="Link to this heading">¶</a></h2>
+<p>Group data and perform aggregations per group:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select city, count(*) as user_count group by city&quot;</span>
+jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select city, avg(age) as avg_age group by city&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">jonq</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Usage</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#basic-usage">Basic Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#query-syntax">Query Syntax</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#field-selection">Field Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#filtering">Filtering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#sorting-and-limiting">Sorting and Limiting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#aggregation-functions">Aggregation Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#grouping">Grouping</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contributing</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="installation.html" title="previous chapter">Installation</a></li>
+      <li>Next: <a href="api.html" title="next chapter">API Reference</a></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, oha.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.4.7</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+      |
+      <a href="_sources/usage.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,7 @@
+.pytest_cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+chunks

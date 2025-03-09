@@ -1,0 +1,43 @@
+[
+    {
+      "id": 1,
+      "name": "Alice",
+      "profile": {
+        "age": 30,
+        "address": {
+          "city": "New York",
+          "zip": "10001"
+        }
+      },
+      "orders": [
+        {
+          "order_id": 101,
+          "item": "Laptop",
+          "price": 1200
+        },
+        {
+          "order_id": 102,
+          "item": "Phone",
+          "price": 800
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Bob",
+      "profile": {
+        "age": 25,
+        "address": {
+          "city": "Los Angeles",
+          "zip": "90001"
+        }
+      },
+      "orders": [
+        {
+          "order_id": 103,
+          "item": "Tablet",
+          "price": 500
+        }
+      ]
+    }
+  ]

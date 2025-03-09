@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Contributing &#8212; jonq 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=12dfc556" />
+    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Examples" href="examples.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="contributing">
+<h1>Contributing<a class="headerlink" href="#contributing" title="Link to this heading">¶</a></h1>
+<p>Contributions to jonq are welcome! Here’s how you can help.</p>
+<section id="setting-up-development-environment">
+<h2>Setting Up Development Environment<a class="headerlink" href="#setting-up-development-environment" title="Link to this heading">¶</a></h2>
+<ol class="arabic">
+<li><p>Fork the repository on GitHub</p></li>
+<li><p>Clone your fork locally:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/duriantaco/jonq.git
+<span class="nb">cd</span><span class="w"> </span>jonq
+</pre></div>
+</div>
+</li>
+<li><p>Create a virtual environment and install development dependencies:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>venv
+<span class="nb">source</span><span class="w"> </span>venv/bin/activate<span class="w">  </span><span class="c1"># On Windows: venv\Scripts\activate</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="running-tests">
+<h2>Running Tests<a class="headerlink" href="#running-tests" title="Link to this heading">¶</a></h2>
+<p>jonq uses pytest for testing. To run tests:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pytest
+</pre></div>
+</div>
+</section>
+<section id="manual-testing">
+<h2>Manual Testing<a class="headerlink" href="#manual-testing" title="Link to this heading">¶</a></h2>
+<p>You can also use the shell scripts in the <code class="docutils literal notranslate"><span class="pre">jonq/json_test_files</span></code> directory to run manual tests:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>jonq/json_test_files/jonq_manual_simple_test.sh
+bash<span class="w"> </span>jonq/json_test_files/jonq_manual_nested_test.sh
+</pre></div>
+</div>
+</section>
+<section id="contributing-code">
+<h2>Contributing Code<a class="headerlink" href="#contributing-code" title="Link to this heading">¶</a></h2>
+<ol class="arabic">
+<li><p>Create a new branch for your feature or bugfix:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>feature-name
+</pre></div>
+</div>
+</li>
+<li><p>Make your changes and add tests for new features</p></li>
+<li><p>Run the test suite to make sure everything passes</p></li>
+<li><p>Commit your changes:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Description of your changes&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p>Push your branch to GitHub:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>feature-name
+</pre></div>
+</div>
+</li>
+<li><p>Create a Pull Request from your fork</p></li>
+</ol>
+</section>
+<section id="coding-style">
+<h2>Coding Style<a class="headerlink" href="#coding-style" title="Link to this heading">¶</a></h2>
+<p>Please follow PEP 8 coding conventions and include docstrings for new functions and classes.</p>
+</section>
+<section id="adding-documentation">
+<h2>Adding Documentation<a class="headerlink" href="#adding-documentation" title="Link to this heading">¶</a></h2>
+<p>If you’re adding new features, please update the documentation as well. jonq uses Sphinx for documentation:</p>
+<ol class="arabic">
+<li><p>Update or add docstrings to your code</p></li>
+<li><p>Update RST files in the <code class="docutils literal notranslate"><span class="pre">docs</span></code> directory if needed</p></li>
+<li><p>Build the documentation to check your changes:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>docs
+make<span class="w"> </span>html
+</pre></div>
+</div>
+<p>The documentation will be built in <code class="docutils literal notranslate"><span class="pre">docs/_build/html</span></code>.</p>
+</li>
+</ol>
+</section>
+<section id="reporting-issues">
+<h2>Reporting Issues<a class="headerlink" href="#reporting-issues" title="Link to this heading">¶</a></h2>
+<p>If you find a bug or have a suggestion for improvement, please create an issue on the GitHub repository.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">jonq</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Contributing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#setting-up-development-environment">Setting Up Development Environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#running-tests">Running Tests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#manual-testing">Manual Testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#contributing-code">Contributing Code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#coding-style">Coding Style</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#adding-documentation">Adding Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#reporting-issues">Reporting Issues</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="examples.html" title="previous chapter">Examples</a></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, oha.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.4.7</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+      |
+      <a href="_sources/contribution.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>API Reference &#8212; jonq 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=12dfc556" />
+    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Examples" href="examples.html" />
+    <link rel="prev" title="Usage" href="usage.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="api-reference">
+<h1>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">¶</a></h1>
+<p>This section provides detailed information about the jonq API.</p>
+<section id="main-module-jonq-main">
+<h2>Main Module (jonq.main)<a class="headerlink" href="#main-module-jonq-main" title="Link to this heading">¶</a></h2>
+<p>The main module provides the command-line interface for jonq.</p>
+<p><strong>main()</strong></p>
+<p>Main entry point for the jonq command-line tool. This function:</p>
+<ul class="simple">
+<li><p>Processes the command-line arguments</p></li>
+<li><p>Parses the SQL-like query</p></li>
+<li><p>Translates it to a jq filter</p></li>
+<li><p>Executes it against the specified JSON file</p></li>
+</ul>
+<p>Command line usage:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>&lt;path/json_file&gt;<span class="w"> </span><span class="s2">&quot;&lt;query&gt;&quot;</span>
+</pre></div>
+</div>
+<p>Where:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;path/json_file&gt;</span></code> - Path to the JSON file to query</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;query&gt;</span></code> - SQL-like query in double quotes</p></li>
+</ul>
+</section>
+<section id="query-parser-jonq-query-parser">
+<h2>Query Parser (jonq.query_parser)<a class="headerlink" href="#query-parser-jonq-query-parser" title="Link to this heading">¶</a></h2>
+<p>The Query Parser module provides functions to parse SQL-like queries into a structured format
+that can be translated into jq filters.</p>
+<p><strong>tokenize(query)</strong></p>
+<p>Tokenize a SQL-like query string into individual tokens.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>query</strong> (<em>str</em>) - The SQL-like query string to tokenize</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>list</strong> - A list of string tokens from the query</p></li>
+</ul>
+</dd>
+</dl>
+<p>Example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">tokenize</span><span class="p">(</span><span class="s2">&quot;select name, age if age &gt; 30&quot;</span><span class="p">)</span>
+<span class="go">[&#39;select&#39;, &#39;name&#39;, &#39;,&#39;, &#39;age&#39;, &#39;if&#39;, &#39;age&#39;, &#39;&gt;&#39;, &#39;30&#39;]</span>
+</pre></div>
+</div>
+<p><strong>parse_query(tokens)</strong></p>
+<p>Parse tokenized query into structured field selections and clauses.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>tokens</strong> (<em>list</em>) - List of string tokens from a tokenized query</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><dl class="simple">
+<dt><strong>tuple</strong> - A tuple containing:</dt><dd><ul>
+<li><p><strong>fields</strong> (<em>list</em>) - List of field specifications
+Each field is a tuple in one of these formats:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">('field',</span> <span class="pre">field_name,</span> <span class="pre">alias)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">('aggregation',</span> <span class="pre">function_name,</span> <span class="pre">field_name,</span> <span class="pre">alias)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">('expression',</span> <span class="pre">expression_text,</span> <span class="pre">alias)</span></code></p></li>
+</ul>
+</li>
+<li><p><strong>condition</strong> (<em>str</em>) - Filter condition or None</p></li>
+<li><p><strong>group_by</strong> (<em>list</em>) - List of fields to group by or None</p></li>
+<li><p><strong>order_by</strong> (<em>str</em>) - Field to sort by or None</p></li>
+<li><p><strong>sort_direction</strong> (<em>str</em>) - Sort direction (‘asc’ or ‘desc’)</p></li>
+<li><p><strong>limit</strong> (<em>str</em>) - Maximum number of results or None</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</dd>
+<dt>Raises:</dt><dd><ul class="simple">
+<li><p><strong>ValueError</strong> - If the query syntax is invalid</p></li>
+</ul>
+</dd>
+</dl>
+<p>Example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">tokens</span> <span class="o">=</span> <span class="n">tokenize</span><span class="p">(</span><span class="s2">&quot;select name, age if age &gt; 30 sort age desc 5&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">parse_query</span><span class="p">(</span><span class="n">tokens</span><span class="p">)</span>
+<span class="go">([(&#39;field&#39;, &#39;name&#39;, &#39;name&#39;), (&#39;field&#39;, &#39;age&#39;, &#39;age&#39;)],</span>
+<span class="go"> &#39;.age? &gt; 30&#39;, None, &#39;age&#39;, &#39;desc&#39;, &#39;5&#39;)</span>
+</pre></div>
+</div>
+<p><strong>parse_condition(tokens)</strong></p>
+<p>Parse condition tokens into a jq-compatible filter expression.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>tokens</strong> (<em>list</em>) - List of tokens representing the condition</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>str</strong> - A jq-compatible filter expression or None if no condition</p></li>
+</ul>
+</dd>
+<dt>Raises:</dt><dd><ul class="simple">
+<li><p><strong>ValueError</strong> - If the condition syntax is invalid</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>parse_or_expression(tokens, pos)</strong></p>
+<p>Parse tokens for OR expressions, which have the lowest precedence.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>tokens</strong> (<em>list</em>) - List of tokens in the condition</p></li>
+<li><p><strong>pos</strong> (<em>int</em>) - Current position in the token list</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>tuple</strong> - (AST node representing the OR expression, new position)</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>parse_and_expression(tokens, pos)</strong></p>
+<p>Parse tokens for AND expressions, which have higher precedence than OR.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>tokens</strong> (<em>list</em>) - List of tokens in the condition</p></li>
+<li><p><strong>pos</strong> (<em>int</em>) - Current position in the token list</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>tuple</strong> - (AST node representing the AND expression, new position)</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>parse_comparison(tokens, pos)</strong></p>
+<p>Parse tokens for comparison expressions or parenthesized expressions.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>tokens</strong> (<em>list</em>) - List of tokens in the condition</p></li>
+<li><p><strong>pos</strong> (<em>int</em>) - Current position in the token list</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>tuple</strong> - (AST node, new position)</p></li>
+</ul>
+</dd>
+<dt>Raises:</dt><dd><ul class="simple">
+<li><p><strong>ValueError</strong> - If the syntax is invalid</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>transform_ast(ast)</strong></p>
+<p>Transform an abstract syntax tree (AST) into a jq-compatible expression.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>ast</strong> - The AST node to transform</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>str</strong> - A jq-compatible filter expression</p></li>
+</ul>
+</dd>
+<dt>Raises:</dt><dd><ul class="simple">
+<li><p><strong>ValueError</strong> - If the AST node is invalid</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>transform_field(token)</strong></p>
+<p>Transform a field token into a jq path expression.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>token</strong> (<em>str</em>) - The field token to transform</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>str</strong> - A jq path expression with nullable access</p></li>
+</ul>
+</dd>
+<dt>Raises:</dt><dd><ul class="simple">
+<li><p><strong>ValueError</strong> - If the field name is invalid</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>transform_value(token)</strong></p>
+<p>Transform a value token into a jq-compatible value.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>token</strong> (<em>str</em>) - The value token to transform</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>str</strong> - A jq-compatible value string</p></li>
+</ul>
+</dd>
+<dt>Raises:</dt><dd><ul class="simple">
+<li><p><strong>ValueError</strong> - If the value is invalid</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>transform_operator(op)</strong></p>
+<p>Transform an operator token into a jq-compatible operator.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>op</strong> (<em>str</em>) - The operator token to transform</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>str</strong> - A jq-compatible operator</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>find_lowest_precedence_operator(tokens)</strong></p>
+<p>Find the operator with the lowest precedence in a list of tokens.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>tokens</strong> (<em>list</em>) - List of tokens to search</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>int</strong> - Index of the lowest precedence operator, or -1 if none found</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>is_balanced(tokens)</strong></p>
+<p>Check if parentheses in tokens are balanced.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>tokens</strong> (<em>list</em>) - List of tokens to check</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>bool</strong> - True if parentheses are balanced, False otherwise</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>parse_query_compat(tokens)</strong></p>
+<p>Compatibility wrapper for parse_query that returns a subset of results.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>tokens</strong> (<em>list</em>) - List of tokens to parse</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>tuple</strong> - (fields, condition, order_by, sort_direction, limit)</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+<section id="jq-filter-jonq-jq-filter">
+<h2>JQ Filter (jonq.jq_filter)<a class="headerlink" href="#jq-filter-jonq-jq-filter" title="Link to this heading">¶</a></h2>
+<p>The JQ Filter module converts parsed query data into jq filter strings.</p>
+<p><strong>format_field_path(field)</strong></p>
+<p>Format a field path with proper nullable access for jq.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>field</strong> (<em>str</em>) - The field path to format</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>str</strong> - Formatted field path with proper nullable access</p></li>
+</ul>
+</dd>
+</dl>
+<p>Examples:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">format_field_path</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span>
+<span class="go">&#39;name?&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">format_field_path</span><span class="p">(</span><span class="s1">&#39;profile.address.city&#39;</span><span class="p">)</span>
+<span class="go">&#39;profile?.address?.city?&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">format_field_path</span><span class="p">(</span><span class="s1">&#39;orders[0].item&#39;</span><span class="p">)</span>
+<span class="go">&#39;orders[0]?.item?&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">format_field_path</span><span class="p">(</span><span class="s1">&#39;first name&#39;</span><span class="p">)</span>
+<span class="go">&#39;&quot;first name&quot;?&#39;</span>
+</pre></div>
+</div>
+<p><strong>build_jq_path(field_path)</strong></p>
+<p>Build a jq path expression from a field path.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>field_path</strong> (<em>str</em>) - The field path to convert</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>str</strong> - jq path expression</p></li>
+</ul>
+</dd>
+</dl>
+<p>Examples:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">build_jq_path</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span>
+<span class="go">&#39;.name?&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">build_jq_path</span><span class="p">(</span><span class="s1">&#39;profile.age&#39;</span><span class="p">)</span>
+<span class="go">&#39;.profile?.age?&#39;</span>
+</pre></div>
+</div>
+<p><strong>translate_expression(expression)</strong></p>
+<p>Translate a jonq expression to a jq expression.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>expression</strong> (<em>str</em>) - jonq expression string</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>str</strong> - Translated jq expression</p></li>
+</ul>
+</dd>
+<dt>Raises:</dt><dd><ul class="simple">
+<li><p><strong>ValueError</strong> - If the function is unsupported</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>escape_string(s)</strong></p>
+<p>Escape a string for use in a jq filter.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>s</strong> (<em>str</em>) - The string to escape</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>str</strong> - The escaped string</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>generate_jq_filter(fields, condition, group_by, order_by, sort_direction, limit)</strong></p>
+<p>Generate a jq filter from the parsed query components.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>fields</strong> (<em>list</em>) - List of field specifications</p></li>
+<li><p><strong>condition</strong> (<em>str</em>) - Filter condition or None</p></li>
+<li><p><strong>group_by</strong> (<em>list</em>) - List of fields to group by or None</p></li>
+<li><p><strong>order_by</strong> (<em>str</em>) - Field to sort by or None</p></li>
+<li><p><strong>sort_direction</strong> (<em>str</em>) - Sort direction (‘asc’ or ‘desc’)</p></li>
+<li><p><strong>limit</strong> (<em>str</em>) - Maximum number of results or None</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>str</strong> - A jq filter string</p></li>
+</ul>
+</dd>
+<dt>Raises:</dt><dd><ul class="simple">
+<li><p><strong>ValueError</strong> - If the expression is invalid</p></li>
+</ul>
+</dd>
+</dl>
+<p>Example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">generate_jq_filter</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="p">[(</span><span class="s1">&#39;field&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;field&#39;</span><span class="p">,</span> <span class="s1">&#39;age&#39;</span><span class="p">,</span> <span class="s1">&#39;age&#39;</span><span class="p">)],</span>
+<span class="gp">... </span>    <span class="s1">&#39;.age? &gt; 30&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">&#39;age&#39;</span><span class="p">,</span> <span class="s1">&#39;desc&#39;</span><span class="p">,</span> <span class="s1">&#39;5&#39;</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="go">&#39;if type == &quot;array&quot; then . | map(select(.age? &gt; 30) | { &quot;name&quot;: (.name? // null), &quot;age&quot;: (.age? // null) }) elif type == &quot;object&quot; then [select(.age? &gt; 30) | { &quot;name&quot;: (.name? // null), &quot;age&quot;: (.age? // null) }] elif type == &quot;number&quot; then if .age? &gt; 30 then [{&quot;value&quot;: .}] else [] end elif type == &quot;string&quot; then if .age? &gt; 30 then [{&quot;value&quot;: .}] else [] end else [] end | sort_by(.age) | reverse | .[0:5]&#39;</span>
+</pre></div>
+</div>
+</section>
+<section id="executor-jonq-executor">
+<h2>Executor (jonq.executor)<a class="headerlink" href="#executor-jonq-executor" title="Link to this heading">¶</a></h2>
+<p>The Executor module handles the execution of jq filters against JSON files.</p>
+<p><strong>run_jq(json_file, jq_filter)</strong></p>
+<p>Run a jq filter against a JSON file.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><ul class="simple">
+<li><p><strong>json_file</strong> (<em>str</em>) - Path to the JSON file</p></li>
+<li><p><strong>jq_filter</strong> (<em>str</em>) - jq filter string to execute</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><ul class="simple">
+<li><p><strong>tuple</strong> - (stdout, stderr) from the jq command</p></li>
+</ul>
+</dd>
+<dt>Raises:</dt><dd><ul class="simple">
+<li><p><strong>ValueError</strong> - If the JSON file or jq filter is invalid</p></li>
+<li><p><strong>RuntimeError</strong> - If jq execution fails</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+<section id="query-syntax">
+<h2>Query Syntax<a class="headerlink" href="#query-syntax" title="Link to this heading">¶</a></h2>
+<p>jonq uses a SQL-like syntax for querying JSON data:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">select</span><span class="w"> </span><span class="o">&lt;</span><span class="n">fields</span><span class="o">&gt;</span><span class="w"> </span><span class="p">[</span><span class="k">if</span><span class="w"> </span><span class="o">&lt;</span><span class="n">condition</span><span class="o">&gt;</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="k">group</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="o">&lt;</span><span class="n">fields</span><span class="o">&gt;</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="n">sort</span><span class="w"> </span><span class="o">&lt;</span><span class="n">field</span><span class="o">&gt;</span><span class="w"> </span><span class="p">[</span><span class="k">asc</span><span class="o">|</span><span class="k">desc</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="k">limit</span><span class="p">]]</span>
+</pre></div>
+</div>
+<p>Where:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;fields&gt;</span></code> - Comma-separated list of fields to select or aggregations</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">if</span> <span class="pre">&lt;condition&gt;</span></code> - Optional filtering condition</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">group</span> <span class="pre">by</span> <span class="pre">&lt;fields&gt;</span></code> - Optional grouping by one or more fields</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sort</span> <span class="pre">&lt;field&gt;</span></code> - Optional field to sort by</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">asc|desc</span></code> - Optional sort direction (default: asc)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">limit</span></code> - Optional integer to limit the number of results</p></li>
+</ul>
+<p>Field Selection:</p>
+<ul class="simple">
+<li><p>Simple fields: <code class="docutils literal notranslate"><span class="pre">select</span> <span class="pre">name,</span> <span class="pre">age</span></code></p></li>
+<li><p>All fields: <code class="docutils literal notranslate"><span class="pre">select</span> <span class="pre">*</span></code></p></li>
+<li><p>Nested fields: <code class="docutils literal notranslate"><span class="pre">select</span> <span class="pre">profile.address.city</span></code></p></li>
+<li><p>Array access: <code class="docutils literal notranslate"><span class="pre">select</span> <span class="pre">orders[0].item</span></code></p></li>
+<li><p>Fields with spaces: <code class="docutils literal notranslate"><span class="pre">select</span> <span class="pre">'first</span> <span class="pre">name'</span></code></p></li>
+<li><p>Aggregations: <code class="docutils literal notranslate"><span class="pre">select</span> <span class="pre">sum(price)</span> <span class="pre">as</span> <span class="pre">total</span></code></p></li>
+<li><p>Expressions: <code class="docutils literal notranslate"><span class="pre">select</span> <span class="pre">price</span> <span class="pre">*</span> <span class="pre">0.7</span> <span class="pre">as</span> <span class="pre">discounted_price</span></code></p></li>
+<li><p>Aliases: <code class="docutils literal notranslate"><span class="pre">select</span> <span class="pre">name</span> <span class="pre">as</span> <span class="pre">customer_name</span></code></p></li>
+</ul>
+<p>Filtering:</p>
+<ul class="simple">
+<li><p>Simple comparison: <code class="docutils literal notranslate"><span class="pre">if</span> <span class="pre">age</span> <span class="pre">&gt;</span> <span class="pre">30</span></code></p></li>
+<li><p>String comparison: <code class="docutils literal notranslate"><span class="pre">if</span> <span class="pre">city</span> <span class="pre">=</span> <span class="pre">'New</span> <span class="pre">York'</span></code></p></li>
+<li><p>Combined with AND: <code class="docutils literal notranslate"><span class="pre">if</span> <span class="pre">age</span> <span class="pre">&gt;</span> <span class="pre">25</span> <span class="pre">and</span> <span class="pre">city</span> <span class="pre">=</span> <span class="pre">'Chicago'</span></code></p></li>
+<li><p>Combined with OR: <code class="docutils literal notranslate"><span class="pre">if</span> <span class="pre">age</span> <span class="pre">&gt;</span> <span class="pre">30</span> <span class="pre">or</span> <span class="pre">city</span> <span class="pre">=</span> <span class="pre">'Los</span> <span class="pre">Angeles'</span></code></p></li>
+<li><p>Nested conditions: <code class="docutils literal notranslate"><span class="pre">if</span> <span class="pre">(age</span> <span class="pre">&gt;</span> <span class="pre">30</span> <span class="pre">and</span> <span class="pre">city</span> <span class="pre">=</span> <span class="pre">'Chicago')</span> <span class="pre">or</span> <span class="pre">(age</span> <span class="pre">&lt;</span> <span class="pre">25</span> <span class="pre">and</span> <span class="pre">city</span> <span class="pre">=</span> <span class="pre">'New</span> <span class="pre">York')</span></code></p></li>
+</ul>
+<p>Grouping:</p>
+<ul class="simple">
+<li><p>Simple grouping: <code class="docutils literal notranslate"><span class="pre">group</span> <span class="pre">by</span> <span class="pre">city</span></code></p></li>
+<li><p>With aggregation: <code class="docutils literal notranslate"><span class="pre">select</span> <span class="pre">city,</span> <span class="pre">count(*)</span> <span class="pre">as</span> <span class="pre">count</span> <span class="pre">group</span> <span class="pre">by</span> <span class="pre">city</span></code></p></li>
+<li><p>Multiple fields: <code class="docutils literal notranslate"><span class="pre">group</span> <span class="pre">by</span> <span class="pre">city,</span> <span class="pre">country</span></code></p></li>
+</ul>
+<p>Sorting:</p>
+<ul class="simple">
+<li><p>Ascending (default): <code class="docutils literal notranslate"><span class="pre">sort</span> <span class="pre">age</span></code></p></li>
+<li><p>Descending: <code class="docutils literal notranslate"><span class="pre">sort</span> <span class="pre">age</span> <span class="pre">desc</span></code></p></li>
+<li><p>With limit: <code class="docutils literal notranslate"><span class="pre">sort</span> <span class="pre">age</span> <span class="pre">desc</span> <span class="pre">5</span></code></p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">jonq</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#main-module-jonq-main">Main Module (jonq.main)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#query-parser-jonq-query-parser">Query Parser (jonq.query_parser)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#jq-filter-jonq-jq-filter">JQ Filter (jonq.jq_filter)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#executor-jonq-executor">Executor (jonq.executor)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#query-syntax">Query Syntax</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contributing</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="usage.html" title="previous chapter">Usage</a></li>
+      <li>Next: <a href="examples.html" title="next chapter">Examples</a></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, oha.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.4.7</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+      |
+      <a href="_sources/api.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "py-jq"
+name = "jonq"
 version = "0.0.1"
 description = "SQL-like query tool for JSON files"
 readme = "README.md"

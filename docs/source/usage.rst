@@ -142,3 +142,46 @@ Group data and perform aggregations per group:
 
    jonq data.json "select city, count(*) as user_count group by city"
    jonq data.json "select city, avg(age) as avg_age group by city"
+
+Output Formats
+--------------
+
+By default, jonq outputs results in JSON format. You can specify a different output format using the ``--format`` or ``-f`` option.
+
+CSV Output
+~~~~~~~~~~
+
+To output results in CSV format:
+
+.. code-block:: bash
+
+   jonq data.json "select name, age" --format csv
+   jonq data.json "select name, age" -f csv
+
+This is useful when you need to import the data into spreadsheets or other tools that work with CSV files.
+
+Processing Large Files
+---------------------
+
+Streaming Mode
+~~~~~~~~~~~~~
+
+For processing large JSON files efficiently, jonq supports streaming mode with the ``--stream`` or ``-s`` option:
+
+.. code-block:: bash
+
+   jonq data.json "select name, age" --stream
+   jonq data.json "select name, age" -s
+
+This processes the JSON array in chunks, significantly reducing memory usage when working with large datasets.
+
+Note: Streaming mode only works with JSON files containing an array at the root level.
+
+Command Line Options
+-------------------
+
+jonq supports the following command line options:
+
+* ``--format, -f csv|json`` - Output format (default: json)
+* ``--stream, -s`` - Process large files in streaming mode
+* ``-h, --help`` - Show help message

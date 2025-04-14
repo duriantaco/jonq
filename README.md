@@ -42,8 +42,11 @@ jonq allows you to query JSON data using familiar Pythonish-SQL-like syntax. It 
 * Sorting: Order results with ascending or descending sort
 * Pagination: Limit the number of results returned
 * Aggregation Functions: Use functions like `sum()`, `avg()`, `count()`, `max()` and `min()`
+* Allows CSV output and streaming mode
 
-## jonq vs Native
+## Why Jonq? 
+
+### jonq vs Native
 
 While jq is incredibly powerful, its syntax is a pain to use. I can't be the only one who feels that way right? jonq simplifies JSON querying with familiar, intuitive syntax:
 
@@ -62,6 +65,14 @@ As you can see, jonq offers:
 - **Familiar patterns**: Py + SQL-like keywords
 - **Readability**: For human readability 
 - **Faster development**: Write complex queries in a fraction of the time
+
+### jonq vs DuckDB
+
+- JSON Path Navigation: Jonq's syntax for traversing nested JSON structures with dot notation is intuitive and pythonic. Pretty easy to use if you ask me. 
+- Lightweight: Lightweight that doesn't require setting up a database system
+- jq Power: By leveraging jq, jonq inherits jq's powerful JSON processing capabilities while making it more accessible through a SQL-like interface.
+- Small Footprint: Jonq has fewer dependencies and a smaller installation footprint compared to DuckDB.
+- Purpose built: Self-explanatory 
 
 ## Installation
 
@@ -259,6 +270,23 @@ jonq nested.json "select profile.address.city, avg(profile.age) as avg_age group
 jonq nested.json "select profile.address.city, count(orders) as order_count, avg(orders.price) as avg_price group by profile.address.city"
 ```
 
+## Output Formats
+
+### CSV Output
+jonq can output results in CSV format using the `--format csv` or `-f csv` option:
+
+```bash
+jonq path/to/simple.json "select name, age" --format csv
+```
+
+## Streaming Mode
+
+For processing large JSON files efficiently, jonq supports streaming mode with the `--stream` or `-s` option:
+
+```bash
+jonq path/to/large.json "select name, age" --stream
+```
+
 ## Troubleshooting
 ### Common Errors
 #### Error: Command 'jq' not found
@@ -290,7 +318,6 @@ jonq nested.json "select profile.address.city, count(orders) as order_count, avg
 * Write Operations: jonq doesn't support writing results back to files. It's a read-only tool (or at least for now).
 * Performance: For very large JSON files (100MB+), processing may be slow.
 * Advanced jq Features: Some advanced jq features aren't exposed in the jonq syntax.
-* CSV Output: Currently only outputs JSON format. CSV export is planned for future versions.
 * Multiple File Joins: No support for joining data from multiple JSON files.
 * Custom Functions: User-defined functions aren't supported in the current version.
 * Date/Time Operations: Limited support for date/time parsing or manipulation.

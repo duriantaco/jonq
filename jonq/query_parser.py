@@ -12,12 +12,6 @@ def tokenize(query):
     - Quoted strings (both single and double quotes)
     - Other non-whitespace characters
     - Commas and parentheses
-
-    Args:
-        query (str): The input query string to be tokenized.
-
-    Returns:
-        list: A list of tokens extracted from the query string.
     """
     pattern = r'(\w+\s*\(\s*\*\s*\))|(\w+\s*\(\s*[\w\.\[\]]+\s*\))|\s+\-\s+|\s+\+\s+|\s+\*\s+|\s+\/\s+|\'[^\']*\'|"[^"]*"|[^\s,()]+|,|\(|\)'
     tokens = []

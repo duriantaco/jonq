@@ -62,8 +62,8 @@ def main():
             raise ValueError(f"JSON file '{json_file}' is empty. Please provide a non-empty JSON file.")
         
         tokens = tokenize(query)
-        fields, condition, group_by, order_by, sort_direction, limit = parse_query(tokens)
-        jq_filter = generate_jq_filter(fields, condition, group_by, order_by, sort_direction, limit)
+        fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
+        jq_filter = generate_jq_filter(fields, condition, group_by, having, order_by, sort_direction, limit, from_path)
         
         if use_streaming:
             logger.info("Using streaming mode for processing")
@@ -71,6 +71,14 @@ def main():
         else:
             stdout, stderr = run_jq(json_file, jq_filter)
         
+        import json
+        logger.info(f"jq returned output length: {len(stdout)}")
+        try:
+            result_data = json.loads(stdout)
+            logger.info(f"jq output type: {type(result_data)}, content: {json.dumps(result_data)[:200]}")
+        except Exception as e:
+            logger.info(f"Could not parse jq output: {e}")
+
         if stdout:
             if output_format == "csv":
                 csv_output = json_to_csv(stdout)

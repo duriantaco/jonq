@@ -5,19 +5,6 @@ import json
 logging.basicConfig(level=logging.INFO)
 
 def format_field_path(field):
-    """Format a field path for use in JQ filters with optional null-check operator.
-
-    Args:
-        field (str): The field path to format. Can include:
-            - Simple field names (e.g., "name")
-            - Nested paths with dots (e.g., "user.address.street")
-            - Array indices (e.g., "users[0].name")
-            - Spaces or special characters (e.g., "first name")
-
-    Returns:
-        str: The formatted field path with appropriate null-check operators and
-            escaped characters. 
-    """
     if ' ' in field or not re.match(r'^[\w\.\[\]]+$', field):
         if '.' in field:
             parts = re.split(r'\.(?![^\[]*\])', field)
@@ -134,28 +121,16 @@ def escape_string(s):
         return f'"{escaped}"'
     return s
 
-def generate_jq_filter(fields, condition, group_by, order_by, sort_direction, limit):
-    """
-    This function is one of the core properties of jonq. It creates a JQ filter for the data operations below:
-    - Select
-    - Count, Sum, Avg, Min, Max
-    - Filtering based on conditions (Where)
-    - Grouping
-    - Sorting
-    - Limiting results
-    Parameters:
-        fields (list): List of tuples describing the fields to select. Each tuple can be:
-            - ('field', field_name, alias) for simple field selection
-            - ('aggregation', func, field_path, alias) for aggregation operations
-            - ('expression', expression, alias) for custom expressions
-        condition (str, optional): Filter condition in JQ syntax. Defaults to None.
-        group_by (list, optional): List of fields to group by. Defaults to None.
-        order_by (str, optional): Field to sort by. Defaults to None.
-        sort_direction (str, optional): Sort direction ('asc' or 'desc'). Defaults to None.
-        limit (int, optional): Maximum number of results to return. Defaults to None.
-    Returns:
-        str: A JQ filter string that can be used to transform JSON data according to the specified parameters.
-    """
+def generate_jq_filter(fields, condition, group_by, having, order_by, sort_direction, limit, from_path=None):
+    base_selector = ''
+    if from_path:
+        if from_path.endswith('[]'):
+            # Handle array flattening syntax
+            base_path = from_path[:-2]
+            base_selector = f'.{base_path}[]'
+        else:
+            base_selector = f'.{from_path}'
+    
     all_aggregations = all(field_type == 'aggregation' for field_type, *_ in fields)
     
     if all_aggregations and not group_by:
@@ -167,15 +142,30 @@ def generate_jq_filter(fields, condition, group_by, order_by, sort_direction, li
                 
             if '.' in field_path:
                 array_field, value_field = field_path.rsplit('.', 1)
+
                 if condition:
-                    selected_values = f'[.[] | select({condition}) | .{array_field}?[] | .{value_field}?]'
+                    if from_path:
+                        selected_values = f'[{base_selector} | select({condition}) | .{array_field}?[] | .{value_field}?]'
+                    else:
+                        selected_values = f'[if type == "array" then .[] | select({condition}) | .{array_field}?[] | .{value_field}? else .{array_field}?[] | .{value_field}? end]'
                 else:
-                    selected_values = f'[.[] | .{array_field}?[] | .{value_field}?]'
+                    if from_path:
+                        selected_values = f'[{base_selector} | .{array_field}?[] | .{value_field}?]'
+                    else:
+                        selected_values = f'[if type == "array" then .[] | .{array_field}?[] | .{value_field}? else .{array_field}?[] | .{value_field}? end]'
+
             else:
                 if condition:
-                    selected_values = f'[.[] | select({condition}) | .{field_path}?]'
+                    if from_path:
+                        selected_values = f'[{base_selector} | select({condition}) | .{field_path}?]'
+                    else:
+                        selected_values = f'[if type == "array" then .[] | select({condition}) | .{field_path}? else .{field_path}? end]'
                 else:
-                    selected_values = f'[.[] | .{field_path}?]'
+                    if from_path:
+                        selected_values = f'[{base_selector} | .{field_path}?]'
+                    else:
+                        selected_values = f'[if type == "array" then .[] | .{field_path}? else .{field_path}? end]'
+
             if func == 'count':
                 agg_expr = f'({selected_values} | map(select(. != null)) | length)'
             else:
@@ -188,6 +178,7 @@ def generate_jq_filter(fields, condition, group_by, order_by, sort_direction, li
                     agg_expr = f'({mapped_values} | {func})'
             selection.append(f'"{alias}": {agg_expr}')
         jq_filter = f'{{ {", ".join(selection)} }}'
+        
     elif group_by:
         group_keys = []
         for field in group_by:
@@ -221,7 +212,7 @@ def generate_jq_filter(fields, condition, group_by, order_by, sort_direction, li
                 elif func in ['sum', 'avg', 'min', 'max']:
                     if '.' in field_path:
                         array_part, field_part = field_path.rsplit('.', 1)
-                        mapped_values = f'map(.{array_part}[]? | .{field_part}? | select(type == "number"))'
+                        mapped_values = f'map(.{array_part}.{field_part}? | select(type == "number"))'
                         
                         if func == 'sum':
                             agg_selections.append(f'"{alias}": ({mapped_values} | add)')
@@ -239,10 +230,19 @@ def generate_jq_filter(fields, condition, group_by, order_by, sort_direction, li
                         else:
                             agg_selections.append(f'"{alias}": ({mapped_values} | map(select(type == "number")) | {func})')
         
-        jq_filter = f'. | map(select(. != null)) | group_by({group_key}) | map({{ {", ".join(agg_selections)} }})'
+        if from_path:
+            jq_filter = f'{base_selector} | map(select(. != null)) | group_by({group_key}) | map({{ {", ".join(agg_selections)} }})'
+        else:
+            jq_filter = f'. | map(select(. != null)) | group_by({group_key}) | map({{ {", ".join(agg_selections)} }})'
+
+        if having:
+            jq_filter += f' | map(select({having}))'
     else:
         if fields == [('field', '*', '*')]:
-            jq_filter = '.'  
+            if from_path:
+                jq_filter = base_selector
+            else:
+                jq_filter = '.'
         else:
             selection = []
             for field_type, *field_data in fields:
@@ -291,30 +291,36 @@ def generate_jq_filter(fields, condition, group_by, order_by, sort_direction, li
             
             map_filter = f'{{ {", ".join(selection)} }}'
             
-            if condition:
-                jq_filter = (
-                    f'if type == "array" then '
-                    f'. | map(select({condition}) | {map_filter}) '
-                    f'elif type == "object" then '
-                    f'[select({condition}) | {map_filter}] '
-                    f'elif type == "number" then '
-                    f'if {condition} then [{{"value": .}}] else [] end '
-                    f'elif type == "string" then '
-                    f'if {condition} then [{{"value": .}}] else [] end '
-                    f'else [] end'
-                )
+            if from_path:
+                if condition:
+                    jq_filter = f'{base_selector} | map(select({condition}) | {map_filter})'
+                else:
+                    jq_filter = f'{base_selector} | map({map_filter})'
             else:
-                jq_filter = (
-                    f'if type == "array" then '
-                    f'. | map({map_filter}) '
-                    f'elif type == "object" then '
-                    f'[{map_filter}] '
-                    f'elif type == "number" then '
-                    f'[{{"value": .}}] '
-                    f'elif type == "string" then '
-                    f'[{{"value": .}}] '
-                    f'else [] end'
-                )
+                if condition:
+                    jq_filter = (
+                        f'if type == "array" then '
+                        f'. | map(select({condition}) | {map_filter}) '
+                        f'elif type == "object" then '
+                        f'[select({condition}) | {map_filter}] '
+                        f'elif type == "number" then '
+                        f'if {condition} then [{{"value": .}}] else [] end '
+                        f'elif type == "string" then '
+                        f'if {condition} then [{{"value": .}}] else [] end '
+                        f'else [] end'
+                    )
+                else:
+                    jq_filter = (
+                        f'if type == "array" then '
+                        f'. | map({map_filter}) '
+                        f'elif type == "object" then '
+                        f'[{map_filter}] '
+                        f'elif type == "number" then '
+                        f'[{{"value": .}}] '
+                        f'elif type == "string" then '
+                        f'[{{"value": .}}] '
+                        f'else [] end'
+                    )
             
             if order_by:
                 jq_filter += f' | sort_by(.{order_by})'

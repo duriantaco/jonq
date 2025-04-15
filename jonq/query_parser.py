@@ -1,72 +1,20 @@
 import re
 import json
 from jonq.jq_filter import build_jq_path
+from jonq.tokenizer import tokenize
 
-## I think might be easier to do a tokenizer library in the next update
-def tokenize(query):
-    """
-    This function breaks down a query string into individual tokens by recognizing various elements including:
-    - Function calls with wildcard parameter: func(*)
-    - Function calls with specific parameters: func(param)
-    - Arithmetic operators: +, -, *, /
-    - Quoted strings (both single and double quotes)
-    - Other non-whitespace characters
-    - Commas and parentheses
-    """
-    pattern = r'(\w+\s*\(\s*\*\s*\))|(\w+\s*\(\s*[\w\.\[\]]+\s*\))|\s+\-\s+|\s+\+\s+|\s+\*\s+|\s+\/\s+|\'[^\']*\'|"[^"]*"|[^\s,()]+|,|\(|\)'
-    tokens = []
-    for match in re.finditer(pattern, query):
-        token = match.group(0).strip()
-        if token in ['+', '-', '*', '/'] or re.match(r'\s+[\+\-\*\/]\s+', token):
-            tokens.append(token.strip())
-        elif re.match(r'^\w+\s*\(\s*\*\s*\)$', token):
-            func = re.match(r'^(\w+)\s*\(\s*\*\s*\)$', token).group(1)
-            tokens.append(func)
-            tokens.append('(')
-            tokens.append('*')
-            tokens.append(')')
-        elif re.match(r'^\w+\s*\(\s*[\w\.\[\]]+\s*\)$', token):
-            func = re.match(r'^(\w+)\s*\(\s*', token).group(1)
-            param = re.search(r'\(\s*([\w\.\[\]]+)\s*\)$', token).group(1)
-            tokens.append(func)
-            tokens.append('(')
-            tokens.append(param)
-            tokens.append(')')
-        else:
-            tokens.append(token)
+def tokenize_query(query):
+    if not isinstance(query, str):
+        raise ValueError("Query must be a string")
+    
+    tokens = tokenize(query)
+    
+    if not is_balanced(tokens):
+        raise ValueError("Unbalanced parentheses in query")
+    
     return tokens
 
 def parse_query(tokens):
-    """
-    This function parses a SQL-like query string into fields, conditions, grouping, and sorting components.
-    Parameters
-    ----------
-    tokens : list
-        List of string tokens that make up the query
-    Returns
-    -------
-    tuple
-        A 6-tuple containing:
-        - fields : list
-            List of tuples describing the selected fields/expressions:
-            ('field', field_path, alias) for simple fields
-            ('expression', expression_string, alias) for expressions
-            ('aggregation', function, parameter, alias) for aggregation functions
-        - condition : dict or None
-            Parsed condition tree if IF clause present, None otherwise
-        - group_by : list or None
-            List of fields to group by if GROUP BY clause present, None otherwise
-        - order_by : str or None
-            Field to sort by if SORT clause present, None otherwise
-        - sort_direction : str
-            Sort direction ('asc' or 'desc'), defaults to 'asc'
-        - limit : str or None
-            Number of results to limit to if specified after SORT, None otherwise
-    Raises
-    ------
-    ValueError
-        If the query syntax is invalid or missing required components
-    """
     if not tokens:
         raise ValueError("Empty query. Please provide a valid query (e.g., 'select *').")
     if tokens[0].lower() != 'select':
@@ -75,7 +23,7 @@ def parse_query(tokens):
     fields = []
     
     expecting_field = True
-    while i < len(tokens) and tokens[i].lower() not in ['if', 'sort', 'group']:
+    while i < len(tokens) and tokens[i].lower() not in ['if', 'sort', 'group', 'having', 'from']:
         if tokens[i] == ',':
             if not expecting_field:
                 expecting_field = True
@@ -101,14 +49,14 @@ def parse_query(tokens):
                 field_tokens = [func, '(', param, ')']
                 
                 if i < len(tokens) and tokens[i] in ['+', '-', '*', '/']:
-                    while i < len(tokens) and tokens[i].lower() not in ['if', 'sort', 'group', ',', 'as']:
+                    while i < len(tokens) and tokens[i].lower() not in ['if', 'sort', 'group', 'having', ',', 'as', 'from']:
                         field_tokens.append(tokens[i])
                         i += 1
                         
                 alias = None
                 if i < len(tokens) and tokens[i] == 'as':
                     i += 1
-                    if i < len(tokens) and tokens[i].lower() not in ['if', 'sort', 'group', ',']:
+                    if i < len(tokens) and tokens[i].lower() not in ['if', 'sort', 'group', 'having', ',', 'from']:
                         alias = tokens[i]
                         i += 1
                     else:
@@ -128,7 +76,7 @@ def parse_query(tokens):
                         depth += 1
                     elif token == ')':
                         depth -= 1
-                    elif depth == 0 and token in [',', 'as'] or token.lower() in ['if', 'sort', 'group']:
+                    elif depth == 0 and token in [',', 'as'] or token.lower() in ['if', 'sort', 'group', 'having', 'from']:
                         break
                     field_tokens.append(token)
                     i += 1
@@ -144,7 +92,7 @@ def parse_query(tokens):
                 alias = None
                 if i < len(tokens) and tokens[i] == 'as':
                     i += 1
-                    if i < len(tokens) and tokens[i].lower() not in ['if', 'sort', 'group', ',']:
+                    if i < len(tokens) and tokens[i].lower() not in ['if', 'sort', 'group', 'having', ',', 'from']:
                         alias = tokens[i]
                         i += 1
                     else:
@@ -167,11 +115,20 @@ def parse_query(tokens):
         else:
             break
     
+    from_path = None
+    if i < len(tokens) and tokens[i].lower() == 'from':
+        i += 1
+        if i < len(tokens) and tokens[i].lower() not in ['if', 'sort', 'group', 'having']:
+            from_path = tokens[i]
+            i += 1
+        else:
+            raise ValueError("Expected path after 'from'")
+    
     condition = None
     if i < len(tokens) and tokens[i].lower() == 'if':
         i += 1
         condition_tokens = []
-        while i < len(tokens) and tokens[i].lower() not in ['sort', 'group']:
+        while i < len(tokens) and tokens[i].lower() not in ['sort', 'group', 'having']:
             condition_tokens.append(tokens[i])
             i += 1
         condition = parse_condition(condition_tokens)
@@ -182,7 +139,7 @@ def parse_query(tokens):
         if i < len(tokens) and tokens[i].lower() == 'by':
             i += 1
             group_by_fields = []
-            while i < len(tokens) and tokens[i].lower() not in ['sort']:
+            while i < len(tokens) and tokens[i].lower() not in ['sort', 'having']:
                 if tokens[i] == ',':
                     i += 1
                     continue
@@ -197,6 +154,17 @@ def parse_query(tokens):
             group_by = group_by_fields
         else:
             raise ValueError("Expected 'by' after 'group'")
+    
+    having = None
+    if i < len(tokens) and tokens[i].lower() == 'having':
+        if not group_by:
+            raise ValueError("HAVING clause can only be used with GROUP BY")
+        i += 1
+        having_tokens = []
+        while i < len(tokens) and tokens[i].lower() not in ['sort']:
+            having_tokens.append(tokens[i])
+            i += 1
+        having = parse_condition(having_tokens)
     
     order_by = None
     sort_direction = 'asc'
@@ -218,7 +186,7 @@ def parse_query(tokens):
     if i < len(tokens):
         raise ValueError(f"Unexpected tokens: {' '.join(tokens[i:])}")
     
-    return fields, condition, group_by, order_by, sort_direction, limit
+    return fields, condition, group_by, having, order_by, sort_direction, limit, from_path
 
 def parse_condition(tokens):
     if not tokens:
@@ -273,17 +241,6 @@ def parse_comparison(tokens, pos):
             raise ValueError("Expected operator after field")
 
 def transform_ast(ast):
-    """
-    This function processes AST nodes representing logical operations ('and', 'or') and
-    comparisons, converting them into properly formatted query strings.
-
-    Returns:
-        str: A formatted query string representing the AST node.
-
-    Raises:
-        ValueError: If the AST node format is invalid or if a right-hand value in a
-                   comparison is neither a valid string literal nor a number.
-    """
     if isinstance(ast, tuple):
         if ast[0] in ['and', 'or']:
             left = transform_ast(ast[1])
@@ -358,5 +315,5 @@ def is_balanced(tokens):
     return depth == 0
 
 def parse_query_compat(tokens):
-    fields, condition, group_by, order_by, sort_direction, limit = parse_query(tokens)
+    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
     return fields, condition, order_by, sort_direction, limit

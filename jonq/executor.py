@@ -21,6 +21,11 @@ def run_jq(json_file, jq_filter):
                 raise ValueError(f"Malformed JSON in '{json_file}': Unexpected character found. Check for missing quotes or syntax errors.")
             else:
                 raise ValueError(f"Invalid JSON in '{json_file}': {error_msg}. Please verify your JSON structure.")
+        elif "Cannot index array with string" in error_msg:
+            raise ValueError(
+                f"Error in jq filter '{jq_filter}': {error_msg}\n"
+                "Looks like you’re tryna hit an array without '[]'. Use '[]' to loop through the array.\n"
+            )
         else:
             raise ValueError(f"Error in jq filter '{jq_filter}': {error_msg}")
     return result.stdout, result.stderr

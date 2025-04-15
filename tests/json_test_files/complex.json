@@ -1,0 +1,92 @@
+{
+    "company": {
+      "name": "TechCorp Global",
+      "founded": 2005,
+      "headquarters": {
+        "address": "123 Innovation Way",
+        "city": "San Francisco",
+        "country": "USA",
+        "coordinates": {
+          "latitude": 37.7749,
+          "longitude": -122.4194
+        }
+      },
+      "subsidiaries": [
+        {
+          "name": "TechCorp Asia",
+          "founded": 2010,
+          "headquarters": {
+            "city": "Singapore",
+            "country": "Singapore"
+          },
+          "employees": 250,
+          "financials": {
+            "revenue": 42000000,
+            "profit": 8500000
+          }
+        },
+        {
+          "name": "TechCorp Europe",
+          "founded": 2008,
+          "headquarters": {
+            "city": "Berlin",
+            "country": "Germany"
+          },
+          "employees": 300,
+          "financials": {
+            "revenue": 58000000,
+            "profit": 12000000
+          }
+        }
+      ]
+    },
+    "products": [
+      {
+        "id": "P001",
+        "name": "Enterprise Suite",
+        "type": "Software",
+        "launched": 2012,
+        "versions": [
+          {
+            "version": "1.0",
+            "released": "2012-05-15",
+            "pricing": {
+              "monthly": 199.99,
+              "yearly": 1999.99
+            }
+          },
+          {
+            "version": "2.0",
+            "released": "2015-06-30",
+            "pricing": {
+              "monthly": 299.99,
+              "yearly": 2999.99
+            }
+          }
+        ],
+        "customers": [
+          {"id": "C001", "name": "Acme Corp", "industry": "Manufacturing"},
+          {"id": "C002", "name": "Globex", "industry": "Finance"}
+        ]
+      },
+      {
+        "id": "P002",
+        "name": "Security Shield",
+        "type": "Software",
+        "launched": 2015,
+        "versions": [
+          {
+            "version": "1.0",
+            "pricing": {
+              "monthly": 149.99,
+              "yearly": 1499.99
+            }
+          }
+        ],
+        "customers": [
+          {"id": "C001", "name": "Acme Corp", "industry": "Manufacturing"},
+          {"id": "C003", "name": "Initech", "industry": "Technology"}
+        ]
+      }
+    ]
+  }

@@ -59,6 +59,8 @@ While jq is incredibly powerful, its syntax is a pain to use. I can't be the onl
 | Count items | `jq 'map(select(.age > 25)) \| length'` | `jonq data.json "select count(*) as count_over_25 if age > 25"` |
 | Group & aggregate | `jq 'group_by(.city) \| map({city: .[0].city, count: length})'` | `jonq data.json "select city, count(*) as user_count group by city"` |
 | Complex filters | `jq '.[] \| select(.age > 25 and (.city == "New York" or .city == "Chicago"))'` | `jonq data.json "select * if age > 25 and (city = 'New York' or city = 'Chicago')"` |
+| Group & filter by count | `jq 'group_by(.city) \| map(select(length > 2)) \| map({city: .[0].city, count: length})'` | `jonq data.json "select city, count(*) as count group by city having count > 2"` |
+| Group & filter by avg | `jq 'group_by(.city) \| map({city: .[0].city, avg_age: (map(.age) \| add / length)}) \| map(select(.avg_age > 30))'` | `jonq data.json "select city, avg(age) as avg_age group by city having avg_age > 30"` | 
 
 As you can see, jonq offers:
 - **Simpler syntax**: I'm not sure how much simpler can it get
@@ -268,6 +270,13 @@ jonq nested.json "select profile.address.city, avg(profile.age) as avg_age group
 
 # Group by city and get total orders and average order price
 jonq nested.json "select profile.address.city, count(orders) as order_count, avg(orders.price) as avg_price group by profile.address.city"
+```
+
+## Grouping and Having 
+
+```bash
+# Select age and city with average age above 25
+jonq nested.json "select profile.address.city, avg(profile.age) as avg_age group by profile.address.city having avg_age > 25"
 ```
 
 ## Output Formats

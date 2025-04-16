@@ -345,6 +345,44 @@ Input: `jonq nested.json "select profile.address.city, avg(profile.age) as avg_a
 ]
 ```
 
+### Using FROM clause to query nested arrays:
+
+Input: `jonq nested.json "select order_id, item, price from [].orders"`
+
+```json
+[
+  {
+    "order_id": 101,
+    "item": "Laptop",
+    "price": 1200
+  },
+  {
+    "order_id": 102,
+    "item": "Phone",
+    "price": 800
+  },
+  {
+    "order_id": 103,
+    "item": "Tablet",
+    "price": 500
+  }
+]
+```
+
+### Filtering nested arrays with FROM:
+
+Input: `jonq nested.json "select order_id, item, price from [].orders if price > 800"`
+
+```json
+[
+  {
+    "order_id": 101,
+    "item": "Laptop",
+    "price": 1200
+  }
+]
+```
+
 =====================================================
 
 ## complex.json
@@ -459,12 +497,49 @@ Input: `jonq complex.json "select company.name, company.headquarters.city"`
 ]
 ```
 
+Input: `jonq complex.json "select name, founded from company.subsidiaries[] if founded > 2008"`
+
+```json
+[
+  {
+    "name": "TechCorp Asia",
+    "founded": 2010
+  }
+]
+```
+
 ### Combine aggregation of nested arrays:
 
-Input: `jonq complex.json "select avg(products[].versions[].pricing.monthly) as avg_price"`
+Input: `jonq complex.json "select avg(products[].versions[].pricing.monthly) as avg_price`
 
 ```json
 {
   "avg_price": 216.65666666666667
 }
 ```
+
+Input: `jonq complex.json "select sum(company.subsidiaries[].financials.profit) as total_profit"`
+
+```json
+{
+  "total_profit": 20500000
+}
+```
+
+### Complex queries: 
+
+Input: `jonq complex.json "select name, avg(versions[].pricing.monthly) as avg_monthly_price from products[]"`
+
+```json
+[
+  {
+    "name": "Enterprise Suite",
+    "avg_monthly_price": 249.99
+  },
+  {
+    "name": "Security Shield",
+    "avg_monthly_price": 149.99
+  }
+]
+```
+

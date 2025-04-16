@@ -23,13 +23,14 @@ class Token:
 def tokenize_with_lexer(query):
     token_specs = [
         ('WHITESPACE', r'\s+'),
-        ('KEYWORD', r'\b(?i:select|if|sort|group|by|having|as|and|or|asc|desc)\b'),
+        ('KEYWORD', r'\b(?i:select|if|sort|group|by|having|as|and|or|asc|desc|from)\b'),
         ('FUNCTION_CALL', r'\w+\s*\(\s*\*\s*\)'),
         ('FUNCTION_PARAM', r'\w+\s*\(\s*[\w\.\[\]]+\s*\)'),
-        ('OPERATOR', r'<=|>=|!=|=|<|>|\+|\-|\*|\/'),
+        ('OPERATOR', r'<=|>=|!=|=|<|>|\+|\*|\/'),
+        ('ARITHMETIC_MINUS', r'\s-\s'),
         ('STRING', r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\''),
         ('NUMBER', r'\d+(?:\.\d+)?'),
-        ('IDENTIFIER', r'[\w\.\[\]]+'),
+        ('IDENTIFIER', r'[\w\.\[\]\-]+'),
         ('PUNCTUATION', r'[,\(\)]'),
         ('INVALID', r'.'),
     ]
@@ -71,6 +72,9 @@ def tokenize_with_lexer(query):
 
         elif token_type == 'OPERATOR':
             tokens.append(Token(TokenType.OPERATOR, value, position))
+            
+        elif token_type == 'ARITHMETIC_MINUS':
+            tokens.append(Token(TokenType.OPERATOR, '-', position))
 
         elif token_type == 'STRING':
             tokens.append(Token(TokenType.STRING, value, position))
@@ -86,7 +90,7 @@ def tokenize_with_lexer(query):
 
         pos = match.end()
 
-    if pos < len(query):
+    if pos < len(query) and not query[pos:].isspace():
         raise ValueError(f"Unexpected character '{query[pos]}' at position {pos}")
 
     simple_tokens = [token.value for token in tokens]

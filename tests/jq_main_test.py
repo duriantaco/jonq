@@ -6,12 +6,26 @@ def test_main_success(tmp_path, capsys):
     json_file = tmp_path / "test.json"
     json_file.write_text('{"name": "Alice", "age": 30}')
     with patch("sys.argv", ["jonq", str(json_file), "select name"]):
-        with patch("jonq.main.parse_query", return_value=(["name"], None, None, None, None, None)):
+        with patch("jonq.main.parse_query", return_value=([('field', 'name', 'name')], None, None, None, None, 'asc', None, None)):
             with patch("jonq.main.generate_jq_filter", return_value=".name"):
                 with patch("jonq.main.run_jq", return_value=('"Alice"\n', "")):
                     main()
     captured = capsys.readouterr()
     assert '"Alice"' in captured.out
+    assert captured.err == ""
+
+def test_main_with_from_clause(tmp_path, capsys):
+    json_file = tmp_path / "test.json"
+    json_file.write_text('{"products": [{"type": "Software", "customers": [1, 2, 3]}]}')
+    with patch("sys.argv", ["jonq", str(json_file), "select type, count(customers) as count from products"]):
+        with patch("jonq.main.parse_query", 
+                   return_value=([('field', 'type', 'type'), ('aggregation', 'count', 'customers', 'count')], 
+                                 None, None, None, None, 'asc', None, 'products')):
+            with patch("jonq.main.generate_jq_filter", return_value=".products | map({ \"type\": (.type? // null), \"count\": (.customers? | length) })"):
+                with patch("jonq.main.run_jq", return_value=('[{"type":"Software","count":3}]\n', "")):
+                    main()
+    captured = capsys.readouterr()
+    assert '[{"type":"Software","count":3}]' in captured.out
     assert captured.err == ""
 
 def test_main_file_not_found(capsys):
@@ -58,7 +72,7 @@ def test_main_jq_execution_error(tmp_path, capsys):
     json_file = tmp_path / "test.json"
     json_file.write_text('{"name": "Alice"}')
     with patch("sys.argv", ["jonq", str(json_file), "select name"]):
-        with patch("jonq.main.parse_query", return_value=(["name"], None, None, None, None, None)):
+        with patch("jonq.main.parse_query", return_value=([('field', 'name', 'name')], None, None, None, None, 'asc', None, None)):
             with patch("jonq.main.generate_jq_filter", return_value=".name"):
                 with patch("jonq.main.run_jq", side_effect=RuntimeError("JQ error")):
                     with pytest.raises(SystemExit) as excinfo:

@@ -6,12 +6,9 @@ from jonq.tokenizer import tokenize
 def tokenize_query(query):
     if not isinstance(query, str):
         raise ValueError("Query must be a string")
-    
     tokens = tokenize(query)
-    
     if not is_balanced(tokens):
         raise ValueError("Unbalanced parentheses in query")
-    
     return tokens
 
 def parse_query(tokens):
@@ -21,7 +18,6 @@ def parse_query(tokens):
         raise ValueError("Query must start with 'select'")
     i = 1
     fields = []
-    
     expecting_field = True
     while i < len(tokens) and tokens[i].lower() not in ['if', 'sort', 'group', 'having', 'from']:
         if tokens[i] == ',':
@@ -31,28 +27,23 @@ def parse_query(tokens):
             else:
                 raise ValueError(f"Unexpected comma at position {i}")
             continue
-            
         if expecting_field:
             if tokens[i] == '*':
                 fields.append(('field', '*', '*'))
                 i += 1
                 expecting_field = False
                 continue
-                
             field_tokens = []
             start = i
-            
             if i+3 < len(tokens) and tokens[i+1] == '(' and tokens[i+3] == ')':
                 func = tokens[i]
                 param = tokens[i+2]
                 i += 4
                 field_tokens = [func, '(', param, ')']
-                
                 if i < len(tokens) and tokens[i] in ['+', '-', '*', '/']:
                     while i < len(tokens) and tokens[i].lower() not in ['if', 'sort', 'group', 'having', ',', 'as', 'from']:
                         field_tokens.append(tokens[i])
                         i += 1
-                        
                 alias = None
                 if i < len(tokens) and tokens[i] == 'as':
                     i += 1
@@ -61,7 +52,6 @@ def parse_query(tokens):
                         i += 1
                     else:
                         raise ValueError("Expected alias after 'as'")
-                
                 if len(field_tokens) > 4:
                     alias = alias or f"expr_{len(fields) + 1}"
                     fields.append(('expression', ' '.join(field_tokens), alias))
@@ -80,7 +70,6 @@ def parse_query(tokens):
                         break
                     field_tokens.append(token)
                     i += 1
-                    
                 if not field_tokens:
                     raise ValueError("Expected field name")
                 if len(field_tokens) > 1:
@@ -88,7 +77,6 @@ def parse_query(tokens):
                         if (re.match(r'[a-zA-Z_][a-zA-Z0-9_.]*$', field_tokens[j]) or field_tokens[j].isdigit()) and \
                            (re.match(r'[a-zA-Z_][a-zA-Z0-9_.]*$', field_tokens[j+1]) or field_tokens[j+1].isdigit()):
                             raise ValueError(f"Unexpected tokens: {' '.join(tokens[start:])}")
-                            
                 alias = None
                 if i < len(tokens) and tokens[i] == 'as':
                     i += 1
@@ -97,7 +85,6 @@ def parse_query(tokens):
                         i += 1
                     else:
                         raise ValueError("Expected alias after 'as'")
-                        
                 if len(field_tokens) == 1:
                     field_token = field_tokens[0]
                     if (field_token.startswith('"') and field_token.endswith('"')) or \
@@ -110,11 +97,9 @@ def parse_query(tokens):
                     expression = ' '.join(field_tokens)
                     alias = alias or f"expr_{len(fields) + 1}"
                     fields.append(('expression', expression, alias))
-                    
             expecting_field = False
         else:
             break
-    
     from_path = None
     if i < len(tokens) and tokens[i].lower() == 'from':
         i += 1
@@ -123,7 +108,6 @@ def parse_query(tokens):
             i += 1
         else:
             raise ValueError("Expected path after 'from'")
-    
     condition = None
     if i < len(tokens) and tokens[i].lower() == 'if':
         i += 1
@@ -132,7 +116,6 @@ def parse_query(tokens):
             condition_tokens.append(tokens[i])
             i += 1
         condition = parse_condition(condition_tokens)
-    
     group_by = None
     if i < len(tokens) and tokens[i].lower() == 'group':
         i += 1
@@ -154,7 +137,6 @@ def parse_query(tokens):
             group_by = group_by_fields
         else:
             raise ValueError("Expected 'by' after 'group'")
-    
     having = None
     if i < len(tokens) and tokens[i].lower() == 'having':
         if not group_by:
@@ -165,7 +147,6 @@ def parse_query(tokens):
             having_tokens.append(tokens[i])
             i += 1
         having = parse_condition(having_tokens)
-    
     order_by = None
     sort_direction = 'asc'
     limit = None
@@ -182,10 +163,8 @@ def parse_query(tokens):
                 i += 1
         else:
             raise ValueError("Expected field name after 'sort'")
-    
     if i < len(tokens):
         raise ValueError(f"Unexpected tokens: {' '.join(tokens[i:])}")
-    
     return fields, condition, group_by, having, order_by, sort_direction, limit, from_path
 
 def parse_condition(tokens):
@@ -226,42 +205,25 @@ def parse_comparison(tokens, pos):
         else:
             raise ValueError("Unbalanced parentheses")
     else:
-        left = tokens[pos]
-        pos += 1
-        if pos < len(tokens) and tokens[pos] in ['=', '!=', '>', '<', '>=', '<=']:
-            op = tokens[pos]
-            pos += 1
-            if pos < len(tokens):
-                right = tokens[pos]
-                pos += 1
-                return ('comparison', left, op, right), pos
-            else:
-                raise ValueError("Expected value after operator")
-        else:
-            raise ValueError("Expected operator after field")
+        if pos + 2 < len(tokens):
+            field = tokens[pos]
+            op = tokens[pos + 1]
+            value = tokens[pos + 2]
+            if op in ['=', '==', '!=', '>', '<', '>=', '<=']:
+                return {'type': 'comparison', 'field': field, 'op': op, 'value': value}, pos + 3
+        raise ValueError(f"Invalid comparison at position {pos}")
 
 def transform_ast(ast):
-    if isinstance(ast, tuple):
-        if ast[0] in ['and', 'or']:
-            left = transform_ast(ast[1])
-            right = transform_ast(ast[2])
-            return f"({left} {ast[0]} {right})"
-        elif ast[0] == 'comparison':
-            left_token = ast[1]
-            left = transform_field(left_token)
-            op = transform_operator(ast[2])
-            right_token = ast[3]
-            if (right_token.startswith('"') and right_token.endswith('"')) or (right_token.startswith("'") and right_token.endswith("'")):
-                content = right_token[1:-1]
-                if (left_token.startswith('"') and left_token.endswith('"')) or (left_token.startswith("'") and left_token.endswith("'")):
-                    right = f"'{content}'"
-                else:
-                    right = json.dumps(content)
-            elif right_token.isdigit():
-                right = right_token
-            else:
-                raise ValueError(f"Invalid value: {right_token}")
-            return f"{left} {op} {right}"
+    if isinstance(ast, dict) and ast.get('type') == 'comparison':
+        field = transform_field(ast['field'])
+        op = transform_operator(ast['op'])
+        value = transform_value(ast['value'])
+        return f"{field} {op} {value}"
+    elif isinstance(ast, tuple):
+        op, left, right = ast
+        left_cond = transform_ast(left)
+        right_cond = transform_ast(right)
+        return f"({left_cond} {op} {right_cond})"
     else:
         raise ValueError(f"Invalid AST node: {ast}")
 
@@ -284,13 +246,14 @@ def transform_value(token):
         raise ValueError(f"Invalid value: {token}")
 
 def transform_operator(op):
-    return '==' if op == '=' else op
+    if op in ['=', '==']:
+        return '=='
+    return op
 
 def find_lowest_precedence_operator(tokens):
     depth = 0
     or_idx = -1
     and_idx = -1
-    
     for i, token in enumerate(tokens):
         if token == '(':
             depth += 1
@@ -300,7 +263,6 @@ def find_lowest_precedence_operator(tokens):
             or_idx = i
         elif depth == 0 and token.lower() == 'and' and or_idx == -1:
             and_idx = i
-    
     return or_idx if or_idx != -1 else and_idx
 
 def is_balanced(tokens):

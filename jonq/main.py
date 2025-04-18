@@ -1,27 +1,20 @@
+#!/usr/bin/env python3
 import sys
 import os
-from jonq.query_parser import tokenize, parse_query
+import json
+import logging
+import re
+from jonq.query_parser import tokenize_query, parse_query
 from jonq.jq_filter import generate_jq_filter
 from jonq.executor import run_jq, run_jq_streaming
 from jonq.csv_utils import json_to_csv
-import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def main():
-    """
-    jonq Command Line Interface.
-
-    This is the entry point for jonq cli.
-    It parses queries, translates them to jq filters, and executes them.
-    """
     if len(sys.argv) > 1 and sys.argv[1] in ['-h', '--help']:
-        print("Usage: jonq <path/json_file> <query> [options]")
-        print("\nOptions:")
-        print("  --format, -f csv|json   Output format (default: json)")
-        print("  --stream, -s            Process large files in streaming mode (for arrays)")
-        print("  -h, --help              Show this help message")
+        print_help()
         sys.exit(0)
         
     if len(sys.argv) < 3:
@@ -32,78 +25,128 @@ def main():
     json_file = sys.argv[1]
     query = sys.argv[2]
     
-    output_format = "json"
-    use_streaming = False
+    options = parse_options(sys.argv[3:])
     
-    i = 3
-    while i < len(sys.argv):
-        if sys.argv[i] in ["--format", "-f"] and i + 1 < len(sys.argv):
-            if sys.argv[i + 1].lower() == "csv":
-                output_format = "csv"
-            i += 2
-        elif sys.argv[i] in ["--stream", "-s"]:
-            use_streaming = True
-            i += 1
-        else:
-            print(f"Unknown option: {sys.argv[i]}")
-            print("Try 'jonq --help' for more information.")
-            sys.exit(1)
-            
     try:
-        if not os.path.exists(json_file):
-            raise FileNotFoundError(f"JSON file '{json_file}' not found. Please check the file path.")
-        if not os.path.isfile(json_file):
-            raise FileNotFoundError(f"JSON file '{json_file}' not found.")
-        if not os.access(json_file, os.R_OK):
-            raise PermissionError(f"Cannot read JSON file '{json_file}'.")
+        validate_input_file(json_file)
         
-        file_size = os.path.getsize(json_file)
-        if file_size == 0:
-            raise ValueError(f"JSON file '{json_file}' is empty. Please provide a non-empty JSON file.")
+        try:
+            tokens = tokenize_query(query)
+            parse_result = parse_query(tokens)
+            fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_result
+            
+            jq_filter = generate_jq_filter(
+                fields, condition, group_by, having, 
+                order_by, sort_direction, limit, from_path
+            )
+        except Exception as e:
+            raise ValueError(f"{str(e)}")
         
-        tokens = tokenize(query)
-        fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-        jq_filter = generate_jq_filter(fields, condition, group_by, having, order_by, sort_direction, limit, from_path)
-        
-        if use_streaming:
+        if options['streaming']:
             logger.info("Using streaming mode for processing")
             stdout, stderr = run_jq_streaming(json_file, jq_filter)
         else:
             stdout, stderr = run_jq(json_file, jq_filter)
         
-        import json
+        if stderr:
+            if "Cannot iterate over null" in stderr:
+                raise RuntimeError(f"Cannot iterate over null values in your JSON. Check field paths in query: {query}")
+            elif "is not defined" in stderr and any(x in stderr for x in ["avg/1", "max/1", "min/1", "sum/1"]):
+                raise RuntimeError(f"Error in aggregation function. Make sure your field paths exist in the JSON.")
+            elif "array" in stderr and "number" in stderr and "cannot be divided" in stderr:
+                raise RuntimeError(f"Error: Trying to perform division on an array. Check your aggregation functions.")
+            elif "Unexpected token" in stderr:
+                raise RuntimeError(f"JQ syntax error. Your query contains invalid operators or field references.")
+            else:
+                raise RuntimeError(f"Error in jq filter: {stderr}")
+        
         logger.info(f"jq returned output length: {len(stdout)}")
         try:
             result_data = json.loads(stdout)
-            logger.info(f"jq output type: {type(result_data)}, content: {json.dumps(result_data)[:200]}")
+            result_type = type(result_data).__name__
+            if isinstance(result_data, (list, dict)):
+                preview = json.dumps(result_data)[:200]
+                if len(preview) < len(json.dumps(result_data)):
+                    preview += "..."
+            else:
+                preview = str(result_data)
+            logger.info(f"jq output type: {result_type}, content: {preview}")
         except Exception as e:
             logger.info(f"Could not parse jq output: {e}")
 
         if stdout:
-            if output_format == "csv":
+            if options['format'] == "csv":
                 csv_output = json_to_csv(stdout)
                 print(csv_output.strip())
             else:
                 print(stdout.strip())
                 
-        if stderr:
-            logger.error(f"JQ error: {stderr}")
-            
-    except ValueError as e:
-        print(f"Query Error: {e}. Please check your query syntax.")
-        sys.exit(1)
-    except FileNotFoundError as e:
-        print(f"File Error: {e}")
-        sys.exit(1)
-    except PermissionError as e:
-        print(f"Permission Error: {e}")
-        sys.exit(1)
-    except RuntimeError as e:
-        print(f"Execution Error: {e}")
-        sys.exit(1)
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        sys.exit(1)
+        handle_error(e)
+
+def print_help():
+    print("jonq - SQL-like query tool for JSON data")
+    print("\nUsage: jonq <path/json_file> <query> [options]")
+    print("\nOptions:")
+    print("  --format, -f csv|json   Output format (default: json)")
+    print("  --stream, -s            Process large files in streaming mode (for arrays)")
+    print("  -h, --help              Show this help message")
+    print("\nExamples:")
+    print("  jonq data.json \"select * from []\"")
+    print("  jonq data.json \"select name, age from [] if age > 30\"")
+    print("  jonq data.json \"select city, count(*) as count group by city\"")
+    print("  jonq data.json \"select products[].name, count(products[].versions[]) as version_count\"")
+    print("  jonq data.json \"select name from products[] if versions[].pricing.monthly > 200\"")
+    print("\nAdvanced operators:")
+    print("  - Use 'between' for range checks: \"if age between 20 and 30\"")
+    print("  - Use 'contains' for substring checks: \"if name contains 'John'\"")
+
+def parse_options(args):
+    options = {
+        'format': 'json',
+        'streaming': False
+    }
+    
+    i = 0
+    while i < len(args):
+        if args[i] in ["--format", "-f"] and i + 1 < len(args):
+            if args[i + 1].lower() == "csv":
+                options['format'] = "csv"
+            i += 2
+        elif args[i] in ["--stream", "-s"]:
+            options['streaming'] = True
+            i += 1
+        else:
+            print(f"Unknown option: {args[i]}")
+            print("Try 'jonq --help' for more information.")
+            sys.exit(1)
+            
+    return options
+
+def validate_input_file(json_file):
+    if not os.path.exists(json_file):
+        raise FileNotFoundError(f"JSON file '{json_file}' not found. Please check the file path.")
+    if not os.path.isfile(json_file):
+        raise FileNotFoundError(f"'{json_file}' is not a file.")
+    if not os.access(json_file, os.R_OK):
+        raise PermissionError(f"Cannot read JSON file '{json_file}'. Check file permissions.")
+    
+    file_size = os.path.getsize(json_file)
+    if file_size == 0:
+        raise ValueError(f"JSON file '{json_file}' is empty. Please provide a non-empty JSON file.")
+
+def handle_error(error):
+    if isinstance(error, ValueError):
+        print(f"Query Error: {error}")
+    elif isinstance(error, FileNotFoundError):
+        print(f"File Error: {error}")
+    elif isinstance(error, PermissionError):
+        print(f"Permission Error: {error}")
+    elif isinstance(error, RuntimeError):
+        print(f"Execution Error: {error}")
+    else:
+        print(f"An unexpected error occurred: {error}")
+    sys.exit(1)
 
 if __name__ == '__main__':
     main()

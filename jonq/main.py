@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import os
-import json
 import logging
-import re
 from jonq.query_parser import tokenize_query, parse_query
 from jonq.jq_filter import generate_jq_filter
 from jonq.executor import run_jq, run_jq_streaming
@@ -24,23 +22,13 @@ def main():
         
     json_file = sys.argv[1]
     query = sys.argv[2]
-    
     options = parse_options(sys.argv[3:])
     
     try:
         validate_input_file(json_file)
-        
-        try:
-            tokens = tokenize_query(query)
-            parse_result = parse_query(tokens)
-            fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_result
-            
-            jq_filter = generate_jq_filter(
-                fields, condition, group_by, having, 
-                order_by, sort_direction, limit, from_path
-            )
-        except Exception as e:
-            raise ValueError(f"{str(e)}")
+        tokens = tokenize_query(query)
+        fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
+        jq_filter = generate_jq_filter(fields, condition, group_by, having, order_by, sort_direction, limit, from_path)
         
         if options['streaming']:
             logger.info("Using streaming mode for processing")
@@ -53,27 +41,9 @@ def main():
                 raise RuntimeError(f"Cannot iterate over null values in your JSON. Check field paths in query: {query}")
             elif "is not defined" in stderr and any(x in stderr for x in ["avg/1", "max/1", "min/1", "sum/1"]):
                 raise RuntimeError(f"Error in aggregation function. Make sure your field paths exist in the JSON.")
-            elif "array" in stderr and "number" in stderr and "cannot be divided" in stderr:
-                raise RuntimeError(f"Error: Trying to perform division on an array. Check your aggregation functions.")
-            elif "Unexpected token" in stderr:
-                raise RuntimeError(f"JQ syntax error. Your query contains invalid operators or field references.")
             else:
                 raise RuntimeError(f"Error in jq filter: {stderr}")
         
-        logger.info(f"jq returned output length: {len(stdout)}")
-        try:
-            result_data = json.loads(stdout)
-            result_type = type(result_data).__name__
-            if isinstance(result_data, (list, dict)):
-                preview = json.dumps(result_data)[:200]
-                if len(preview) < len(json.dumps(result_data)):
-                    preview += "..."
-            else:
-                preview = str(result_data)
-            logger.info(f"jq output type: {result_type}, content: {preview}")
-        except Exception as e:
-            logger.info(f"Could not parse jq output: {e}")
-
         if stdout:
             if options['format'] == "csv":
                 csv_output = json_to_csv(stdout)
@@ -94,19 +64,9 @@ def print_help():
     print("\nExamples:")
     print("  jonq data.json \"select * from []\"")
     print("  jonq data.json \"select name, age from [] if age > 30\"")
-    print("  jonq data.json \"select city, count(*) as count group by city\"")
-    print("  jonq data.json \"select products[].name, count(products[].versions[]) as version_count\"")
-    print("  jonq data.json \"select name from products[] if versions[].pricing.monthly > 200\"")
-    print("\nAdvanced operators:")
-    print("  - Use 'between' for range checks: \"if age between 20 and 30\"")
-    print("  - Use 'contains' for substring checks: \"if name contains 'John'\"")
 
 def parse_options(args):
-    options = {
-        'format': 'json',
-        'streaming': False
-    }
-    
+    options = {'format': 'json', 'streaming': False}
     i = 0
     while i < len(args):
         if args[i] in ["--format", "-f"] and i + 1 < len(args):
@@ -118,22 +78,18 @@ def parse_options(args):
             i += 1
         else:
             print(f"Unknown option: {args[i]}")
-            print("Try 'jonq --help' for more information.")
             sys.exit(1)
-            
     return options
 
 def validate_input_file(json_file):
     if not os.path.exists(json_file):
-        raise FileNotFoundError(f"JSON file '{json_file}' not found. Please check the file path.")
+        raise FileNotFoundError(f"JSON file '{json_file}' not found.")
     if not os.path.isfile(json_file):
         raise FileNotFoundError(f"'{json_file}' is not a file.")
     if not os.access(json_file, os.R_OK):
-        raise PermissionError(f"Cannot read JSON file '{json_file}'. Check file permissions.")
-    
-    file_size = os.path.getsize(json_file)
-    if file_size == 0:
-        raise ValueError(f"JSON file '{json_file}' is empty. Please provide a non-empty JSON file.")
+        raise PermissionError(f"Cannot read JSON file '{json_file}'.")
+    if os.path.getsize(json_file) == 0:
+        raise ValueError(f"JSON file '{json_file}' is empty.")
 
 def handle_error(error):
     if isinstance(error, ValueError):

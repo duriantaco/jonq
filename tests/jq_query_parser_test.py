@@ -285,7 +285,6 @@ def test_complex_query_with_multiple_features():
     assert limit == '5'
     assert from_path is None
 
-# New tests for FROM clause
 def test_select_with_from_clause():
     tokens = tokenize("select type, count(customers) as customer_count from products")
     fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)

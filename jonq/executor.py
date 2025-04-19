@@ -5,9 +5,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 def run_jq(json_file, jq_filter):
-    """
-    Run jq filter on a JSON file and return stdout/stderr.
-    """
     cmd = ['jq', jq_filter, json_file]
     result = subprocess.run(cmd, text=True, capture_output=True)
     if result.returncode != 0:

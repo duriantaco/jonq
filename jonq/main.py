@@ -7,10 +7,15 @@ from jonq.jq_filter import generate_jq_filter
 from jonq.executor import run_jq, run_jq_streaming
 from jonq.csv_utils import json_to_csv
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def main():
+
+    logging.basicConfig(
+        format='%(levelname)s:%(name)s:%(message)s',
+        level=logging.INFO
+    )
+
     if len(sys.argv) > 1 and sys.argv[1] in ['-h', '--help']:
         print_help()
         sys.exit(0)

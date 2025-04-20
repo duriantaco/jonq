@@ -70,7 +70,7 @@ def parse_condition_for_from(tokens):
     condition_str = re.sub(r"'([^']*)'", r'"\1"', condition_str)
     condition_str = condition_str.replace(" = = ", " == ").replace("==", " == ")
     condition = ast_parse_condition(condition_str)
-    return generate_jq_condition(condition, "array")
+    return generate_jq_condition(condition, "array").replace('?', '')
 
 def parse_condition(tokens):
     if not tokens:
@@ -168,6 +168,9 @@ def parse_query(tokens):
                 if not field_tokens:
                     raise ValueError("Expected field name")
                     
+                if len(field_tokens) > 1 and all(t.isidentifier() for t in field_tokens):
+                    raise ValueError(f"Unexpected token {field_tokens[1]!r} after field name")
+            
                 alias = None
                 if i < len(tokens) and tokens[i] == 'as':
                     i += 1
@@ -248,12 +251,21 @@ def parse_query(tokens):
             i += 1
         having = " ".join(having_tokens)
     
+    if i < len(tokens) and tokens[i].lower() == 'from':
+        i += 1
+        if i < len(tokens) and tokens[i].lower() not in ['sort']:
+            from_path = tokens[i]
+            i += 1
+        else:
+            raise ValueError("Expected path after 'from'")
+        
     order_by = None
     sort_direction = 'asc'
     limit = None
     if i < len(tokens) and tokens[i].lower() == 'sort':
         i += 1
         if i < len(tokens):
+            
             order_by = tokens[i]
             i += 1
             if i < len(tokens) and tokens[i].lower() in ['desc', 'asc']:
@@ -262,10 +274,20 @@ def parse_query(tokens):
             if i < len(tokens) and tokens[i].isdigit():
                 limit = tokens[i]
                 i += 1
+            if i < len(tokens) and tokens[i].lower() == 'from':
+                i += 1
+                if i < len(tokens):
+                    from_path = tokens[i]
+                    i += 1
+                else:
+                    raise ValueError("Expected path after 'from'")
+ 
+    if from_path is None and i < len(tokens) and tokens[i].lower() == 'from':
+        i += 1
+        if i < len(tokens):
+            from_path = tokens[i]
+            i += 1
         else:
-            raise ValueError("Expected field name after 'sort'")
-
-        if i < len(tokens) and tokens[i].lower() == 'from':
-            pass
+            raise ValueError("Expected path after 'from'")
 
     return fields, condition, group_by, having, order_by, sort_direction, limit, from_path

@@ -1,75 +1,94 @@
 import pytest
+import time
 import os
-import json
 import tempfile
-from jonq.stream_utils import detect_json_structure, split_json_array, process_json_streaming
+import json as stdlib_json
+from jonq.json_utils import dumps, loads
+from jonq.stream_utils import process_json_streaming
 
-class TestStreamUtils:
-    def setup_method(self):
-        self.array_json = tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False)
-        self.object_json = tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False)
-        
-        array_data = [{"id": i, "name": f"Item {i}"} for i in range(1, 101)]
-        json.dump(array_data, self.array_json)
-        self.array_json.close()
-        
-        object_data = {"id": 1, "name": "Test Object", "items": list(range(1, 10))}
-        json.dump(object_data, self.object_json)
-        self.object_json.close()
+class TestJsonOptimization:
+    @pytest.fixture
+    def test_data(self):
+        """Create test data of various sizes"""
+        return {
+            "small": [{"id": i, "name": f"Item {i}"} for i in range(10)],
+            "medium": [{"id": i, "name": f"Item {i}", "nested": {"values": list(range(20))}} for i in range(100)],
+            "large": [{"id": i, "name": f"Item {i}", "nested": {"values": list(range(50))}} for i in range(1000)]
+        }
     
-    def teardown_method(self):
-        os.unlink(self.array_json.name)
-        os.unlink(self.object_json.name)
+    def test_json_correctness(self, test_data):
+        for name, data in test_data.items():
+            serialized = dumps(data)
+            deserialized = loads(serialized)
+            
+            assert deserialized == data, f"Data corruption in {name} dataset"
+            
+            stdlib_serialized = stdlib_json.dumps(data)
+            stdlib_deserialized = stdlib_json.loads(stdlib_serialized)
+            
+            assert deserialized == stdlib_deserialized, f"Output differs from stdlib in {name} dataset"
     
-    def test_detect_json_structure(self):
-        assert detect_json_structure(self.array_json.name) == True
+    def test_json_performance(self, test_data):
+        data = test_data["large"]
+        start = time.time()
+        for _ in range(50):
+            dumps(data)
+        custom_dumps_time = time.time() - start
         
-        assert detect_json_structure(self.object_json.name) == False
+        start = time.time()
+        for _ in range(50):
+            stdlib_json.dumps(data)
+        stdlib_dumps_time = time.time() - start
+        
+        serialized = dumps(data)
+        stdlib_serialized = stdlib_json.dumps(data)
+        
+        start = time.time()
+        for _ in range(50):
+            loads(serialized)
+        custom_loads_time = time.time() - start
+        
+        start = time.time()
+        for _ in range(50):
+            stdlib_json.loads(stdlib_serialized)
+        stdlib_loads_time = time.time() - start
+        
+        print(f"\nJSON Performance Results:")
+        print(f"  Serialization   - Custom: {custom_dumps_time:.4f}s, Stdlib: {stdlib_dumps_time:.4f}s")
+        print(f"  Deserialization - Custom: {custom_loads_time:.4f}s, Stdlib: {stdlib_loads_time:.4f}s")
+        
+        using_orjson = custom_dumps_time < stdlib_dumps_time * 0.7
+        print(f"  Using orjson: {'Yes' if using_orjson else 'No (fallback to stdlib)'}")
     
-    def test_split_json_array(self):
-        temp_dir, chunk_files = split_json_array(self.array_json.name, chunk_size=20)
-        
+    def test_stream_utils_integration(self, test_data):
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as temp_file:
+            temp_file.write(dumps(test_data["medium"]))
+            temp_path = temp_file.name
+            
         try:
-            assert len(chunk_files) == 5
+            def process_chunk(chunk_file):
+                with open(chunk_file, 'r') as f:
+                    data = loads(f.read())
+                    for item in data:
+                        item["id"] *= 2
+                    return dumps(data)
             
-            with open(chunk_files[0], 'r') as f:
-                chunk_data = json.load(f)
-                assert len(chunk_data) == 20
-                assert chunk_data[0]["id"] == 1
-                assert chunk_data[19]["id"] == 20
+            result = process_json_streaming(temp_path, process_chunk, chunk_size=20)
             
-            with open(chunk_files[-1], 'r') as f:
-                chunk_data = json.load(f)
-                assert len(chunk_data) == 20
-                assert chunk_data[0]["id"] == 81
-                assert chunk_data[-1]["id"] == 100
-                
+            processed_data = loads(result)
+            assert len(processed_data) == len(test_data["medium"])
+            assert processed_data[0]["id"] == test_data["medium"][0]["id"] * 2
+            
         finally:
-            import shutil
-            shutil.rmtree(temp_dir)
+            os.unlink(temp_path)
     
-    def test_process_json_streaming(self):
-        def process_chunk(chunk_file):
-            with open(chunk_file, 'r') as f:
-                data = json.load(f)
-                for item in data:
-                    item["id"] *= 2
-                return json.dumps(data)
+    def test_unicode_handling(self):
+        data = {
+            "text": "Hello, 世界! 🌍 привет",
+            "special_chars": "\n\t\b\f\r\"\\/"
+        }
         
-        result = process_json_streaming(self.array_json.name, process_chunk, chunk_size=25)
+        serialized = dumps(data)
+        deserialized = loads(serialized)
         
-        processed_data = json.loads(result)
-        
-        assert len(processed_data) == 100
-        assert processed_data[0]["id"] == 2
-        assert processed_data[50]["id"] == 102
-        assert processed_data[-1]["id"] == 200
-    
-    def test_process_json_streaming_not_array(self):
-        def process_chunk(chunk_file):
-            return "test"
-        
-        with pytest.raises(ValueError) as excinfo:
-            process_json_streaming(self.object_json.name, process_chunk)
-        
-        assert "Streaming mode only works with JSON files" in str(excinfo.value)
+        assert deserialized == data

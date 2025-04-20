@@ -8,6 +8,9 @@ version = "0.0.1"
 description = "SQL-like query tool for JSON files"
 readme = "README.md"
 requires-python = ">=3.9"
+dependencies = [
+    "orjson>=3.8.0",
+]
 license = {text = "MIT"}
 authors = [
     {name = "oha", email = "aaronoh2015@gmail.com"},

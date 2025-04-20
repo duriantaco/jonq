@@ -3,6 +3,9 @@ import subprocess
 import tempfile
 import os
 import logging
+import shutil
+from jonq.json_utils import dumps, loads 
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -16,40 +19,58 @@ def detect_json_structure(json_file):
             char = f.read(1)
         return char == '['
 
-def split_json_array(json_file, chunk_size=1000):
-    """
-    Split a JSON array file into chunks for streaming processing.
-    """
+def split_json_array(json_file: str, chunk_size: int = 1000) -> tuple[str, list[str]]:
+
     temp_dir = tempfile.mkdtemp(prefix="jonq_")
-    chunk_base = os.path.join(temp_dir, "chunk_")
-    
+    chunk_files: list[str] = []
+
     try:
-        cmd = f"jq -c '.[]' {json_file} | split -l {chunk_size} - {chunk_base}"
-        subprocess.run(cmd, shell=True, check=True)
-        
-        chunk_files = []
-        for filename in sorted(os.listdir(temp_dir)):
-            if filename.startswith("chunk_"):
-                chunk_path = os.path.join(temp_dir, filename)
-                with open(chunk_path, 'r') as f:
-                    content = f.read()
-                
-                with open(chunk_path, 'w') as f:
-                    f.write('[' + content.replace('\n', ',').rstrip(',') + ']')
-                
-                chunk_files.append(chunk_path)
-        
+        proc = subprocess.Popen(
+            ['jq', '-c', '.[]', json_file],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+        current_chunk_idx = 0
+        current_line_count = 0
+        current_path = os.path.join(temp_dir, f"chunk_{current_chunk_idx:06d}")
+        current_handle = open(current_path, 'w', encoding='utf-8')
+        current_handle.write('[')
+
+        for line in proc.stdout:
+            if current_line_count:
+                current_handle.write(',')
+            current_handle.write(line.strip())
+            current_line_count += 1
+
+            if current_line_count >= chunk_size:
+                current_handle.write(']')
+                current_handle.close()
+                chunk_files.append(current_path)
+
+                # reset counters 
+                current_chunk_idx += 1
+                current_line_count = 0
+                current_path = os.path.join(temp_dir, f"chunk_{current_chunk_idx:06d}")
+                current_handle = open(current_path, 'w', encoding='utf-8')
+                current_handle.write('[')
+
+        current_handle.write(']')
+        current_handle.close()
+        chunk_files.append(current_path)
+
+        jq_err = proc.stderr.read()
+        if proc.wait() != 0:
+            raise RuntimeError(f"jq failed: {jq_err.strip()}")
+
         return temp_dir, chunk_files
-    
-    except subprocess.CalledProcessError as e:
-        import shutil
-        shutil.rmtree(temp_dir)
-        raise RuntimeError(f"Error splitting JSON into chunks: {str(e)}")
+
+    except Exception:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise
 
 def process_json_streaming(json_file, process_func, chunk_size=1000):
-    """
-    Process a large JSON file in streaming mode.
-    """
     if not detect_json_structure(json_file):
         raise ValueError("Streaming mode only works with JSON files containing an array at the root level")
     
@@ -62,7 +83,7 @@ def process_json_streaming(json_file, process_func, chunk_size=1000):
             chunk_result = process_func(chunk_file)
             
             try:
-                result_data = json.loads(chunk_result)
+                result_data = loads(chunk_result)
                 if isinstance(result_data, list):
                     all_results.extend(result_data)
                 else:
@@ -70,11 +91,10 @@ def process_json_streaming(json_file, process_func, chunk_size=1000):
             except json.JSONDecodeError:
                 all_results.append(chunk_result)
         
-        import shutil
         shutil.rmtree(temp_dir)
         
         if all(isinstance(r, (dict, list)) for r in all_results):
-            return json.dumps(all_results)
+            return dumps(all_results)
         else:
             return '\n'.join(str(r) for r in all_results)
             

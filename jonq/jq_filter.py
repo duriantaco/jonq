@@ -6,7 +6,7 @@ from jonq.generator import transform_nested_array_path as ast_transform_nested_a
 from jonq.generator import escape_string as ast_escape_string
 from jonq.parser import parse_condition_tokens
 
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def format_field_path(field):
     return ast_format_field_path(field)
@@ -32,7 +32,27 @@ def parse_condition(tokens, from_path=None):
         return generate_jq_condition(condition, context)
     return None
 
-def generate_jq_filter(fields, condition, group_by, having, order_by, sort_direction, limit, from_path=None):
+def generate_jq_filter(fields, condition=None, group_by=None, having=None,
+                       order_by=None, sort_direction='asc',
+                       limit=None, from_path=None):
+
+    legacy_call = (
+        having is not None                  
+        and order_by in (None, 'asc', 'desc')
+        and (isinstance(sort_direction, (int, str))
+             and str(sort_direction).isdigit())
+    )
+    if legacy_call:
+        order_by, sort_direction, limit = having, order_by, sort_direction
+        having = None
+        # normalise
+        sort_direction = sort_direction or 'asc'
+        limit = str(limit)
+
+    if isinstance(limit, int):
+        limit = str(limit)
+
     return ast_generate_jq_filter(
-        fields, condition, group_by, having, order_by, sort_direction, limit, from_path
+        fields, condition, group_by, having,
+        order_by, sort_direction, limit, from_path
     )

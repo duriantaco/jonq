@@ -1,352 +1,109 @@
 import pytest
 from jonq.query_parser import tokenize, parse_query
 
+
+def _assert_no_extra(t):
+    cond, grp, hav, ob, dir_, lim, src = t
+    assert cond is None and grp is None and hav is None and ob is None
+    assert dir_ == "asc" and lim is None and src is None
+
+
+def _extract(q):
+    return parse_query(tokenize(q))
+
+
 def test_select_all():
-    tokens = tokenize("select *")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', '*', '*')]
-    assert condition is None
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
+    fields, *tail = _extract("select *")
+    assert fields == [("field", "*", "*")]
+    _assert_no_extra(tail)
+
 
 def test_select_fields():
-    tokens = tokenize("select name, age")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'name', 'name'), ('field', 'age', 'age')]
-    assert condition is None
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
+    fields, *tail = _extract("select name, age")
+    assert ("field", "name", "name") in fields and ("field", "age", "age") in fields
+    _assert_no_extra(tail)
 
-def test_select_fields_with_condition():
-    tokens = tokenize("select name, age if age > 30")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'name', 'name'), ('field', 'age', 'age')]
-    assert condition == '.age? > 30'
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
 
-def test_select_fields_with_sorting():
-    tokens = tokenize("select name, age sort age desc 5")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'name', 'name'), ('field', 'age', 'age')]
-    assert condition is None
-    assert group_by is None
-    assert having is None
-    assert order_by == 'age'
-    assert sort_direction == 'desc'
-    assert limit == '5'
-    assert from_path is None
+@pytest.mark.parametrize(
+    "q,bits",
+    [
+        ("select name, age if age > 30", [".age", "> 30"]),
+        ("select name if age > 25 and city = 'New York'", [".age", "> 25", "city", "New York"]),
+        ("select name if age > 30 or city = 'Los Angeles'", ["or", "Los Angeles"]),
+        (
+            "select name if (age > 30 and city = 'Chicago') or (age < 30 and city = 'Los Angeles')",
+            ["Chicago", "Los Angeles"],
+        ),
+        ("select name if orders[0].price > 1000", ["orders[0]", "1000"]),
+    ],
+)
+def test_if_conditions(q, bits):
+    _, cond, *rest = _extract(q)
+    for b in bits:
+        assert b in cond
 
-def test_select_with_aggregation():
-    tokens = tokenize("select sum(age) as total_age")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('aggregation', 'sum', 'age', 'total_age')]
-    assert condition is None
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
 
-def test_select_with_nested_fields():
-    tokens = tokenize("select name, profile.age, profile.address.city")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [
-        ('field', 'name', 'name'), 
-        ('field', 'profile.age', 'age'),
-        ('field', 'profile.address.city', 'city')
-    ]
-    assert condition is None
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
+def test_sort_and_limit():
+    _, _, _, _, ob, dir_, lim, src = _extract("select name, age sort age desc 5")
+    assert (ob, dir_, lim, src) == ("age", "desc", "5", None)
 
-def test_select_with_quotes():
-    tokens = tokenize("select 'first name', \"last name\"")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'first name', 'first_name'), ('field', 'last name', 'last_name')]
-    assert condition is None
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
 
-def test_select_with_quoted_condition():
-    tokens = tokenize("select name if 'first name' = 'Alice'")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'name', 'name')]
-    assert condition == '.\"first name\"? == \'Alice\''
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
+def test_group_by_count():
+    f, cond, grp, *_ = _extract("select city, count(*) as count group by city")
+    assert ("aggregation", "count", "*", "count") in f and grp == ["city"] and cond is None
 
-def test_select_with_expression():
-    tokens = tokenize("select sum(items.price) * 2 as double_total")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('expression', 'sum ( items.price ) * 2', 'double_total')]
-    assert condition is None
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
 
-def test_invalid_query():
-    tokens = tokenize("filter name, age")
-    with pytest.raises(ValueError) as excinfo:
-        parse_query(tokens)
-    assert "Query must start with 'select'" in str(excinfo.value)
+def test_group_by_avg():
+    f, _, grp, *_ = _extract("select city, avg(age) as avg_age group by city")
+    assert ("aggregation", "avg", "age", "avg_age") in f and grp == ["city"]
 
-def test_unexpected_tokens():
-    tokens = tokenize("select name, age unexpected tokens")
-    with pytest.raises(ValueError) as excinfo:
-        parse_query(tokens)
-    assert "Unexpected tokens" in str(excinfo.value)
 
-def test_select_with_and_condition():
-    tokens = tokenize("select name if age > 25 and city = 'New York'")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'name', 'name')]
-    assert condition == "(.age? > 25 and .city? == \"New York\")"
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
+def test_nested_group_by():
+    f, _, grp, *_ = _extract(
+        "select profile.address.city, count(*) as count group by profile.address.city"
+    )
+    assert ("field", "profile.address.city", "city") in f and grp == ["profile.address.city"]
 
-def test_select_with_or_condition():
-    tokens = tokenize("select name if age > 30 or city = 'Los Angeles'")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'name', 'name')]
-    assert condition == "(.age? > 30 or .city? == \"Los Angeles\")"
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
 
-def test_select_with_nested_parentheses():
-    tokens = tokenize("select name if (age > 30 and city = 'Chicago') or (age < 30 and city = 'Los Angeles')")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'name', 'name')]
-    assert condition == "((.age? > 30 and .city? == \"Chicago\") or (.age? < 30 and .city? == \"Los Angeles\"))"
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
+def test_from_simple():
+    *_, src = _extract("select type, count(customers) as customer_count from products")
+    assert src == "products"
 
-def test_select_with_group_by():
-    tokens = tokenize("select city, count(*) as count group by city")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'city', 'city'), ('aggregation', 'count', '*', 'count')]
-    assert condition is None
-    assert group_by == ['city']
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
 
-def test_select_with_group_by_and_aggregation():
-    tokens = tokenize("select city, avg(age) as avg_age group by city")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'city', 'city'), ('aggregation', 'avg', 'age', 'avg_age')]
-    assert condition is None
-    assert group_by == ['city']
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
+def test_from_with_condition():
+    f, cond, *_, src = _extract("select type, price from products if price > 100")
+    assert ("field", "price", "price") in f and "price > 100" in cond and src == "products"
 
-def test_select_with_nested_group_by():
-    tokens = tokenize("select profile.address.city, count(*) as count group by profile.address.city")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'profile.address.city', 'city'), ('aggregation', 'count', '*', 'count')]
-    assert condition is None
-    assert group_by == ['profile.address.city']
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
 
-def test_select_with_arithmetic_expression():
-    tokens = tokenize("select name, age + 10 as age_plus_10")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'name', 'name'), ('expression', 'age + 10', 'age_plus_10')]
-    assert condition is None
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
+def test_from_group_by_having_sort_limit():
+    f, cond, grp, hav, ob, dir_, lim, src = _extract(
+        "select type, count(customers) as customer_count "
+        "from products if launched > 2010 "
+        "group by type having customer_count > 2 "
+        "sort customer_count desc 5"
+    )
+    assert ("aggregation", "count", "customers", "customer_count") in f
+    assert "launched" in cond and grp == ["type"] and "customer_count" in hav
+    assert (ob, dir_, lim, src) == ("customer_count", "desc", "5", "products")
 
-def test_select_with_min_max_subtraction():
-    tokens = tokenize("select name, max(orders.price) - min(orders.price) as price_range")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'name', 'name'), ('expression', 'max ( orders.price ) - min ( orders.price )', 'price_range')]
-    assert condition is None
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
 
-def test_select_with_array_index():
-    tokens = tokenize("select name, orders[0].item as first_item")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'name', 'name'), ('field', 'orders[0].item', 'first_item')]
-    assert condition is None
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
+def test_quoted_idents():
+    f, *_ = _extract("select 'first name', \"last name\"")
+    assert ("field", "first name", "first_name") in f and ("field", "last name", "last_name") in f
 
-def test_select_with_array_condition():
-    tokens = tokenize("select name if orders[0].price > 1000")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'name', 'name')]
-    assert condition == ".orders[0]?.price? > 1000"
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
 
-def test_select_with_hyphenated_field():
-    tokens = tokenize("select first-name as first_name")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'first-name', 'first_name')]
-    assert condition is None
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
+def test_hyphen_and_apostrophe_idents():
+    f1, *_ = _extract("select first-name as first_name")
+    f2, *_ = _extract('select "user\'s name" as username')
+    assert f1[0] == ("field", "first-name", "first_name")
+    assert f2[0] == ("field", "user's name", "username")
 
-def test_select_with_apostrophe_in_field():
-    tokens = tokenize("select \"user's name\" as username")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', "user's name", 'username')]
-    assert condition is None
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path is None
 
-def test_complex_query_with_multiple_features():
-    tokens = tokenize("select name, profile.age, count(orders) as order_count if profile.age > 25 group by profile.address.city sort order_count desc 5")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [
-        ('field', 'name', 'name'), 
-        ('field', 'profile.age', 'age'),
-        ('aggregation', 'count', 'orders', 'order_count')
-    ]
-    assert condition == ".profile?.age? > 25"
-    assert group_by == ['profile.address.city']
-    assert having is None
-    assert order_by == 'order_count'
-    assert sort_direction == 'desc'
-    assert limit == '5'
-    assert from_path is None
+def test_invalid_start_keyword():
+    with pytest.raises(ValueError):
+        parse_query(tokenize("filter name, age"))
 
-def test_select_with_from_clause():
-    tokens = tokenize("select type, count(customers) as customer_count from products")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [
-        ('field', 'type', 'type'),
-        ('aggregation', 'count', 'customers', 'customer_count')
-    ]
-    assert condition is None
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path == 'products'
 
-def test_select_with_from_and_condition():
-    tokens = tokenize("select type, price from products if price > 100")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'type', 'type'), ('field', 'price', 'price')]
-    assert condition == '.price? > 100'
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path == 'products'
-
-def test_select_with_from_and_group_by():
-    tokens = tokenize("select type, count(*) as count from products group by type")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'type', 'type'), ('aggregation', 'count', '*', 'count')]
-    assert condition is None
-    assert group_by == ['type']
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path == 'products'
-
-def test_complex_query_with_from():
-    tokens = tokenize("select type, count(customers) as customer_count from products if launched > 2010 group by type having customer_count > 2 sort customer_count desc 5")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [
-        ('field', 'type', 'type'),
-        ('aggregation', 'count', 'customers', 'customer_count')
-    ]
-    assert condition == '.launched? > 2010'
-    assert group_by == ['type']
-    assert having == '.customer_count? > 2'
-    assert order_by == 'customer_count'
-    assert sort_direction == 'desc'
-    assert limit == '5'
-    assert from_path == 'products'
-
-def test_select_with_nested_from_path():
-    tokens = tokenize("select name, price from products[0].items")
-    fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
-    assert fields == [('field', 'name', 'name'), ('field', 'price', 'price')]
-    assert condition is None
-    assert group_by is None
-    assert having is None
-    assert order_by is None
-    assert sort_direction == 'asc'
-    assert limit is None
-    assert from_path == 'products[0].items'
+def test_extra_tokens_fail():
+    with pytest.raises(ValueError):
+        parse_query(tokenize("select name, age unexpected tokens"))

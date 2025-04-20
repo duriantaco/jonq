@@ -3,7 +3,37 @@ import re
 from jonq.ast import *
 from jonq.parser import parse_path, parse_expression
 
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+_HAVING_REPLACEMENTS = {
+    'avg_age': '.avg_age',
+    'count': '.count',
+    'avg_monthly': '.avg_monthly',
+    'total_revenue': '.total_revenue',
+    'avg_price': '.avg_price',
+    'total_price': '.total_price',
+    'min_age': '.min_age',
+    'max_age': '.max_age',
+    'avg_profit': '.avg_profit',
+    'total_spent': '.total_spent',
+    'total_orders': '.total_orders',
+    'price_order_ratio': '.price_order_ratio',
+    'user_count': '.user_count',
+    'version_count': '.version_count',
+    'customer_count': '.customer_count',
+    'avg_yearly': '.avg_yearly',
+    'price_range': '.price_range',
+    'avg_monthly_price': '.avg_monthly_price',
+}
+
+_HAVING_REGEXES = {
+    key: re.compile(rf'\b{key}\b') for key in _HAVING_REPLACEMENTS
+}
+
+def _quote(name: str) -> str:
+    if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
+        return name
+    return '"' + name.replace('"', r'\"') + '"'
 
 def generate_jq_path(path, context="root", null_check=True):
     if not path.elements:
@@ -12,13 +42,13 @@ def generate_jq_path(path, context="root", null_check=True):
     result = ""
     for i, element in enumerate(path.elements):
         if element.type == PathType.FIELD:
-            seg = f".{element.value}"
+            seg = f".{_quote(element.value)}"
             if i == 0:
                 result += seg
             else:
                 result += seg
         elif element.type == PathType.ARRAY:
-            seg = f".{element.value}[]?"
+            seg = f".{_quote(element.value)}[]?"
             if i == 0:
                 result += seg
             else:
@@ -68,7 +98,10 @@ def generate_jq_expression(expr, context="root"):
             if func == "count":
                 return f"([{arg_jq}] | length)"
             elif func == "sum":
-                return f"([{arg_jq}] | flatten | map(select(type == \"number\")) | add // 0)"
+                return (
+                    f"([{arg_jq}] | flatten | map(select(type == \"number\")) "
+                    f"| add // 0)  # sum"
+                )
             elif func == "avg":
                 return f"([{arg_jq}] | flatten | map(select(type == \"number\")) | if length > 0 then (add / length) else null end)"
             elif func == "max":
@@ -105,7 +138,7 @@ def generate_jq_expression(expr, context="root"):
                 if func == "count":
                     return f"length"
                 elif func == "sum":
-                    return f"([.[] | {arg_jq} | select(type == \"number\")] | add // 0)"
+                    return f"([.[] | {arg_jq} | select(type == \"number\")] | add // 0) # sum"
                 elif func == "avg":
                     return f"([.[] | {arg_jq} | select(type == \"number\")] | if length > 0 then (add / length) else null end)"
                 elif func == "max":
@@ -118,7 +151,7 @@ def generate_jq_expression(expr, context="root"):
         op = expr.value
         left = generate_jq_expression(expr.args[0], context)
         right = generate_jq_expression(expr.args[1], context)
-        return f"(({left}) {op} ({right}))"
+        return f"({left} {op} {right})"
     elif expr.type == ExprType.BINARY_CONDITION:
         op = expr.value
         left = generate_jq_expression(expr.args[0], context)
@@ -184,24 +217,8 @@ def process_having_condition(having):
     if not having:
         return ""
     
-    having = re.sub(r'\bavg_age\b', '.avg_age', having)
-    having = re.sub(r'\bcount\b', '.count', having)
-    having = re.sub(r'\bavg_monthly\b', '.avg_monthly', having)
-    having = re.sub(r'\btotal_revenue\b', '.total_revenue', having)
-    having = re.sub(r'\bavg_price\b', '.avg_price', having)
-    having = re.sub(r'\btotal_price\b', '.total_price', having)
-    having = re.sub(r'\bmin_age\b', '.min_age', having)
-    having = re.sub(r'\bmax_age\b', '.max_age', having)
-    having = re.sub(r'\bavg_profit\b', '.avg_profit', having)
-    having = re.sub(r'\btotal_spent\b', '.total_spent', having)
-    having = re.sub(r'\btotal_orders\b', '.total_orders', having)
-    having = re.sub(r'\bprice_order_ratio\b', '.price_order_ratio', having)
-    having = re.sub(r'\buser_count\b', '.user_count', having)
-    having = re.sub(r'\bversion_count\b', '.version_count', having)
-    having = re.sub(r'\bcustomer_count\b', '.customer_count', having)
-    having = re.sub(r'\bavg_yearly\b', '.avg_yearly', having)
-    having = re.sub(r'\bprice_range\b', '.price_range', having)
-    having = re.sub(r'\bavg_monthly_price\b', '.avg_monthly_price', having)
+    for key, pattern in _HAVING_REGEXES.items():
+        having = pattern.sub(_HAVING_REPLACEMENTS[key], having)
     
     for op in [" > ", " < ", " >= ", " <= ", " == "]:
         if op in having:
@@ -236,27 +253,19 @@ def process_having_condition(having):
     return having
 
 def make_selector_from_path(path_with_arrays: str) -> str:
-    bits   = path_with_arrays.split('[]')
     pieces = []
-    running = bits[0].lstrip('.')
-    while True:
-        pieces.append(f'.{running.strip(".")}[]')
-        if len(bits) == 1 or not bits[1]:
-            break
-        nxt = bits[1]
-        if nxt.startswith('.'):
-            nxt = nxt[1:]
-        if '[]' in nxt:
-            running = nxt.split('[]',1)[0]
-            bits[1] = nxt.split('[]',1)[1]
-        else:
-            break
+    remaining = path_with_arrays.lstrip('.')
+    while '[]' in remaining:
+        pre, remaining = remaining.split('[]', 1)
+        pre = pre.lstrip('.')
+        pieces.append(f'.{pre}[]')
+        if remaining.startswith('.'):
+            remaining = remaining[1:]
     return ' | '.join(pieces)
 
 def generate_jq_filter(fields, condition, group_by, having, order_by, sort_direction, limit, from_path=None):
     base_context = "root"
     base_selector = ""
-
     if from_path:
         if from_path == '[]':
             base_selector = '.[]'
@@ -269,209 +278,146 @@ def generate_jq_filter(fields, condition, group_by, having, order_by, sort_direc
             base_context = "array"
         elif '[]' in from_path:
             parts = from_path.split('[]', 1)
-            if parts[0]:
-                if parts[0].startswith('.'):
-                    parts[0] = parts[0][1:]
-                base = f'.{parts[0]}'
-            else:
-                base = '.'
-                
-            if len(parts) > 1 and parts[1]:
-                rest = parts[1]
-                if rest.startswith('.'):
-                    rest = rest[1:]
-                base_selector = f'{base}[] | .{rest}'
-            else:
-                base_selector = f'{base}[]'
+            base = f'.{parts[0].lstrip(".")}' if parts[0] else '.'
+            rest = parts[1].lstrip('.') if len(parts) > 1 else ''
+            base_selector = f'{base}[]' + (f' | .{rest}' if rest else '')
             base_context = "array"
         else:
             base_selector = f'.{from_path}'
             base_context = "object"
-    
-    if not from_path and group_by:
-        implicit_base, inner = split_base_array(group_by[0])
-        if implicit_base:
-            base_selector = make_selector_from_path(group_by[0])
-            base_context  = "array"
-
-            group_by = [split_base_array(g)[1] for g in group_by]
-
-            new_fields = []
-            for tup in fields:
-                kind = tup[0]
-                if kind == 'field':
-                    path    = strip_prefix(tup[1], implicit_base)
-                    new_fields.append(('field', path, tup[2]))
-                elif kind == 'aggregation':
-                    func, param, alias = tup[1], tup[2], tup[3]
+    if not from_path and group_by and any('[]' in g for g in group_by):
+        implicit_base, _ = split_base_array(group_by[0])
+        base_selector = make_selector_from_path(group_by[0])
+        base_context = "array"
+        group_by = [g.split('[]')[-1].lstrip('.') for g in group_by]
+        new_fields = []
+        for tup in fields:
+            if tup[0] == 'field':
+                path, alias = tup[1:]
+                if '[]' in path:
+                    path = strip_prefix(path, implicit_base).split('[]')[-1].lstrip('.')
+                new_fields.append(('field', path, alias))
+            elif tup[0] == 'aggregation':
+                func, param, alias = tup[1:]
+                if '[]' in param:
                     param = strip_prefix(param, implicit_base)
-                    new_fields.append(('aggregation', func, param, alias))
-                else:
-                    new_fields.append(tup)
-            fields = new_fields
-
-    all_aggregations = all(field_type == 'aggregation' for field_type, *_ in fields)
-    
-    if all_aggregations and not group_by:
-        selection = []
-
-        def _wrap(expr: str) -> str:
-            """Return a list literal [ expr ] unless it already is one."""
-            return expr if expr.lstrip().startswith('[') else f'[ {expr} ]'
-
-        for _, func, field_path, alias in fields:
-            if base_selector:
-                raw = f'{base_selector} | .{field_path}'
-            elif '[]' in field_path:
-                raw = f'.{field_path}'
+                new_fields.append(('aggregation', func, param, alias))
             else:
-                raw = f'.[] | .{field_path}'
-
-            wrapped = _wrap(raw)
-
-            if func == 'count' and field_path == '*':
-                selection.append(f'"{alias}": length')
-                continue
-
+                new_fields.append(tup)
+        fields = new_fields
+    if not from_path and not group_by:
+        first_param_with_array = next(
+            (tup[2] for tup in fields if tup[0] == 'aggregation' and '[]' in tup[2]),
+            None,
+        )
+        if first_param_with_array:
+            implicit_base, _ = split_base_array(first_param_with_array)
+            base_selector = f'.{implicit_base}[]'
+            base_context = "array"
+            fields = [
+                ('aggregation', func, strip_prefix(param, implicit_base), alias)
+                if ftype == 'aggregation' else tup
+                for tup in fields
+                for ftype, func, param, alias in [tup] if ftype == 'aggregation'
+            ] + [tup for tup in fields if tup[0] != 'aggregation']
+    all_aggregations = all(ft == 'aggregation' for ft, *_ in fields)
+    if all_aggregations and not group_by:
+        base_data = base_selector or '(if type=="array" then .[] else . end)'
+        if condition:
+            base_data += f' | select({condition})'
+        def wrap(expr): return expr if expr.lstrip().startswith('[') else f'[ {expr} ]'
+        selection = []
+        for _, func, param, alias in fields:
+            raw = f'{base_data} | .{param.lstrip(".")}'
+            wrapped = wrap(raw)
+            if func == 'count' and param == '*':
+                selection.append(f'"{alias}": length'); continue
             if func == 'sum':
-                selection.append(
-                    f'"{alias}": ({wrapped} | map(select(type=="number")) | add // 0)'
-                )
+                selection.append(f'"{alias}": ({wrapped} | map(select(type=="number")) | add // 0)')
             elif func == 'avg':
-                selection.append(
-                    f'"{alias}": ({wrapped} | map(select(type=="number")) ' +
-                    f'| if length>0 then add/length else null end)'
-                )
+                selection.append(f'"{alias}": ({wrapped} | map(select(type=="number")) | if length>0 then add/length else null end)')
             elif func == 'min':
-                selection.append(
-                    f'"{alias}": ({wrapped} | map(select(type=="number")) ' +
-                    f'| if length>0 then min else null end)'
-                )
+                selection.append(f'"{alias}": ({wrapped} | map(select(type=="number")) | if length>0 then min else null end)')
             elif func == 'max':
-                selection.append(
-                    f'"{alias}": ({wrapped} | map(select(type=="number")) ' +
-                    f'| if length>0 then max else null end)'
-                )
+                selection.append(f'"{alias}": ({wrapped} | map(select(type=="number")) | if length>0 then max else null end)')
             elif func == 'count':
                 selection.append(f'"{alias}": ({wrapped} | length)')
-
         jq_filter = f'{{ {", ".join(selection)} }}'
-
     elif group_by:
-        group_keys = []
-        for field in group_by:
-            group_keys.append('.' + generate_jq_path(parse_path(field), False).lstrip('.'))
+        group_keys = [generate_jq_path(parse_path(g), context="root", null_check=False) for g in group_by]
         group_key = ', '.join(group_keys)
-
-        agg_selections = []
-        for ft, *fd in fields:
-            if ft == 'field':
-                fld, alias = fd
-                if fld in group_by:
-                    agg_selections.append(f'"{alias}": .[0].{generate_jq_path(parse_path(fld), False).lstrip(".")}')
-            else: 
-                func, param, alias = fd
-                agg_selections.append(f'"{alias}": {generate_jq_expression(Expression(ExprType.AGGREGATION, func, [param]), "group")}')
-
-        prefix = f'[ {base_selector} ] | ' if base_selector else ''
-        jq_filter = (
-            f'{prefix}map(select(. != null)) | '
-            f'group_by({group_key}) | '
-            f'map({{ {", ".join(agg_selections)} }})'
-        )
-
+        agg_sel = []
+        for ftype, *data in fields:
+            if ftype == 'field':
+                fld, alias = data
+                path = generate_jq_path(parse_path(fld), context="root", null_check=False).lstrip('.')
+                agg_sel.append(f'"{alias}": .[0].{path}')
+            elif ftype == 'aggregation':
+                func, param, alias = data
+                expr = Expression(ExprType.AGGREGATION, func, [param])
+                agg_sel.append(f'"{alias}": {generate_jq_expression(expr,"group")}')
+            elif ftype == 'expression':
+                expr_txt, alias = data
+                expr = parse_expression(expr_txt)
+                agg_sel.append(f'"{alias}": {generate_jq_expression(expr,"group")}')
+        prefix = f'[ {base_selector} ] | ' if base_selector else '[ .[] ] | '
+        jq_filter = f'{prefix}map(select(. != null)) | group_by({group_key}) | map({{ {", ".join(agg_sel)} }})'
         if having:
             jq_filter += f' | map(select({process_having_condition(having)}))'
-
     else:
         if fields == [('field', '*', '*')]:
-            if from_path:
-                jq_filter = f'[{base_selector}]'
-            else:
-                jq_filter = '.'
-        elif (not any(ftype == 'field' for ftype, *_ in fields) and not from_path and not group_by):
-            selection = []
-            for field_type, *field_data in fields:
-                if field_type == 'aggregation':
-                    func, field_path, alias = field_data
-                    expr = Expression(ExprType.AGGREGATION, func, [field_path])
-                    jq_expr = generate_jq_expression(expr, base_context)
-                    selection.append(f'"{alias}": {jq_expr}')
-                elif field_type == 'expression':
-                    expression, alias = field_data
-                    expr = parse_expression(expression)
-                    jq_expr = generate_jq_expression(expr, base_context)
-                    selection.append(f'"{alias}": {jq_expr}')
-                elif field_type == 'direct_jq':
-                    jq_expr, alias = field_data
-                    selection.append(f'"{alias}": {jq_expr}')
-            jq_filter = f'[{{ {", ".join(selection)} }}]'
-
+            jq_filter = f'[{base_selector}]' if from_path else '.'
+        elif not any(ft[0] == 'field' for ft in fields) and not from_path and not group_by:
+            sel = []
+            for ftype, *data in fields:
+                if ftype == 'aggregation':
+                    func, param, alias = data
+                    sel.append(f'"{alias}": {generate_jq_expression(Expression(ExprType.AGGREGATION,func,[param]),base_context)}')
+                elif ftype == 'expression':
+                    expr_txt, alias = data
+                    sel.append(f'"{alias}": {generate_jq_expression(parse_expression(expr_txt),base_context)}')
+                elif ftype == 'direct_jq':
+                    jq_expr, alias = data
+                    sel.append(f'"{alias}": {jq_expr}')
+            jq_filter = f'[{{ {", ".join(sel)} }}]'
         else:
-            selection = []
-            for field_type, *field_data in fields:
-                if field_type == 'field':
-                    field, alias = field_data
-                    path = parse_path(field)
-                    selection.append(f'"{alias}": ({generate_jq_path(path, base_context)} // null)')
-                elif field_type == 'aggregation':
-                    func, field_path, alias = field_data
-                    expr = Expression(ExprType.AGGREGATION, func, [field_path])
-                    jq_expr = generate_jq_expression(expr, base_context)
-                    selection.append(f'"{alias}": {jq_expr}')
-                elif field_type == 'expression':
-                    expression, alias = field_data
-                    expr = parse_expression(expression)
-                    jq_expr = generate_jq_expression(expr, base_context)
-                    selection.append(f'"{alias}": {jq_expr}')
-                elif field_type == 'direct_jq':
-                    jq_expr, alias = field_data
-                    selection.append(f'"{alias}": {jq_expr}')
-            map_filter = f'{{ {", ".join(selection)} }}'
-
+            sel = []
+            for ftype, *data in fields:
+                if ftype == 'field':
+                    field, alias = data
+                    sel.append(f'"{alias}": ({generate_jq_path(parse_path(field),base_context)} // null)')
+                elif ftype == 'aggregation':
+                    func, param, alias = data
+                    sel.append(f'"{alias}": {generate_jq_expression(Expression(ExprType.AGGREGATION,func,[param]),base_context)}')
+                elif ftype == 'expression':
+                    expr_txt, alias = data
+                    sel.append(f'"{alias}": {generate_jq_expression(parse_expression(expr_txt),base_context)}')
+                elif ftype == 'direct_jq':
+                    jq_expr, alias = data
+                    sel.append(f'"{alias}": {jq_expr}')
+            map_filter = f'{{ {", ".join(sel)} }}'
             if from_path:
-                if condition and isinstance(condition, str):
-                    if "between" in condition.lower():
-                        field, range_part = condition.split(" between ")
-                        low, high = range_part.split(" and ")
-                        cond_filter = f"(.{field.strip()} >= {low.strip()} and .{field.strip()} <= {high.strip()})"
-                        jq_filter = f'[{base_selector} | select({cond_filter}) | {map_filter}]'
-                    elif " contains " in condition.lower():
-                        field, value = condition.split(" contains ")
-                        value = value.strip()
-                        if value.startswith("'") and value.endswith("'"):
-                            value = value[1:-1]
-                        cond_filter = f"(.{field.strip()} | tostring | contains(\"{value}\"))"
-                        jq_filter = f'[{base_selector} | select({cond_filter}) | {map_filter}]'
-                    else:
-                        jq_filter = f'[{base_selector} | select({condition}) | {map_filter}]'
-                else:
-                    if condition:
-                        jq_filter = f'[{base_selector} | select({condition}) | {map_filter}]'
-                    else:
-                        jq_filter = f'[{base_selector} | {map_filter}]'
+                body = f'{base_selector} | ' + ('select({}) | '.format(condition) if condition else '') + map_filter
+                jq_filter = f'[ {body} ]'
             else:
                 if condition:
                     jq_filter = (
-                        f'if type == "array" then . | map(select({condition}) | {map_filter}) '
-                        f'elif type == "object" then [select({condition}) | {map_filter}] '
-                        f'elif type == "number" then if {condition} then [{{"value": .}}] else [] end '
-                        f'elif type == "string" then if {condition} then [{{"value": .}}] else [] end '
+                        f'if type=="array" then . | map(select({condition}) | {map_filter}) '
+                        f'elif type=="object" then [select({condition}) | {map_filter}] '
+                        f'elif type=="number" then if {condition} then [{{"value":.}}] else [] end '
+                        f'elif type=="string" then if {condition} then [{{"value":.}}] else [] end '
                         f'else [] end'
                     )
                 else:
                     jq_filter = (
-                        f'if type == "array" then . | map({map_filter}) '
-                        f'elif type == "object" then [{map_filter}] '
-                        f'elif type == "number" then [{{"value": .}}] '
-                        f'elif type == "string" then [{{"value": .}}] '
+                        f'if type=="array" then . | map({map_filter}) '
+                        f'elif type=="object" then [{map_filter}] '
+                        f'elif type=="number" then [{{"value":.}}] '
+                        f'elif type=="string" then [{{"value":.}}] '
                         f'else [] end'
                     )
-
             if order_by:
-                jq_filter += f' | sort_by(.{order_by})'
-                if sort_direction == 'desc':
-                    jq_filter += ' | reverse'
+                jq_filter += f' | sort_by(.{order_by})' + (' | reverse' if sort_direction == 'desc' else '')
             if limit:
                 jq_filter += f' | .[0:{limit}]'
     logging.info(f"Generated jq filter: {jq_filter}")

@@ -1,6 +1,7 @@
+sphinx>=7.0.0
+furo
 sphinx-copybutton
 sphinx-design
 sphinx-inline-tabs
 sphinxcontrib-mermaid
 myst-parser
-furo

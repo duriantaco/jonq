@@ -1,22 +1,34 @@
 import datetime
+import os
 
 project = 'jonq'
 copyright = f'{datetime.datetime.now().year}, oha'
 author = 'oha'
 release = '0.0.2'
 
-extensions = [
-    'sphinx.ext.autodoc',    
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+
+all_extensions = [
+    'sphinx.ext.autodoc',
     'sphinx.ext.viewcode',
-    'sphinx.ext.napoleon',    
+    'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
-    # Removed sphinx_copybutton
+    
+    'sphinx_copybutton',
     'sphinx_design',
     'sphinx_inline_tabs',
     'sphinxcontrib.mermaid',
-    
     'myst_parser',
 ]
+
+extensions = []
+
+for extension in all_extensions:
+    try:
+        __import__(extension.split('.')[0])
+        extensions.append(extension)
+    except ImportError:
+        print(f"Warning: Extension {extension} not available, skipping.")
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
@@ -29,8 +41,6 @@ myst_enable_extensions = [
     "tasklist",
     "attrs_inline",
 ]
-
-# Removed copybutton configuration lines
 
 templates_path = ['_templates']
 exclude_patterns = []

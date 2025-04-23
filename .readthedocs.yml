@@ -8,12 +8,13 @@ build:
 sphinx:
   configuration: docs/source/conf.py
 
-formats:
-  - pdf
-
 python:
   install:
+    - requirements: docs/requirements.txt
     - method: pip
       path: .
       extra_requirements:
         - docs
+
+formats:
+  - pdf

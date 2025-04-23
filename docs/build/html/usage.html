@@ -5,15 +5,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Usage &#8212; jonq 0.0.1 documentation</title>
+    <title>Usage &#8212; jonq 0.0.2 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=12dfc556" />
-    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/documentation_options.js?v=e3a6060d"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="API Reference" href="api.html" />
+    <link rel="next" title="Comparison" href="comparison.html" />
     <link rel="prev" title="Installation" href="installation.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
@@ -34,114 +34,379 @@
             
   <section id="usage">
 <h1>Usage<a class="headerlink" href="#usage" title="Link to this heading">¶</a></h1>
-<section id="basic-usage">
-<h2>Basic Usage<a class="headerlink" href="#basic-usage" title="Link to this heading">¶</a></h2>
-<p>jonq provides a command-line interface for querying JSON files using a SQL-like syntax.</p>
-<p>The basic syntax is:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>&lt;path/to/json_file&gt;<span class="w"> </span><span class="s2">&quot;&lt;query&gt;&quot;</span>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<p><cite>jonq</cite> is a command-line tool that lets you query JSON files using a SQL-like syntax, making it approachable for users familiar with SQL while leveraging the power of the <cite>jq</cite> utility behind the scenes. Whether you’re working with simple flat data or complex nested structures, <cite>jonq</cite> provides an intuitive way to select, filter, sort, group, and aggregate JSON data.</p>
+<p>### Basic Command Structure</p>
+<p>Run <cite>jonq</cite> with the following syntax:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>&lt;path/to/json_file&gt;<span class="w"> </span><span class="s2">&quot;&lt;query&gt;&quot;</span><span class="w"> </span><span class="o">[</span>options<span class="o">]</span>
 </pre></div>
 </div>
-</section>
-<section id="query-syntax">
-<h2>Query Syntax<a class="headerlink" href="#query-syntax" title="Link to this heading">¶</a></h2>
-<p>The query syntax follows a simplified SQL format:</p>
-<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">select</span><span class="w"> </span><span class="o">&lt;</span><span class="n">fields</span><span class="o">&gt;</span><span class="w"> </span><span class="p">[</span><span class="k">if</span><span class="w"> </span><span class="o">&lt;</span><span class="n">condition</span><span class="o">&gt;</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="k">group</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="o">&lt;</span><span class="n">fields</span><span class="o">&gt;</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="n">sort</span><span class="w"> </span><span class="o">&lt;</span><span class="n">field</span><span class="o">&gt;</span><span class="w"> </span><span class="p">[</span><span class="k">asc</span><span class="o">|</span><span class="k">desc</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="k">limit</span><span class="p">]]</span>
-</pre></div>
-</div>
-<p>Where:</p>
+<p><strong>Available Options:</strong></p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">&lt;fields&gt;</span></code> - Comma-separated list of fields to select or aggregations</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">if</span> <span class="pre">&lt;condition&gt;</span></code> - Optional filtering condition</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">group</span> <span class="pre">by</span> <span class="pre">&lt;fields&gt;</span></code> - Optional grouping by one or more fields</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">sort</span> <span class="pre">&lt;field&gt;</span></code> - Optional field to sort by</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">asc|desc</span></code> - Optional sort direction (default: asc)</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">limit</span></code> - Optional integer to limit the number of results</p></li>
+<li><p><cite>–format, -f &lt;csv|json&gt;</cite>: Choose output format (default: <cite>json</cite>).</p></li>
+<li><p><cite>–stream, -s</cite>: Enable streaming mode for processing large files efficiently.</p></li>
+<li><p><cite>–fast, -F</cite>: Use the Rust extension for faster processing (requires <cite>jonq-fast</cite>).</p></li>
+<li><p><cite>–format csv</cite>: Output results in CSV format.</p></li>
+<li><p><cite>-h, –help</cite>: Display the help message and exit.</p></li>
+<li><p><cite>format csv –fast &gt; output.csv</cite>: Redirect output to a file.</p></li>
+<li><p><cite>–version</cite>: Show the version of <cite>jonq</cite>.</p></li>
 </ul>
+<p><strong>Quick Example:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>users.json<span class="w"> </span><span class="s2">&quot;select name, age if age &gt; 30&quot;</span>
+</pre></div>
+</div>
+<p>This command selects the <cite>name</cite> and <cite>age</cite> fields from <cite>users.json</cite> where the <cite>age</cite> is greater than 30.</p>
+</section>
+<section id="query-syntax-breakdown">
+<h2>Query Syntax Breakdown<a class="headerlink" href="#query-syntax-breakdown" title="Link to this heading">¶</a></h2>
+<p>The <cite>jonq</cite> query syntax mirrors SQL but is tailored for JSON. Here’s the full structure:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">select</span><span class="w"> </span><span class="o">&lt;</span><span class="n">fields</span><span class="o">&gt;</span><span class="w"> </span><span class="p">[</span><span class="k">from</span><span class="w"> </span><span class="o">&lt;</span><span class="n">path</span><span class="o">&gt;</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="k">if</span><span class="w"> </span><span class="o">&lt;</span><span class="n">condition</span><span class="o">&gt;</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="k">group</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="o">&lt;</span><span class="n">fields</span><span class="o">&gt;</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="k">having</span><span class="w"> </span><span class="o">&lt;</span><span class="n">condition</span><span class="o">&gt;</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="n">sort</span><span class="w"> </span><span class="o">&lt;</span><span class="n">field</span><span class="o">&gt;</span><span class="w"> </span><span class="p">[</span><span class="k">asc</span><span class="o">|</span><span class="k">desc</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="k">limit</span><span class="p">]]</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong>`&lt;fields&gt;`</strong>: Fields to select (e.g., <cite>name</cite>, <cite>age</cite>), including aliases, expressions, or aggregations.</p></li>
+<li><p><strong>`from &lt;path&gt;`</strong>: Optional path to query a specific part of the JSON (e.g., <cite>from [].orders</cite>).</p></li>
+<li><p><strong>`if &lt;condition&gt;`</strong>: Optional filter (e.g., <cite>age &gt; 30</cite>).</p></li>
+<li><p><strong>`group by &lt;fields&gt;`</strong>: Optional grouping (e.g., <cite>group by city</cite>).</p></li>
+<li><p><strong>`having &lt;condition&gt;`</strong>: Optional filter on grouped results (e.g., <cite>having count &gt; 2</cite>).</p></li>
+<li><p><strong>`sort &lt;field&gt;`</strong>: Optional sorting field (e.g., <cite>sort age</cite>).</p></li>
+<li><p><strong>`asc|desc`</strong>: Optional sort direction (default: <cite>asc</cite>).</p></li>
+<li><p><strong>`limit`</strong>: Optional number of results (e.g., <cite>5</cite>).</p></li>
+</ul>
+<p>Let’s dive into each part with detailed explanations and examples!</p>
 </section>
 <section id="field-selection">
 <h2>Field Selection<a class="headerlink" href="#field-selection" title="Link to this heading">¶</a></h2>
-<p>To select all fields:</p>
+<p>You can select specific fields, all fields, or even compute new values from your JSON data.</p>
+<p>### Selecting Fields</p>
+<ul>
+<li><p><strong>All Fields (`*`):</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select *&quot;</span>
 </pre></div>
 </div>
-<p>To select specific fields:</p>
+<p>Retrieves all top-level fields in each JSON object.</p>
+</li>
+<li><p><strong>Specific Fields:</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age&quot;</span>
 </pre></div>
 </div>
-<p>Nested fields can be accessed using dot notation:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, profile.age, profile.address.city&quot;</span>
+<p>Returns only <cite>name</cite> and <cite>age</cite> from each object.</p>
+</li>
+<li><p><strong>Nested Fields (Using Dot Notation):</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select profile.age, profile.address.city&quot;</span>
 </pre></div>
 </div>
-<p>Array elements can be accessed using square brackets:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, orders[0].item&quot;</span>
+<p>Accesses nested fields like <cite>age</cite> inside <cite>profile</cite> and <cite>city</cite> inside <cite>address</cite>.</p>
+</li>
+<li><p><strong>Array Elements (Using Brackets):</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select orders[0].item&quot;</span>
 </pre></div>
 </div>
-<p>You can use quotes for fields with spaces or special characters:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select &#39;first name&#39;, address.&#39;street address&#39;&quot;</span>
+<p>Retrieves the <cite>item</cite> from the first element of the <cite>orders</cite> array.</p>
+</li>
+<li><p><strong>Fields with Spaces or Special Characters (Quotes):</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select &#39;first name&#39;, \&quot;last-name\&quot;&quot;</span>
+</pre></div>
+</div>
+<p>Use single or double quotes for field names with spaces or special characters.</p>
+</li>
+</ul>
+<p>### Aliases</p>
+<p>Rename fields in the output using <cite>as</cite>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name as full_name, age as years&quot;</span>
+</pre></div>
+</div>
+<p><strong>Output Example:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;full_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;years&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;full_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;years&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<p>### Arithmetic Expressions</p>
+<p>Perform calculations within the <cite>select</cite> clause:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age + 10 as age_plus_10, price * 2 as doubled_price&quot;</span>
+</pre></div>
+</div>
+<p><strong>Output Example:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;age_plus_10&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">40</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;doubled_price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2400</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;age_plus_10&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">35</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;doubled_price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">}</span>
+<span class="p">]</span>
 </pre></div>
 </div>
 </section>
-<section id="filtering">
-<h2>Filtering<a class="headerlink" href="#filtering" title="Link to this heading">¶</a></h2>
-<p>Filter results using the <code class="docutils literal notranslate"><span class="pre">if</span></code> keyword:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age if age &gt; 30&quot;</span>
+<section id="from-clause">
+<h2>FROM Clause<a class="headerlink" href="#from-clause" title="Link to this heading">¶</a></h2>
+<p>The <cite>FROM</cite> clause lets you target a specific part of the JSON structure, such as a nested array.</p>
+<ul>
+<li><p><strong>Basic Usage:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select order_id, item from [].orders&quot;</span>
 </pre></div>
 </div>
-<p>Combine conditions with <code class="docutils literal notranslate"><span class="pre">and</span></code> and <code class="docutils literal notranslate"><span class="pre">or</span></code>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age if age &gt; 25 and city = &#39;New York&#39;&quot;</span>
-jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age if age &gt; 30 or city = &#39;Los Angeles&#39;&quot;</span>
+<p>Queries the <cite>orders</cite> array within each top-level object.</p>
+</li>
+<li><p><strong>With Filtering:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select order_id, price from [].orders if price &gt; 800&quot;</span>
 </pre></div>
 </div>
-<p>Use parentheses for complex expressions:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age if (age &gt; 30 and city = &#39;Chicago&#39;) or (age &lt; 25 and city = &#39;New York&#39;)&quot;</span>
+<p>Filters <cite>orders</cite> where <cite>price</cite> exceeds 800.</p>
+</li>
+</ul>
+<p><strong>Example JSON:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;orders&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">101</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1200</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">102</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">800</span><span class="p">}]},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;orders&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">103</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="p">}]}</span>
+<span class="p">]</span>
 </pre></div>
 </div>
+<p><strong>Output:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">101</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1200</span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+</section>
+<section id="filtering-with-conditions">
+<h2>Filtering with Conditions<a class="headerlink" href="#filtering-with-conditions" title="Link to this heading">¶</a></h2>
+<p>The <cite>if</cite> clause filters data based on conditions using comparison and logical operators.</p>
+<p>### Basic Filtering</p>
+<ul>
+<li><p><strong>Comparison Operators:</strong> <cite>=</cite>, <cite>==</cite>, <cite>!=</cite>, <cite>&gt;</cite>, <cite>&lt;</cite>, <cite>&gt;=</cite>, <cite>&lt;=</cite></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age if age &gt;= 30&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>String Equality:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name if city = &#39;New York&#39;&quot;</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<p>### Logical Operators</p>
+<p>Combine conditions with <cite>and</cite>, <cite>or</cite>, and parentheses:</p>
+<ul>
+<li><p><strong>Multiple Conditions:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name if age &gt; 25 and city = &#39;Chicago&#39;&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>With `or`:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name if age &gt; 30 or city = &#39;Los Angeles&#39;&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Complex Logic:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name if (age &gt; 30 and city = &#39;Chicago&#39;) or profile.active = true&quot;</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<p>### Advanced Operators</p>
+<ul>
+<li><p><strong>BETWEEN (Numeric Ranges):</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select item, price from [].orders if price between 700 and 1000&quot;</span>
+</pre></div>
+</div>
+<p>Matches values inclusively between 700 and 1000.</p>
+</li>
+<li><p><strong>CONTAINS (String Search):</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select item from [].orders if item contains &#39;book&#39;&quot;</span>
+</pre></div>
+</div>
+<p>Returns items with “book” in the string.</p>
+</li>
+</ul>
 </section>
 <section id="sorting-and-limiting">
 <h2>Sorting and Limiting<a class="headerlink" href="#sorting-and-limiting" title="Link to this heading">¶</a></h2>
-<p>Sort results by a field:</p>
+<p>Control the order and number of results.</p>
+<ul>
+<li><p><strong>Sort Ascending:</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age sort age&quot;</span>
 </pre></div>
 </div>
-<p>Sort in descending order:</p>
+</li>
+<li><p><strong>Sort Descending:</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age sort age desc&quot;</span>
 </pre></div>
 </div>
-<p>Limit the number of results:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age sort age desc 5&quot;</span>
+</li>
+<li><p><strong>Limit Results:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age sort age desc 3&quot;</span>
 </pre></div>
 </div>
+<p>Returns the top 3 results sorted by <cite>age</cite> descending.</p>
+</li>
+</ul>
 </section>
 <section id="aggregation-functions">
 <h2>Aggregation Functions<a class="headerlink" href="#aggregation-functions" title="Link to this heading">¶</a></h2>
-<p>jonq supports several aggregation functions:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">sum()</span></code> - Calculate the sum of values</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">avg()</span></code> - Calculate the average of values</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">count()</span></code> - Count the number of items</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">max()</span></code> - Find the maximum value</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">min()</span></code> - Find the minimum value</p></li>
-</ul>
-<p>Examples:</p>
+<p>Summarize data with built-in functions: <cite>sum</cite>, <cite>avg</cite>, <cite>count</cite>, <cite>max</cite>, <cite>min</cite>.</p>
+<ul>
+<li><p><strong>Sum:</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select sum(age) as total_age&quot;</span>
-jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select avg(age) as average_age&quot;</span>
-jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select count(*) as user_count&quot;</span>
-jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select max(orders.price) as highest_price&quot;</span>
-jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select min(orders.price) as lowest_price&quot;</span>
 </pre></div>
 </div>
-<p>You can use aliases with the <code class="docutils literal notranslate"><span class="pre">as</span></code> keyword:</p>
+</li>
+<li><p><strong>Average:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select avg(price) as average_price from [].orders&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Count:</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select count(*) as total_users&quot;</span>
 </pre></div>
 </div>
-</section>
-<section id="grouping">
-<h2>Grouping<a class="headerlink" href="#grouping" title="Link to this heading">¶</a></h2>
-<p>Group data and perform aggregations per group:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select city, count(*) as user_count group by city&quot;</span>
-jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select city, avg(age) as avg_age group by city&quot;</span>
+</li>
+<li><p><strong>Maximum:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select max(orders.price) as highest_price&quot;</span>
 </pre></div>
 </div>
+</li>
+<li><p><strong>Minimum:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select min(age) as youngest&quot;</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<p>### Combining Aggregations</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select sum(price) as total, avg(price) as avg_price from [].orders&quot;</span>
+</pre></div>
+</div>
+<p><strong>Output Example:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;total&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2500</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;avg_price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">833.33</span><span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="grouping-data">
+<h2>Grouping Data<a class="headerlink" href="#grouping-data" title="Link to this heading">¶</a></h2>
+<p>Use <cite>group by</cite> to aggregate data by categories.</p>
+<ul>
+<li><p><strong>Simple Grouping:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select city, count(*) as user_count group by city&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Multiple Fields:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select city, country, avg(age) as avg_age group by city, country&quot;</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="having-clause">
+<h2>Having Clause<a class="headerlink" href="#having-clause" title="Link to this heading">¶</a></h2>
+<p>Filter grouped results with <cite>having</cite>:</p>
+<ul>
+<li><p><strong>Basic Example:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select city, count(*) as count group by city having count &gt; 2&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>With Aggregation:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select city, avg(age) as avg_age group by city having avg_age &gt;= 30&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Complex Conditions:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select city, sum(price) as total group by city having total &gt; 1000 and count(*) &gt; 1&quot;</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="output-formats">
+<h2>Output Formats<a class="headerlink" href="#output-formats" title="Link to this heading">¶</a></h2>
+<p>Choose how results are displayed:</p>
+<ul>
+<li><p><strong>JSON (Default):</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>CSV:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&quot;select name, age&quot;</span><span class="w"> </span>--format<span class="w"> </span>csv
+</pre></div>
+</div>
+<p><strong>Output Example:</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>name,age
+Alice,30
+Bob,25
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="optional">
+<h2>Optional<a class="headerlink" href="#optional" title="Link to this heading">¶</a></h2>
+<p>For users dealing with large or complex nested JSON structures, we recommend installing the optional <cite>jonq_fast</cite> Rust extension.</p>
+<ul>
+<li><p><strong>Fast:</strong></p>
+<blockquote>
+<div><p>jonq data.json “select name, age” –fast</p>
+</div></blockquote>
+</li>
+</ul>
+</section>
+<section id="handling-large-files">
+<h2>Handling Large Files<a class="headerlink" href="#handling-large-files" title="Link to this heading">¶</a></h2>
+<p>For big JSON files, use streaming mode:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>large_data.json<span class="w"> </span><span class="s2">&quot;select name, age&quot;</span><span class="w"> </span>--stream
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong>Requirement:</strong> The JSON must be an array at the root level.</p></li>
+<li><p><strong>Benefit:</strong> Processes data in chunks, reducing memory usage.</p></li>
+</ul>
+</section>
+<section id="tips-and-tricks">
+<h2>Tips and Tricks<a class="headerlink" href="#tips-and-tricks" title="Link to this heading">¶</a></h2>
+<p>### Debugging Queries</p>
+<ul class="simple">
+<li><p><strong>Test Small:</strong> Start with a simple <cite>select *</cite> to verify the JSON structure.</p></li>
+<li><p><strong>Check Paths:</strong> Use tools like <cite>jq ‘.’ data.json</cite> to inspect nested paths.</p></li>
+<li><p><strong>Quote Strings:</strong> Always quote string literals in conditions (e.g., <cite>‘New York’</cite>).</p></li>
+</ul>
+<p>### Optimizing Performance</p>
+<ul class="simple">
+<li><p><strong>Use FROM:</strong> Narrow down the data with <cite>from</cite> to avoid processing unnecessary parts.</p></li>
+<li><p><strong>Limit Early:</strong> Apply <cite>limit</cite> or strict <cite>if</cite> conditions to reduce output size.</p></li>
+<li><p><strong>Stream Large Files:</strong> Always use <cite>–stream</cite> for files over 100MB.</p></li>
+</ul>
+<p>### Working with Arrays</p>
+<ul class="simple">
+<li><p><strong>Unpack Arrays:</strong> Use <cite>from [].path</cite> to query array elements directly.</p></li>
+<li><p><strong>Index Safely:</strong> Check array lengths in your data to avoid out-of-bounds errors.</p></li>
+</ul>
+<p>### Handling Nulls</p>
+<ul class="simple">
+<li><p><strong>Filter Nulls:</strong> Add <cite>if field != null</cite> to exclude missing values.</p></li>
+<li><p><strong>Default Values:</strong> Use expressions like <cite>field + 0</cite> to treat null as zero in calculations.</p></li>
+</ul>
+</section>
+<section id="best-practices">
+<h2>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<p>To optimize your experience with <code class="docutils literal notranslate"><span class="pre">jonq</span></code>, follow these best practices:</p>
+<ul class="simple">
+<li><p><strong>Use the `from` Clause</strong>: Specify a <cite>from</cite> clause (e.g., <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">[].orders</span></code>) to target specific JSON structures, reducing processed data (supported in <cite>SYNTAX.md</cite> and <cite>jonq/query_parser.py</cite>).</p></li>
+<li><p><strong>Limit Results Early</strong>: Apply filters (e.g., <code class="docutils literal notranslate"><span class="pre">if</span> <span class="pre">price</span> <span class="pre">&gt;</span> <span class="pre">1000</span></code>) and limits (e.g., <code class="docutils literal notranslate"><span class="pre">sort</span> <span class="pre">age</span> <span class="pre">desc</span> <span class="pre">5</span></code>) early in queries to minimize data handling (see <cite>USAGE.md</cite> examples).</p></li>
+<li><p><strong>Stream Large Files</strong>: Use the <code class="docutils literal notranslate"><span class="pre">--stream</span></code> option for large JSON files to process data in chunks and avoid memory overload (implemented in <cite>jonq/main.py</cite> and <cite>jonq/stream_utils.py</cite>).</p></li>
+<li><p><strong>Test Queries on Small Data</strong>: Validate queries on smaller JSON subsets before running on large datasets to ensure correctness and performance (a practical tip from usage patterns).</p></li>
+<li><p><strong>Handle Nulls Carefully</strong>: Use conditions like <code class="docutils literal notranslate"><span class="pre">age</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">null</span></code> to manage null values explicitly, as <code class="docutils literal notranslate"><span class="pre">jonq</span></code> handles them automatically but may need specific filtering (noted in <cite>SYNTAX.md</cite>).</p></li>
+</ul>
+</section>
+<section id="known-limitations">
+<h2>Known Limitations<a class="headerlink" href="#known-limitations" title="Link to this heading">¶</a></h2>
+<p>While <code class="docutils literal notranslate"><span class="pre">jonq</span></code> excels at lightweight JSON querying, it has some constraints based on its design and implementation:</p>
+<ul class="simple">
+<li><p><strong>Performance with Very Large Files</strong>: Processing JSON files exceeding 100MB may be slow, even with streaming (<code class="docutils literal notranslate"><span class="pre">--stream</span></code>), due to JSON parsing overhead (noted in <cite>README.md</cite>).</p></li>
+<li><p><strong>Advanced jq Features</strong>: Some complex <code class="docutils literal notranslate"><span class="pre">jq</span></code> functionalities (e.g., recursive descent or custom filters) are not exposed through <code class="docutils literal notranslate"><span class="pre">jonq</span></code>’s SQL-like syntax (see <cite>jonq/jq_filter.py</cite>).</p></li>
+<li><p><strong>Multiple File Joins</strong>: <code class="docutils literal notranslate"><span class="pre">jonq</span></code> does not support joining data across multiple JSON files, limiting it to single-file operations (evident from <cite>jonq/main.py</cite> accepting one file).</p></li>
+<li><p><strong>Custom Functions</strong>: Users cannot define custom functions within queries, restricting extensibility (confirmed by <cite>SYNTAX.md</cite> lacking such syntax).</p></li>
+<li><p><strong>Date/Time Operations</strong>: Limited support for parsing or manipulating date/time data (e.g., no date-specific functions in <cite>SYNTAX.md</cite> or test cases like <cite>test_manual_edge.sh</cite>).</p></li>
+</ul>
 </section>
 </section>
 
@@ -166,18 +431,26 @@ jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&q
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Usage</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#basic-usage">Basic Usage</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#query-syntax">Query Syntax</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#query-syntax-breakdown">Query Syntax Breakdown</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#field-selection">Field Selection</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#filtering">Filtering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#from-clause">FROM Clause</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#filtering-with-conditions">Filtering with Conditions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#sorting-and-limiting">Sorting and Limiting</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#aggregation-functions">Aggregation Functions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#grouping">Grouping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#grouping-data">Grouping Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#having-clause">Having Clause</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#output-formats">Output Formats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#optional">Optional</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#handling-large-files">Handling Large Files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tips-and-tricks">Tips and Tricks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#best-practices">Best Practices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#known-limitations">Known Limitations</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="comparison.html">Comparison</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
-<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
 
 <div class="relations">
@@ -185,7 +458,7 @@ jonq<span class="w"> </span>data.json<span class="w"> </span><span class="s2">&q
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
       <li>Previous: <a href="installation.html" title="previous chapter">Installation</a></li>
-      <li>Next: <a href="api.html" title="next chapter">API Reference</a></li>
+      <li>Next: <a href="comparison.html" title="next chapter">Comparison</a></li>
   </ul></li>
 </ul>
 </div>

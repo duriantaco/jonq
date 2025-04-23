@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>usage in python &#8212; jonq 0.0.2 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=12dfc556" />
+    <script src="_static/documentation_options.js?v=e3a6060d"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="usage-in-python">
+<h1>usage in python<a class="headerlink" href="#usage-in-python" title="Link to this heading">¶</a></h1>
+<p>While <cite>jonq</cite> is designed as a command-line tool, you can integrate its functionality into Python scripts in two ways:</p>
+<ol class="arabic simple">
+<li><p><strong>Using the `jonq_fast` extension</strong> (if installed) for efficient JSON flattening.</p></li>
+<li><p><strong>Calling `jonq` via the `subprocess` module</strong> to execute queries from within Python.</p></li>
+</ol>
+<p>This section provides examples and guidance for both approaches.</p>
+<section id="using-jonq-fast">
+<h2>Using jonq_fast<a class="headerlink" href="#using-jonq-fast" title="Link to this heading">¶</a></h2>
+<p>If you have installed the optional <cite>jonq-fast</cite> extension (via <cite>pip install jonq-fast</cite>), you can use its <cite>flatten</cite> function directly in your Python code to flatten nested JSON structures efficiently. This is particularly useful for preparing JSON data for further processing, such as generating CSV output or performing data analysis.</p>
+<p>### Example: Flattening JSON with <cite>jonq_fast</cite></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jonq_fast</span>
+
+<span class="n">data</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;user&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Alice&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;address&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;city&quot;</span><span class="p">:</span> <span class="s2">&quot;New York&quot;</span><span class="p">},</span>
+        <span class="s2">&quot;orders&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;item&quot;</span><span class="p">:</span> <span class="s2">&quot;Laptop&quot;</span><span class="p">,</span> <span class="s2">&quot;price&quot;</span><span class="p">:</span> <span class="mi">1200</span><span class="p">},</span>
+            <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;item&quot;</span><span class="p">:</span> <span class="s2">&quot;Phone&quot;</span><span class="p">,</span> <span class="s2">&quot;price&quot;</span><span class="p">:</span> <span class="mi">800</span><span class="p">}</span>
+        <span class="p">]</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="n">flattened</span> <span class="o">=</span> <span class="n">jonq_fast</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;.&quot;</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">flattened</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Output:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;user.name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;user.address.city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;New York&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;user.orders.0.id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;user.orders.0.item&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Laptop&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;user.orders.0.price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1200</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;user.orders.1.id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;user.orders.1.item&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Phone&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;user.orders.1.price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">800</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The <cite>flatten</cite> function takes two arguments:</p>
+<ul class="simple">
+<li><p><cite>data</cite>: The JSON object (as a Python dictionary or list) to flatten.</p></li>
+<li><p><cite>sep</cite>: The separator to use for nested keys (e.g., <cite>“.”</cite> for dot notation).</p></li>
+</ul>
+<p>This function leverages Rust for improved performance, making it ideal for large or deeply nested JSON structures.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Ensure that <cite>jonq-fast</cite> is installed by running <cite>pip install jonq-fast</cite>. Without it, this functionality is unavailable.</p>
+</div>
+</section>
+<section id="calling-jonq-via-subprocess">
+<h2>Calling jonq via subprocess<a class="headerlink" href="#calling-jonq-via-subprocess" title="Link to this heading">¶</a></h2>
+<p>To use <cite>jonq</cite>’s querying capabilities from within a Python script, you can call it via the <cite>subprocess</cite> module. This allows you to execute <cite>jonq</cite> commands programmatically and capture the output for further processing.</p>
+<p>### Example: Running a <cite>jonq</cite> Query from Python</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">run_jonq</span><span class="p">(</span><span class="n">json_file</span><span class="p">,</span> <span class="n">query</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="s1">&#39;jonq&#39;</span><span class="p">,</span> <span class="n">json_file</span><span class="p">,</span> <span class="n">query</span><span class="p">],</span> <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">returncode</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">run_jonq</span><span class="p">(</span><span class="s1">&#39;simple.json&#39;</span><span class="p">,</span> <span class="s1">&#39;select name, age if age &gt; 25&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Example Output (using `simple.json` from the Examples section):</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Charlie&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">35</span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<p>In this example:</p>
+<ul class="simple">
+<li><p>The <cite>run_jonq</cite> function executes a <cite>jonq</cite> query on the specified JSON file.</p></li>
+<li><p>It captures the output and parses it as JSON if the command succeeds.</p></li>
+<li><p>If <cite>jonq</cite> returns an error (e.g., invalid query or file not found), it raises an exception with the error message.</p></li>
+</ul>
+<p>This approach is useful for integrating <cite>jonq</cite> into larger Python workflows, such as data pipelines or automated scripts.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Ensure that <cite>jonq</cite> is installed and accessible in your system’s PATH. Verify this by running <cite>jonq –version</cite> from the command line.</p>
+</div>
+</section>
+<section id="additional-considerations">
+<h2>Additional Considerations<a class="headerlink" href="#additional-considerations" title="Link to this heading">¶</a></h2>
+<ul>
+<li><p><strong>Performance</strong>: For large JSON files, use the <cite>–stream</cite> option when calling <cite>jonq</cite> via <cite>subprocess</cite> to process data in chunks:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="s1">&#39;jonq&#39;</span><span class="p">,</span> <span class="s1">&#39;large_data.json&#39;</span><span class="p">,</span> <span class="s1">&#39;select name, age&#39;</span><span class="p">,</span> <span class="s1">&#39;--stream&#39;</span><span class="p">],</span> <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Error Handling</strong>: Always check the return code and handle errors appropriately, as shown in the example.</p></li>
+<li><p><strong>Output Parsing</strong>: The output from <cite>jonq</cite> is typically a JSON array or object. Use <cite>json.loads()</cite> to parse it into a Python data structure.</p></li>
+</ul>
+<p>By leveraging these methods, you can incorporate <cite>jonq</cite>’s powerful JSON querying capabilities into your Python projects.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">jonq</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="comparison.html">Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contributing</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, oha.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.4.7</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+      |
+      <a href="_sources/usage_in_python.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

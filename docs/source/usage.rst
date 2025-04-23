@@ -361,7 +361,7 @@ Choose how results are displayed:
 
   **Output Example:**
 
-  .. code-block:: csv
+  .. code-block:: text
 
      name,age
      Alice,30

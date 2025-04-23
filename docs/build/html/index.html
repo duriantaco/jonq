@@ -5,10 +5,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Welcome to jonq’s documentation! &#8212; jonq 0.0.1 documentation</title>
+    <title>Welcome to jonq’s documentation! &#8212; jonq 0.0.2 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=12dfc556" />
-    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/documentation_options.js?v=e3a6060d"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -35,7 +35,7 @@
 <h1>Welcome to jonq’s documentation!<a class="headerlink" href="#welcome-to-jonq-s-documentation" title="Link to this heading">¶</a></h1>
 <a class="reference external image-reference" href="https://pypi.org/project/jonq/"><img alt="PyPI Version" src="https://img.shields.io/pypi/v/jonq.svg" />
 </a>
-<p>jonq is a Python tool that provides SQL-like syntax for querying JSON files, built as a wrapper around the powerful jq utility.</p>
+<p>jonq is a Python tool that provides a SQL-like syntax for querying JSON files, built as a wrapper around the powerful <cite>jq</cite> utility. It simplifies JSON querying for users familiar with SQL, making it easier to extract and manipulate data without needing to master <cite>jq</cite>’s complex syntax.</p>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
@@ -47,13 +47,34 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="usage.html#basic-usage">Basic Usage</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage.html#query-syntax">Query Syntax</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#query-syntax-breakdown">Query Syntax Breakdown</a></li>
 <li class="toctree-l2"><a class="reference internal" href="usage.html#field-selection">Field Selection</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage.html#filtering">Filtering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#from-clause">FROM Clause</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#filtering-with-conditions">Filtering with Conditions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="usage.html#sorting-and-limiting">Sorting and Limiting</a></li>
 <li class="toctree-l2"><a class="reference internal" href="usage.html#aggregation-functions">Aggregation Functions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage.html#grouping">Grouping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#grouping-data">Grouping Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#having-clause">Having Clause</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#output-formats">Output Formats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#optional">Optional</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#handling-large-files">Handling Large Files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#tips-and-tricks">Tips and Tricks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#best-practices">Best Practices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage.html#known-limitations">Known Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage_in_python.html">usage in python</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage_in_python.html#using-jonq-fast">Using jonq_fast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage_in_python.html#calling-jonq-via-subprocess">Calling jonq via subprocess</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage_in_python.html#additional-considerations">Additional Considerations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="comparison.html">Comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#simple-json">Simple JSON</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#nested-json">Nested JSON</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#complex-json">Complex JSON</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a><ul>
@@ -61,12 +82,7 @@
 <li class="toctree-l2"><a class="reference internal" href="api.html#query-parser-jonq-query-parser">Query Parser (jonq.query_parser)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#jq-filter-jonq-jq-filter">JQ Filter (jonq.jq_filter)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#executor-jonq-executor">Executor (jonq.executor)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#query-syntax">Query Syntax</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="examples.html#simple-json">Simple JSON</a></li>
-<li class="toctree-l2"><a class="reference internal" href="examples.html#nested-json">Nested JSON</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#csv-utils-jonq-csv-utils">CSV Utils (jonq.csv_utils)</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="contribution.html">Contributing</a><ul>
@@ -85,6 +101,8 @@
 <section id="indices-and-tables">
 <h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading">¶</a></h1>
 <ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
 <li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
 </ul>
 </section>
@@ -110,8 +128,10 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
-<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage_in_python.html">usage in python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="comparison.html">Comparison</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="contribution.html">Contributing</a></li>
 </ul>
 

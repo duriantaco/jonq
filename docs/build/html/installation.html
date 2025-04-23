@@ -5,10 +5,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Installation &#8212; jonq 0.0.1 documentation</title>
+    <title>Installation &#8212; jonq 0.0.2 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=12dfc556" />
-    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/documentation_options.js?v=e3a6060d"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -68,6 +68,15 @@
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>jonq
 </pre></div>
 </div>
+<p>For improved performance, especially when processing large or complex JSON structures (e.g., for CSV output), install the optional <strong>jonq-fast</strong> Rust extension:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>jonq-fast
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong>Purpose</strong>: <strong>jonq-fast</strong> provides a faster JSON flattening implementation, beneficial when using the <cite>–fast</cite> or <cite>-F</cite> option with CSV output.</p></li>
+<li><p><strong>Requirements</strong>: Typically, <cite>pip install jonq-fast</cite> installs a pre-built wheel. If a wheel is unavailable for your platform, you’ll need a Rust compiler to build it from source.</p></li>
+<li><p><strong>Usage</strong>: After installation, use the <cite>–fast</cite> flag for enhanced performance:</p></li>
+</ul>
 </section>
 <section id="development-installation">
 <h2>Development Installation<a class="headerlink" href="#development-installation" title="Link to this heading">¶</a></h2>
@@ -107,9 +116,9 @@ pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </s
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
-<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="comparison.html">Comparison</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
-<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
 
 <div class="relations">

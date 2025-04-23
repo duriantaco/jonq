@@ -5,16 +5,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Examples &#8212; jonq 0.0.1 documentation</title>
+    <title>Examples &#8212; jonq 0.0.2 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=12dfc556" />
-    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/documentation_options.js?v=e3a6060d"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Contributing" href="contribution.html" />
-    <link rel="prev" title="API Reference" href="api.html" />
+    <link rel="next" title="API Reference" href="api.html" />
+    <link rel="prev" title="Comparison" href="comparison.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -36,247 +36,190 @@
 <h1>Examples<a class="headerlink" href="#examples" title="Link to this heading">¶</a></h1>
 <section id="simple-json">
 <h2>Simple JSON<a class="headerlink" href="#simple-json" title="Link to this heading">¶</a></h2>
-<p>Consider this simple JSON file (<code class="docutils literal notranslate"><span class="pre">simple.json</span></code>):</p>
+<p>Consider <cite>simple.json</cite>:</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;New York&quot;</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Los Angeles&quot;</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Charlie&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">35</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Chicago&quot;</span>
-<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;New York&quot;</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Los Angeles&quot;</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Charlie&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">35</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Chicago&quot;</span><span class="p">}</span>
 <span class="p">]</span>
 </pre></div>
 </div>
-<p>Select all fields:</p>
+<ul>
+<li><p><strong>Select all fields:</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>simple.json<span class="w"> </span><span class="s2">&quot;select *&quot;</span>
 </pre></div>
 </div>
-<p>Output:</p>
+<p><strong>Output:</strong></p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;New York&quot;</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Los Angeles&quot;</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Charlie&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">35</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Chicago&quot;</span>
-<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;New York&quot;</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Los Angeles&quot;</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Charlie&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">35</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Chicago&quot;</span><span class="p">}</span>
 <span class="p">]</span>
 </pre></div>
 </div>
-<p>Select specific fields:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>simple.json<span class="w"> </span><span class="s2">&quot;select name, age&quot;</span>
+</li>
+<li><p><strong>Filter and sort:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>simple.json<span class="w"> </span><span class="s2">&quot;select name, age if age &gt; 25 sort age desc 2&quot;</span>
 </pre></div>
 </div>
-<p>Output:</p>
+<p><strong>Output:</strong></p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Charlie&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">35</span>
-<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Charlie&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">35</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">}</span>
 <span class="p">]</span>
 </pre></div>
 </div>
-<p>Filter with conditions:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>simple.json<span class="w"> </span><span class="s2">&quot;select name, age if age &gt; 30&quot;</span>
+</li>
+<li><p><strong>Aggregation with having:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>simple.json<span class="w"> </span><span class="s2">&quot;select city, avg(age) as avg_age group by city having avg_age &gt; 25&quot;</span>
 </pre></div>
 </div>
-<p>Output:</p>
+<p><strong>Output:</strong></p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Charlie&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">35</span>
-<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Chicago&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;avg_age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">35</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;New York&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;avg_age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">}</span>
 <span class="p">]</span>
 </pre></div>
 </div>
-<p>Sorting:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>simple.json<span class="w"> </span><span class="s2">&quot;select name, age sort age desc 2&quot;</span>
+</li>
+<li><p><strong>Arithmetic expression:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>simple.json<span class="w"> </span><span class="s2">&quot;select max(age) - min(age) as age_range&quot;</span>
 </pre></div>
 </div>
-<p>Output:</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Charlie&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">35</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">]</span>
+<p><strong>Output:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;age_range&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">}</span>
 </pre></div>
 </div>
-<p>Aggregation:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>simple.json<span class="w"> </span><span class="s2">&quot;select sum(age) as total_age&quot;</span>
-</pre></div>
-</div>
-<p>Output:</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;total_age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">90</span>
-<span class="p">}</span>
-</pre></div>
-</div>
+</li>
+</ul>
 </section>
 <section id="nested-json">
 <h2>Nested JSON<a class="headerlink" href="#nested-json" title="Link to this heading">¶</a></h2>
-<p>For more complex, nested JSON files:</p>
+<p>Consider <cite>nested.json</cite>:</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
 <span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;profile&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;New York&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;zip&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;10001&quot;</span>
-<span class="w">      </span><span class="p">}</span>
-<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;profile&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;New York&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;zip&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;10001&quot;</span><span class="p">}},</span>
 <span class="w">    </span><span class="nt">&quot;orders&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">      </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">101</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;item&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Laptop&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1200</span>
-<span class="w">      </span><span class="p">},</span>
-<span class="w">      </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">102</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;item&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Phone&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">800</span>
-<span class="w">      </span><span class="p">}</span>
+<span class="w">      </span><span class="p">{</span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">101</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;item&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Laptop&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1200</span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">102</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;item&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Phone&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">800</span><span class="p">}</span>
 <span class="w">    </span><span class="p">]</span>
 <span class="w">  </span><span class="p">},</span>
 <span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;profile&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Los Angeles&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;zip&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;90001&quot;</span>
-<span class="w">      </span><span class="p">}</span>
-<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;profile&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Los Angeles&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;zip&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;90001&quot;</span><span class="p">}},</span>
 <span class="w">    </span><span class="nt">&quot;orders&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">      </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">103</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;item&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Tablet&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span>
-<span class="w">      </span><span class="p">}</span>
+<span class="w">      </span><span class="p">{</span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">103</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;item&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Tablet&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="p">}</span>
 <span class="w">    </span><span class="p">]</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">]</span>
 </pre></div>
 </div>
-<p>Query nested fields:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>nested.json<span class="w"> </span><span class="s2">&quot;select name, profile.age&quot;</span>
-</pre></div>
-</div>
-<p>Output:</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">]</span>
-</pre></div>
-</div>
-<p>Access deeply nested fields:</p>
+<ul>
+<li><p><strong>Nested fields:</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>nested.json<span class="w"> </span><span class="s2">&quot;select name, profile.address.city&quot;</span>
 </pre></div>
 </div>
-<p>Output:</p>
+<p><strong>Output:</strong></p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;New York&quot;</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Los Angeles&quot;</span>
-<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;New York&quot;</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Los Angeles&quot;</span><span class="p">}</span>
 <span class="p">]</span>
 </pre></div>
 </div>
-<p>Count items in arrays:</p>
+</li>
+<li><p><strong>Array operations:</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>nested.json<span class="w"> </span><span class="s2">&quot;select name, count(orders) as order_count&quot;</span>
 </pre></div>
 </div>
-<p>Output:</p>
+<p><strong>Output:</strong></p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;order_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;order_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;order_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>BETWEEN operator:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>nested.json<span class="w"> </span><span class="s2">&quot;select order_id, price from [].orders if price between 700 and 1000&quot;</span>
+</pre></div>
+</div>
+<p><strong>Output:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">102</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">800</span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>CONTAINS operator:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>nested.json<span class="w"> </span><span class="s2">&quot;select order_id, item from [].orders if item contains &#39;a&#39;&quot;</span>
+</pre></div>
+</div>
+<p><strong>Output:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">101</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;item&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Laptop&quot;</span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">103</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;item&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Tablet&quot;</span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="complex-json">
+<h2>Complex JSON<a class="headerlink" href="#complex-json" title="Link to this heading">¶</a></h2>
+<p>Consider <cite>complex.json</cite> (abbreviated):</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;company&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;subsidiaries&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TechCorp Asia&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;employees&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">250</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;financials&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;revenue&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42000000</span><span class="p">}},</span>
+<span class="w">      </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TechCorp Europe&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;employees&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;financials&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;revenue&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">58000000</span><span class="p">}}</span>
+<span class="w">    </span><span class="p">]</span>
 <span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;order_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">]</span>
+<span class="w">  </span><span class="nt">&quot;products&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;P001&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Software&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;versions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">&quot;pricing&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;monthly&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">199.99</span><span class="p">}}]},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;P002&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Software&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;versions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">&quot;pricing&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;monthly&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">149.99</span><span class="p">}}]}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
 </pre></div>
 </div>
-<p>Complex filtering:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>nested.json<span class="w"> </span><span class="s2">&quot;select name, profile.age if profile.address.city = &#39;New York&#39; or orders[0].price &gt; 1000&quot;</span>
+<ul>
+<li><p><strong>Filtering:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>complex.json<span class="w"> </span><span class="s2">&quot;select name, founded from company.subsidiaries[] if founded &gt; 2008&quot;</span>
 </pre></div>
 </div>
-<p>Output:</p>
+<p><strong>Output:</strong></p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span>
-<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TechCorp Asia&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;founded&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2010</span><span class="p">},</span>
 <span class="p">]</span>
 </pre></div>
 </div>
-<p>Group by with aggregation:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>nested.json<span class="w"> </span><span class="s2">&quot;select profile.address.city, avg(profile.age) as avg_age group by profile.address.city&quot;</span>
+</li>
+<li><p><strong>Deep nesting:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>complex.json<span class="w"> </span><span class="s2">&quot;select company.headquarters.coordinates.latitude&quot;</span>
 </pre></div>
 </div>
-<p>Output:</p>
+<p><strong>Output:</strong>
+.. code-block:: json</p>
+<blockquote>
+<div><dl class="simple">
+<dt>{</dt><dd><p>“latitude”: 37.7749</p>
+</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+</li>
+<li><p><strong>Complex grouping:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jonq<span class="w"> </span>complex.json<span class="w"> </span><span class="s2">&quot;select type, avg(versions[].pricing.monthly) as avg_price group by type from products[]&quot;</span>
+</pre></div>
+</div>
+<p><strong>Output:</strong></p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;New York&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;avg_age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;city&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Los Angeles&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;avg_age&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span>
-<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="p">{</span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Software&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;avg_price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">216.67</span><span class="p">}</span>
 <span class="p">]</span>
 </pre></div>
 </div>
+</li>
+</ul>
 </section>
 </section>
 
@@ -301,21 +244,22 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
-<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="comparison.html">Comparison</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Examples</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#simple-json">Simple JSON</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#nested-json">Nested JSON</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#complex-json">Complex JSON</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="api.html" title="previous chapter">API Reference</a></li>
-      <li>Next: <a href="contribution.html" title="next chapter">Contributing</a></li>
+      <li>Previous: <a href="comparison.html" title="previous chapter">Comparison</a></li>
+      <li>Next: <a href="api.html" title="next chapter">API Reference</a></li>
   </ul></li>
 </ul>
 </div>

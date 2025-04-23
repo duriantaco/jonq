@@ -13,11 +13,11 @@ jonq is a Python tool that provides a SQL-like syntax for querying JSON files, b
 
    installation
    usage
-   using jonq in Python
+   usage_in_python
    comparison
    examples
    api
-   contributing
+   contribution
 
 Indices and tables
 ==================

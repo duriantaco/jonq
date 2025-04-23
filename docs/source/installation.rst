@@ -47,6 +47,16 @@ Install jonq using pip:
 
    pip install jonq
 
+For improved performance, especially when processing large or complex JSON structures (e.g., for CSV output), install the optional **jonq-fast** Rust extension:
+
+.. code-block:: bash 
+
+   pip install jonq-fast
+
+- **Purpose**: **jonq-fast** provides a faster JSON flattening implementation, beneficial when using the `--fast` or `-F` option with CSV output.
+- **Requirements**: Typically, `pip install jonq-fast` installs a pre-built wheel. If a wheel is unavailable for your platform, you'll need a Rust compiler to build it from source.
+- **Usage**: After installation, use the `--fast` flag for enhanced performance:
+
 Development Installation
 -------------------------
 

@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
 name = "jonq"
-version = "0.0.1"
+version = "0.0.2"
 description = "SQL-like query tool for JSON files"
 readme = "README.md"
 requires-python = ">=3.9"

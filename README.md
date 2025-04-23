@@ -3,104 +3,169 @@
 
 # jonq
 
-### Human-readable syntax for JQ
+### Human‑readable syntax for **jq**
 
 [![PyPI version](https://img.shields.io/pypi/v/jonq.svg)](https://pypi.org/project/jonq/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/jonq.svg)](https://pypi.org/project/jonq/)
-[![Tests](https://github.com/duriantaco/jonq/actions/workflows/tests.yml/badge.svg)](https://github.com/duriantaco/jonq/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI tests](https://github.com/duriantaco/jonq/actions/workflows/tests.yml/badge.svg)](https://github.com/duriantaco/jonq/actions)
 [![Documentation Status](https://readthedocs.org/projects/jonq/badge/?version=latest)](https://jonq.readthedocs.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 </div>
 
-A Pythonish-SQL-like query tool for JSON files, built as a Python wrapper around the super awesome but difficult to use jq utility.
+---
 
-## Table of Contents
-- [Overview](#overview)
-- [Quick Start](#quick-start)
-- [Features](#features)
-- [jonq vs Native](#jonq-vs-native)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Example Simple JSON](#example-simple-json)
-- [Example with Nested JSON](#example-with-nested-json)
-- [Advanced Filtering](#advanced-filtering-with-complex-boolean-expressions)
-- [Grouping and Aggregation](#grouping-and-aggregation-with-group-by)
-- [Troubleshooting](#troubleshooting)
-- [Known Limitations](#known-limitations)
-- [Contributing](#contributing)
-- [License](#license)
+`jq` is unbeatable for JSON processing, but its syntax requires a lot of learning.  
+**jonq** wraps `jq` in a SQL-lish/pythonic layer you can read and remember.
 
-## Overview
+**Who It's For**: Jonq is designed for anyone who needs to work with JSON data. It's good for quick JSON exploration, lightweight ETL tasks, or validating config files in CI pipelines.
+---
 
-jonq allows you to query JSON data using familiar Pythonish-SQL-like syntax. It translates these queries into jq filters, making it easier for users familiar with SQL and Python to extract and manipulate data from JSON files without learning the full jq syntax (it's just too complex imo). 
+## ✨ What’s new in 0.0.2
 
-## Features
+* **Robust nested‑array handling** – automatic base‑array detection (`products[].versions[]`)
+* **Expression parser fixes** – arithmetic around aggregations now works (`sum(x) * 2`)
+* **Null‑safe aggregation** – avoids `Cannot iterate over null` errors
+* **jonq_fast** - 2x faster than normal jonq, but optional
+---
 
-* SQL-like Syntax: Query JSON with familiar `SELECT` statements and traverse nested JSONs with pythonic like syntax aka `abc.def`
-* Field Selection: Choose specific fields from your JSON data
-* Filtering: Filter your results using the `if` keyword
-* Sorting: Order results with ascending or descending sort
-* Pagination: Limit the number of results returned
-* Aggregation Functions: Use functions like `sum()`, `avg()`, `count()`, `max()` and `min()`
-* Allows CSV output and streaming mode
+## Features at a glance
 
-## Why Jonq? 
+| Category          | What you can do | Example |
+|-------------------|-----------------|---------|
+| **Selection**     | Pick fields     | `select name, age` |
+| **Wildcard**      | All fields      | `select *` |
+| **Filtering**     | Python‑style ops<br>`and / or / between / contains` | `if age > 30 and city = 'NY'` |
+| **Aggregations**  | `sum avg min max count` | `select avg(price) as avg_price` |
+| **Grouping**      | `group by` + `having`   | `… group by city having count > 2` |
+| **Ordering**      | `sort <field> [asc\|desc] <limit>` | `sort age desc 5` |
+| **Nested arrays** | `from [].orders` or inline paths | `select products[].name …` |
+| **Inline maths**  | Real expressions | `sum(items.price) * 2 as double_total` |
+| **CSV / stream**  | `--format csv`, `--stream` |
 
-### jonq vs Native
+---
 
-While jq is incredibly powerful, its syntax is a pain to use. I can't be the only one who feels that way right? jonq simplifies JSON querying with familiar, intuitive syntax:
+## Why Jonq?  
 
-| Task | Native jq | jonq | 
-|------|-----------|------|
-| Select specific fields | `jq '.[] \| {name: .name, age: .age}'` | `jonq data.json "select name, age"` |
-| Filter with condition | `jq '.[] \| select(.age > 30) \| {name, age}'` | `jonq data.json "select name, age if age > 30"` |
-| Sort results | `jq 'sort_by(.age) \| reverse \| .[0:2]'` | `jonq data.json "select name, age sort age desc 2"` |
-| Work with nested data | `jq '.[] \| select(.profile.address.city == "New York") \| {name, city: .profile.address.city}'` | `jonq data.json "select name, profile.address.city if profile.address.city = 'New York'"` |
-| Count items | `jq 'map(select(.age > 25)) \| length'` | `jonq data.json "select count(*) as count_over_25 if age > 25"` |
-| Group & aggregate | `jq 'group_by(.city) \| map({city: .[0].city, count: length})'` | `jonq data.json "select city, count(*) as user_count group by city"` |
-| Complex filters | `jq '.[] \| select(.age > 25 and (.city == "New York" or .city == "Chicago"))'` | `jonq data.json "select * if age > 25 and (city = 'New York' or city = 'Chicago')"` |
-| Group & filter by count | `jq 'group_by(.city) \| map(select(length > 2)) \| map({city: .[0].city, count: length})'` | `jonq data.json "select city, count(*) as count group by city having count > 2"` |
-| Group & filter by avg | `jq 'group_by(.city) \| map({city: .[0].city, avg_age: (map(.age) \| add / length)}) \| map(select(.avg_age > 30))'` | `jonq data.json "select city, avg(age) as avg_age group by city having avg_age > 30"` | 
+### Jonq vs raw jq  
 
-As you can see, jonq offers:
-- **Simpler syntax**: I'm not sure how much simpler can it get
-- **Familiar patterns**: Py + SQL-like keywords
-- **Readability**: For human readability 
-- **Faster development**: Write complex queries in a fraction of the time
+| Task | Raw **jq** filter | **jonq** one‑liner |
+|------|------------------|--------------------|
+| Select specific fields | `jq '.[]&#124;{name:.name,age:.age}'` | `jonq data.json "select name, age"` |
+| Filter rows | `jq '.[]&#124;select(.age &gt; 30)&#124;{name,age}'` | `… "select name, age if age > 30"` |
+| Sort + limit | `jq 'sort_by(.age) | reverse | .[0:2]'` | `… "select name, age sort age desc 2"` |
+| Deep filter | `jq '.[]&#124;select(.profile.address.city=="NY")&#124;{name,city:.profile.address.city}'` | `… "select name, profile.address.city if profile.address.city = 'NY'"` |
+| Count items | `jq 'map(select(.age>25)) | length'` | `… "select count(*) as over_25 if age > 25"` |
+| Group & count | `jq 'group_by(.city) | map({city:.[0].city,count:length})'` | `… "select city, count(*) as count group by city"` |
+| Complex boolean | `jq '.[] | select(.age>25 and (.city=="NY" or .city=="Chicago"))'` | `… "select * if age > 25 and (city = 'NY' or city = 'Chicago')"` |
+| Group & HAVING | `jq 'group_by(.city) | map(select(length>2)) | map({city:.[0].city,count:length})'` | `… "select city, count(*) group by city having count > 2"` |
+| Aggregation expression | - | `… "select sum(price) * 1.07 as total_gst"` |
+| Nested‑array aggregation | - | `… "select avg(products[].versions[].pricing.monthly) as avg_price"` |
 
-### jonq vs DuckDB
+**Take‑away:** a single `jonq` string replaces many pipes and brackets while still producing pure jq under the hood.
 
-- JSON Path Navigation: Jonq's syntax for traversing nested JSON structures with dot notation is intuitive and pythonic. Pretty easy to use if you ask me. 
-- Lightweight: Lightweight that doesn't require setting up a database system
-- jq Power: By leveraging jq, jonq inherits jq's powerful JSON processing capabilities while making it more accessible through a SQL-like interface.
-- Small Footprint: Jonq has fewer dependencies and a smaller installation footprint compared to DuckDB.
-- Purpose built: Self-explanatory 
+---
+
+### Jonq vs DuckDB vs Pandas (JSON extension)
+
+| Aspect | **jonq** | **DuckDB** | **Pandas** |
+|--------|------------|----------|----------|
+| Primary Use Case | Fast, lightweight JSON querying directly from the command line | General-purpose data manipulation and analysis in Python | Analytical SQL queries on large datasets, including JSON |
+| Setup | No DB, streams any JSON | Requires DB file / extension | Requires a Python environment with pandas and its dependencies installed |
+| Query language | Familiar SQL‑ish, no funky `json_extract`| SQL + JSON functions | Python code for data manipulation and analysis |
+| Footprint | Minimal: requires only jq (a ~500 KB binary); no environment setup | ~ 140 MB binary | Larger: ~20 MB for pandas and its dependencies |
+| Streaming | `--stream` processes line‑delimited JSON lazily | Must load into table | Can process large files using chunking, but not as memory-efficient as streaming |
+| Memory Usage | Low; streams data to avoid loading full JSON into memory | In-memory database, but optimized for large data with columnar storage | Loads data into memory; can strain RAM with large datasets |
+| jq ecosystem | Leverages **all** jq filters for post‑processing | No | Part of the Python data science ecosystem; integrates with NumPy, Matplotlib, scikit-learn, etc |
+
+---
+
+### Why you’ll reach for Jonq
+
+1. **Instant JSON Querying, No Setup Hassle**
+
+You have a JSON file (data.json) and need to extract all records where age > 30 in seconds.
+
+* With `jonq`: Run `jonq "SELECT * FROM data.json WHERE age > 30"`. Done. No environment setup, no imports—just install jq and go.
+
+* Pandas: Fire up Python, write a script (`import pandas as pd; df = pd.read_json('data.json'); df[df['age'] > 30]`), and run it. More steps. 
+
+* DuckDB: Set up a database, load the JSON (`SELECT * FROM read_json('data.json') WHERE age > 30`), and execute. Powerful, but overkill for a quick task.
+
+2. **Command-Line Power**
+
+Use Case: Chain commands in a pipeline, like cat data.json | jonq "SELECT name, age FROM stdin" | grep "John".
+
+`Jonq` thrives in shell scripts or CI/CD workflows. Pandas and DuckDB require scripting or a heavier integration layer. 
+
+3. **Lightweight and Efficient**
+
+`Jonq` uses `jq’s` streaming mode (`--stream`) for large JSON files, processing data piece-by-piece instead of loading it all into memory.
+
+Comparison: Pandas loads everything into a DataFrame (RAM-intensive), and while DuckDB is memory-efficient for analytics, it’s still a full database engine, thus there'll be significant overhead.
+
+4. **SQL Simplicity for JSON**
+
+Example: `jonq "SELECT name, email FROM users.json WHERE status = 'active' ORDER BY name"`.
+
+Advantage: If you know SQL, "jonq" feels natural for JSON—no need to learn jq’s super difficult syntax.
+
+5. **Speed for Ad-Hoc Tasks**
+
+Test Case: Querying a 1 GB JSON file for specific fields.
+
+* Jonq: Streams it in seconds with minimal memory use.
+
+* Pandas: Might choke or require chunking hacks.
+
+* DuckDB: Fast, but setup and SQL complexity add time.
 
 ## Installation
+
+**Supported Platforms**: Jonq works on Linux, macOS, and Windows with WSL.
 
 ### Prerequisites
 
 - Python 3.9+
-- jq command line tool installed (https://stedolan.github.io/jq/download/)
+- `jq` command line tool installed (https://stedolan.github.io/jq/download/)
 
 ### Setup
 
-1. Clone this repository:
-`pip install jonq`
+**From PyPI**
+```bash
+pip install jonq # latest stable
+```
+
+**From source**
+```bash
+git clone https://github.com/duriantaco/jonq.git
+cd jonq && pip install -e .
+```
  
-**Make sure you have jq installed:**
-   ```
-   jq --version
-   ```
+**Verify Installation**: After installation, run `jonq --version` to ensure it's working correctly.
+
+### Optional: Rust-powered extension
+
+For users dealing with large or complex nested JSON structures, we recommend installing the optional `jonq_fast` Rust extension. 
+
+```bash
+pip install jonq-fast
+```
+
+We will explain more about this down below
 
 ### Quick Start 
 
 # Create a simple JSON file
-echo '[{"name":"Alice","age":30},{"name":"Bob","age":25}]' > data.json
+`echo '[{"name":"Alice","age":30},{"name":"Bob","age":25}]' > data.json`
 
 # Run a query
+
+```bash
 jonq data.json "select name, age if age > 25"
+
 # Output: [{"name":"Alice","age":30}]
+
+```
 
 ## Query Syntax
 
@@ -122,28 +187,13 @@ where:
 
 You can also refer to the `json_test_files` for the test jsons and look up `USAGE.md` guide. Anyway let's start with `simple.json`. 
 
-Image a json like the following: 
+Imagine a json like the following: 
 
 ```json
 [
-  {
-    "id": 1,
-    "name": "Alice",
-    "age": 30,
-    "city": "New York"
-  },
-  {
-    "id": 2,
-    "name": "Bob",
-    "age": 25,
-    "city": "Los Angeles"
-  },
-  {
-    "id": 3,
-    "name": "Charlie",
-    "age": 35,
-    "city": "Chicago"
-  }
+  { "id": 1, "name": "Alice",   "age": 30, "city": "New York"    },
+  { "id": 2, "name": "Bob",     "age": 25, "city": "Los Angeles" },
+  { "id": 3, "name": "Charlie", "age": 35, "city": "Chicago"     }
 ]
 ```
 
@@ -155,11 +205,6 @@ jonq path/to/simple.json "select *"
 ### Select specific fields:
 ```bash
 jonq path/to/simple.json "select name, age"
-```
-
-### Filter with conditions:
-```bash
-jonq path/to/simple.json "select name, age if age > 30"
 ```
 
 ### Filter with conditions:
@@ -192,91 +237,41 @@ Imagine a nested json like below:
     "name": "Alice",
     "profile": {
       "age": 30,
-      "address": {
-        "city": "New York",
-        "zip": "10001"
-      }
+      "address": { "city": "New York", "zip": "10001" }
     },
     "orders": [
-      {
-        "order_id": 101,
-        "item": "Laptop",
-        "price": 1200
-      },
-      {
-        "order_id": 102,
-        "item": "Phone",
-        "price": 800
-      }
+      { "order_id": 101, "item": "Laptop", "price": 1200 },
+      { "order_id": 102, "item": "Phone",  "price": 800  }
     ]
   },
-  {
-    "id": 2,
-    "name": "Bob",
-    "profile": {
-      "age": 25,
-      "address": {
-        "city": "Los Angeles",
-        "zip": "90001"
-      }
-    },
-    "orders": [
-      {
-        "order_id": 103,
-        "item": "Tablet",
-        "price": 500
-      }
-    ]
-  }
+  { "id": 2, "name": "Bob", "profile": { "age": 25, "address": { "city": "Los Angeles", "zip": "90001" } }, "orders": [ { "order_id": 103, "item": "Tablet", "price": 500 } ] }
 ]
 ```
 
-### Query nested fields with dot notation
+### Common patterns
 ```bash
-jonq path/to/nested.json "select name, profile.age"
-jonq path/to/nested.json "select name, profile.address.city"
+# nested field access
+jonq nested.json "select name, profile.age"
+jonq nested.json "select name, profile.address.city"
+
+# count array elements
+jonq nested.json "select name, count(orders) as order_count"
+
+# boolean logic (AND / OR / parentheses)
+jonq nested.json "select name if profile.address.city = 'New York' or orders[0].price > 1000"
+jonq nested.json "select name if (profile.age > 25 and profile.address.city = 'New York') or (profile.age < 26 and profile.address.city = 'Los Angeles')"
 ```
 
-### Count items in nested fields
-```bash
-jonq path/to/nested.json "select name, count(orders) as order_count"
-```
-
-## Advanced Filtering with Complex Boolean Expressions
-
-jonq supports complex boolean conditions using AND, OR, and parentheses:
-
-### Find users either from New York OR with orders costing more than 1000
+### Advanced Filtering with Complex Boolean Expressions
 
 ```bash
-jonq nested.json "select name, profile.age if profile.address.city = 'New York' or orders[0].price > 1000"
+ jonq nested.json "select name, profile.age if profile.address.city = 'New York' or orders[0].price > 1000"
 
-### Find users who are both under 30 AND from Los Angeles
+### Find users who are both under 30 **and** from Los Angeles
 jonq nested.json "select name, profile.age if profile.age < 30 and profile.address.city = 'Los Angeles'"
 
 ### Using parentheses for complex logic
 jonq nested.json "select name, profile.age if (profile.age > 25 and profile.address.city = 'New York') or (profile.age < 26 and profile.address.city = 'Los Angeles')"
-```
-
-## Grouping and Aggregation with GROUP BY
-jonq supports grouping data and performing aggregations per group:
-
-```bash
-# Group by city and count users in each city
-jonq nested.json "select profile.address.city, count(*) as user_count group by profile.address.city"
-
-# Group by city and get average age in each city
-jonq nested.json "select profile.address.city, avg(profile.age) as avg_age group by profile.address.city"
-
-# Group by city and get total orders and average order price
-jonq nested.json "select profile.address.city, count(orders) as order_count, avg(orders.price) as avg_price group by profile.address.city"
-```
-
-## Grouping and Having 
-
-```bash
-# Select age and city with average age above 25
-jonq nested.json "select profile.address.city, avg(profile.age) as avg_age group by profile.address.city having avg_age > 25"
 ```
 
 ## Output Formats
@@ -285,7 +280,89 @@ jonq nested.json "select profile.address.city, avg(profile.age) as avg_age group
 jonq can output results in CSV format using the `--format csv` or `-f csv` option:
 
 ```bash
-jonq path/to/simple.json "select name, age" --format csv
+jonq path/to/simple.json "select name, age" --format csv  > output.csv
+```
+
+### Python code
+
+Using flatten_json in your code:
+
+```python
+
+from jonq.csv_utils import flatten_json
+import csv
+
+data = {
+    "user": {
+        "name": "Alice",
+        "address": {"city": "New York"},
+        "orders": [
+            {"id": 1, "item": "Laptop", "price": 1200},
+            {"id": 2, "item": "Phone", "price": 800}
+        ]
+    }
+}
+
+flattened = flatten_json(data, sep=".")
+
+print(flattened)
+```
+
+## Optional: Rust-powered extension
+
+For users dealing with large or complex nested JSON structures, we recommend installing the optional `jonq_fast` Rust extension for significantly improved performance.
+
+### Using jonq_fast on the command line:
+
+Once installed, you can use jonq_fast from the command line with the `--fast` or `-F` flag:
+
+```bash
+jonq data.json "select name, age" --format csv --fast > output.csv
+```
+
+This flag improves performance when converting to CSV format by using a faster JSON flattening implementation. The performance benefit is most noticeable with large or deeply nested JSON structures.
+
+### Using jonq_fast in your code
+You can also use jonq_fast directly in your Python code:
+
+```python
+import jonq_fast
+import csv 
+
+# fake data
+data = {
+    "user": {
+        "name": "Alice",
+        "address": {"city": "New York"},
+        "orders": [
+            {"id": 1, "item": "Laptop", "price": 1200},
+            {"id": 2, "item": "Phone", "price": 800}
+        ]
+    }
+}
+
+flattened = jonq_fast.flatten(data, ".")
+
+print(flattened)
+# Output: {
+#   "user.name": "Alice", 
+#   "user.address.city": "New York",
+#   "user.orders.0.id": 1,
+#   "user.orders.0.item": "Laptop",
+#   "user.orders.0.price": 1200,
+#   "user.orders.1.id": 2,
+#   "user.orders.1.item": "Phone",
+#   "user.orders.1.price": 800
+# }
+
+## write to your csv here
+with open('output.csv', 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    
+    writer.writerow(flattened.keys())
+    
+    writer.writerow(flattened.values())
+
 ```
 
 ## Streaming Mode
@@ -324,12 +401,16 @@ jonq path/to/large.json "select name, age" --stream
 
 ## Known Limitations
 
-* Write Operations: jonq doesn't support writing results back to files. It's a read-only tool (or at least for now).
 * Performance: For very large JSON files (100MB+), processing may be slow.
 * Advanced jq Features: Some advanced jq features aren't exposed in the jonq syntax.
 * Multiple File Joins: No support for joining data from multiple JSON files.
 * Custom Functions: User-defined functions aren't supported in the current version.
 * Date/Time Operations: Limited support for date/time parsing or manipulation.
+
+## Go Tos: 
+Pandas: Go here for complex analysis (e.g., merging datasets, statistical ops, plotting). `Jonq` won’t crunch numbers or integrate with machine learning libraries.
+
+DuckDB: Pick this for big data analytics with joins, aggregates, or window functions across multiple files. `Jonq` is simpler, **not** a database.
 
 ## Docs
 

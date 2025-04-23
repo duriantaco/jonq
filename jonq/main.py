@@ -28,7 +28,8 @@ def main():
     json_file = sys.argv[1]
     query = sys.argv[2]
     options = parse_options(sys.argv[3:])
-    
+    logger.info(f"Options: {options}")
+
     try:
         validate_input_file(json_file)
         tokens = tokenize_query(query)
@@ -50,9 +51,15 @@ def main():
                 raise RuntimeError(f"Error in jq filter: {stderr}")
         
         if stdout:
-            if options['format'] == "csv":
-                csv_output = json_to_csv(stdout)
-                print(csv_output.strip())
+            logger.info(f"Raw output type: {type(stdout)}, length: {len(stdout)}")
+            if options.get('format') == "csv":
+                try:
+                    csv_output = json_to_csv(stdout, use_fast=options.get('use_fast', False))
+                    logger.info(f"CSV output type: {type(csv_output)}, length: {len(csv_output)}")
+                    print(csv_output.strip())
+                except Exception as e:
+                    logger.error(f"Error converting to CSV: {e}")
+                    print(stdout.strip())
             else:
                 print(stdout.strip())
                 
@@ -65,13 +72,14 @@ def print_help():
     print("\nOptions:")
     print("  --format, -f csv|json   Output format (default: json)")
     print("  --stream, -s            Process large files in streaming mode (for arrays)")
+    print("  --fast, -F              Use jonq_fast Rust implementation when avail (faster JSON flattening)")
     print("  -h, --help              Show this help message")
     print("\nExamples:")
     print("  jonq data.json \"select * from []\"")
     print("  jonq data.json \"select name, age from [] if age > 30\"")
 
 def parse_options(args):
-    options = {'format': 'json', 'streaming': False}
+    options = {'format': 'json', 'streaming': False, 'use_fast': False}
     i = 0
     while i < len(args):
         if args[i] in ["--format", "-f"] and i + 1 < len(args):
@@ -80,6 +88,9 @@ def parse_options(args):
             i += 2
         elif args[i] in ["--stream", "-s"]:
             options['streaming'] = True
+            i += 1
+        elif args[i] in ["--fast", "-F"]:
+            options['use_fast'] = True
             i += 1
         else:
             print(f"Unknown option: {args[i]}")

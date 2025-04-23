@@ -10,7 +10,7 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',    
     'sphinx.ext.intersphinx',
-    'sphinx_copybutton',
+    # Removed sphinx_copybutton
     'sphinx_design',
     'sphinx_inline_tabs',
     'sphinxcontrib.mermaid',
@@ -30,8 +30,7 @@ myst_enable_extensions = [
     "attrs_inline",
 ]
 
-copybutton_prompt_text = r">>> |\.\.\. |\$ "
-copybutton_prompt_is_regexp = True
+# Removed copybutton configuration lines
 
 templates_path = ['_templates']
 exclude_patterns = []

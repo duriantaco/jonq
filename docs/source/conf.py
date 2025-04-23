@@ -10,7 +10,6 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',    
     'sphinx.ext.intersphinx',
-    
     'sphinx_copybutton',
     'sphinx_design',
     'sphinx_inline_tabs',
@@ -21,7 +20,6 @@ extensions = [
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
-    'jq': ('https://stedolan.github.io/jq/manual/', None),
 }
 
 myst_enable_extensions = [

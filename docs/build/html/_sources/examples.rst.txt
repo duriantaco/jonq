@@ -197,12 +197,13 @@ Consider `complex.json` (abbreviated):
      jonq complex.json "select company.headquarters.coordinates.latitude"
 
   **Output:**
+  
   .. code-block:: json
 
      {
        "latitude": 37.7749
      }
-     
+
 - **Complex grouping:**
 
   .. code-block:: bash

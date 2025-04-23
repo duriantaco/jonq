@@ -1,0 +1,11 @@
+[package]
+name = "jonq_fast"
+version = "0.0.1"
+edition = "2024"
+
+[lib]
+name = "jonq_fast"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.24", features = ["extension-module"] }

@@ -2,6 +2,7 @@ from __future__ import annotations
 import json, subprocess, threading, atexit
 from typing import Dict
 from functools import lru_cache
+import asyncio
 
 class JQWorker:
     def __init__(self, filter_src: str):
@@ -34,10 +35,71 @@ def get_worker(filter_src: str) -> "JQWorker":
     _workers[filter_src] = JQWorker(filter_src)
     return _workers[filter_src]
 
+##### for async support #####
+class AsyncJQWorker:
+    def __init__(self, filter_src: str):
+        self.filter = filter_src
+        self.proc = None
+        self._lock = asyncio.Lock()
+
+    async def start(self):
+        """Start the jq process"""
+        self.proc = await asyncio.create_subprocess_exec(
+            "jq", "-c", "--unbuffered", self.filter,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            text=True
+        )
+
+    async def query(self, obj) -> str:
+        if not self.proc:
+            await self.start()
+            
+        payload = json.dumps(obj, separators=(",", ":")) + "\n"
+        async with self._lock:
+            self.proc.stdin.write(payload.encode())
+            await self.proc.stdin.drain()
+            result = await self.proc.stdout.readline()
+            return result.decode().rstrip("\n")
+
+    async def close(self):
+        if self.proc:
+            self.proc.terminate()
+            await self.proc.wait()
+
+_async_workers: Dict[str, AsyncJQWorker] = {}
+
+async def get_worker_async(filter_src: str) -> "AsyncJQWorker":
+    """Async version of get_worker - no caching to avoid complexity"""
+    if (w := _async_workers.get(filter_src)) and w.proc and w.proc.returncode is None:
+        return w
+    _async_workers[filter_src] = AsyncJQWorker(filter_src)
+    return _async_workers[filter_src]
+
+async def _cleanup_async():
+    """Cleanup async workers"""
+    for w in _async_workers.values():
+        try:
+            await w.close()
+        except Exception:
+            pass
+
 def _cleanup():
+    """Cleanup sync workers"""
     for w in _workers.values():
         try:
             w.close()
         except Exception:
             pass
+    
+    try:
+        loop = asyncio.get_running_loop()
+        if loop and not loop.is_closed():
+            loop.create_task(_cleanup_async())
+    except RuntimeError:
+        try:
+            asyncio.run(_cleanup_async())
+        except Exception:
+            pass
+
 atexit.register(_cleanup)

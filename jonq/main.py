@@ -4,12 +4,17 @@ import os
 import logging
 from jonq.query_parser import tokenize_query, parse_query
 from jonq.jq_filter import generate_jq_filter
-from jonq.executor import run_jq, run_jq_streaming
+from jonq.executor import run_jq_async, run_jq_streaming_async
 from jonq.csv_utils import json_to_csv
+from jonq.error_handler import (
+    ErrorAnalyzer, validate_query_against_schema, 
+    handle_error_with_context, QuerySyntaxError
+)
+import asyncio
 
 logger = logging.getLogger(__name__)
 
-def main():
+async def main():
 
     logging.basicConfig(
         format='%(levelname)s:%(name)s:%(message)s',
@@ -28,19 +33,46 @@ def main():
     json_file = sys.argv[1]
     query = sys.argv[2]
     options = parse_options(sys.argv[3:])
-    logger.info(f"Options: {options}")
 
     try:
         validate_input_file(json_file)
+
+        validation_error = validate_query_against_schema(json_file, query)
+        if validation_error:
+            raise QuerySyntaxError(
+                validation_error,
+                suggestion="Use 'jonq file.json \"select *\"' to see all available fields"
+            )
+        
         tokens = tokenize_query(query)
         fields, condition, group_by, having, order_by, sort_direction, limit, from_path = parse_query(tokens)
         jq_filter = generate_jq_filter(fields, condition, group_by, having, order_by, sort_direction, limit, from_path)
         
+        if os.environ.get('JONQ_DEBUG'):
+            logger.info(f"Query: {query}")
+            logger.info(f"Generated jq filter: {jq_filter}")
+        
         if options['streaming']:
             logger.info("Using streaming mode for processing")
-            stdout, stderr = run_jq_streaming(json_file, jq_filter)
+            stdout, stderr = await run_jq_streaming_async(json_file, jq_filter)
         else:
-            stdout, stderr = run_jq(json_file, jq_filter)
+            stdout, stderr = await run_jq_async(json_file, jq_filter)
+
+        if stderr:
+            analyzer = ErrorAnalyzer(json_file, query, jq_filter)
+            jonq_error = analyzer.analyze_jq_error(stderr)
+            raise jonq_error
+        
+        if stdout:
+            if options['format'] == "csv":
+                csv_output = json_to_csv(stdout, use_fast=options.get('use_fast', False))
+                print(csv_output.strip())
+            else:
+                print(stdout.strip())
+                
+    except Exception as e:
+        handle_error_with_context(e, json_file, query, jq_filter if 'jq_filter' in locals() else None)
+        sys.exit(1)
         
         if stderr:
             if "Cannot iterate over null" in stderr:
@@ -121,4 +153,4 @@ def handle_error(error):
     sys.exit(1)
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main()) 

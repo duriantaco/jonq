@@ -48,7 +48,8 @@ class AsyncJQWorker:
             "jq", "-c", "--unbuffered", self.filter,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
-            text=True
+            stderr=asyncio.subprocess.PIPE, 
+            text=False
         )
 
     async def query(self, obj) -> str:
@@ -67,14 +68,22 @@ class AsyncJQWorker:
             self.proc.terminate()
             await self.proc.wait()
 
-_async_workers: Dict[str, AsyncJQWorker] = {}
+_async_workers: Dict[tuple, AsyncJQWorker] = {}
 
 async def get_worker_async(filter_src: str) -> "AsyncJQWorker":
-    """Async version of get_worker - no caching to avoid complexity"""
-    if (w := _async_workers.get(filter_src)) and w.proc and w.proc.returncode is None:
-        return w
-    _async_workers[filter_src] = AsyncJQWorker(filter_src)
-    return _async_workers[filter_src]
+    current_loop = asyncio.get_running_loop()
+    
+    cache_key = (filter_src, id(current_loop))
+    
+    if cache_key in _async_workers:
+        worker = _async_workers[cache_key]
+        if worker.proc and worker.proc.returncode is None:
+            return worker
+    
+    worker = AsyncJQWorker(filter_src)
+    await worker.start()
+    _async_workers[cache_key] = worker
+    return worker
 
 async def _cleanup_async():
     """Cleanup async workers"""

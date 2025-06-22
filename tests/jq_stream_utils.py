@@ -3,8 +3,10 @@ import time
 import os
 import tempfile
 import json as stdlib_json
+import aiofiles
 from jonq.json_utils import dumps, loads
-from jonq.stream_utils import process_json_streaming
+from jonq.stream_utils import process_json_streaming, process_json_streaming_async
+from jonq.executor import run_jq, run_jq_streaming, run_jq_async, run_jq_streaming_async
 
 class TestJsonOptimization:
     @pytest.fixture
@@ -74,6 +76,29 @@ class TestJsonOptimization:
                     return dumps(data)
             
             result = process_json_streaming(temp_path, process_chunk, chunk_size=20)
+            
+            processed_data = loads(result)
+            assert len(processed_data) == len(test_data["medium"])
+            assert processed_data[0]["id"] == test_data["medium"][0]["id"] * 2
+            
+        finally:
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_stream_utils_integration_async(self, test_data):
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as temp_file:
+            temp_file.write(dumps(test_data["medium"]))
+            temp_path = temp_file.name
+            
+        try:
+            async def process_chunk_async(chunk_file):
+                async with aiofiles.open(chunk_file, 'r') as f:
+                    data = loads(await f.read())
+                    for item in data:
+                        item["id"] *= 2
+                    return dumps(data)
+            
+            result = await process_json_streaming_async(temp_path, process_chunk_async, chunk_size=20)
             
             processed_data = loads(result)
             assert len(processed_data) == len(test_data["medium"])

@@ -4,12 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jonq"
-version = "0.0.2"
+version = "0.1.0"
 description = "SQL-like query tool for JSON files"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "orjson>=3.8.0",
+    "aiofiles"
 ]
 license = {text = "MIT"}
 authors = [

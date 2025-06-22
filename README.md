@@ -14,19 +14,26 @@
 
 ---
 
+## About 
+
 `jq` is unbeatable for JSON processing, but its syntax requires a lot of learning.  
 **jonq** wraps `jq` in a SQL-lish/pythonic layer you can read and remember.
 
 **Who It's For**: Jonq is designed for anyone who needs to work with JSON data. It's good for quick JSON exploration, lightweight ETL tasks, or validating config files in CI pipelines.
+
+**jonq is NOT a database. It's NOT competing with DuckDB or Pandas. jonq is a command-line tool that makes jq accessible by wrapping it in SQL-like syntax.**
 ---
 
-## ✨ What’s new in 0.0.2
+### What jonq IS for:
+* Quick JSON exploration
+* jq beginners
+* Ad-hoc JSON tasks - No setup, just run a command
+* Config file validation - Quick checks in scripts
 
-* **Robust nested‑array handling** – automatic base‑array detection (`products[].versions[]`)
-* **Expression parser fixes** – arithmetic around aggregations now works (`sum(x) * 2`)
-* **Null‑safe aggregation** – avoids `Cannot iterate over null` errors
-* **jonq_fast** - 2x faster than normal jonq, but optional
----
+### What jonq is NOT for:
+1. Data analysis - Use Pandas, or Polars or DuckDB
+2. Complex joins - Use DuckDB, PostgreSQL, or whatever DB you want
+3. Business intelligence - Use proper BI tools
 
 ## Features at a glance
 
@@ -372,6 +379,8 @@ For processing large JSON files efficiently, jonq supports streaming mode with t
 ```bash
 jonq path/to/large.json "select name, age" --stream
 ```
+
+**New**: Streaming now uses async processing to handle chunks concurrently, providing performance improvements on large files. No changes to commands. Same flags, same syntax, just faster thats all.
 
 ## Troubleshooting
 ### Common Errors

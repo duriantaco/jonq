@@ -1,6 +1,21 @@
 # Changelog
 
-## [v0.0.1] - Current 
+## [v0.1.0] - 2025-06-22
+
+### Added
+- Concurrent chunk processing for 2-5x performance improvement on large files
+- Prevents freezing on large datasets
+- New `run_jq_async()` and `run_jq_streaming_async()` functions for concurrent processing
+- Streaming mode now processes chunks in parallel
+
+### Improved  
+- Tool remains responsive during large file processing
+
+### Technical
+- Added `aiofiles` dependency for async file operations
+- Internal async architecture for streaming operations
+
+## [v0.0.1]  
 - Prototype implementation
 - Initial public release
 - SQL-like query syntax for JSON files

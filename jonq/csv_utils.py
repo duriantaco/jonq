@@ -16,37 +16,25 @@ except ModuleNotFoundError:
     _loads = _json_impl.loads
 
 def flatten_json(data, parent_key='', sep='.', use_fast=False):
-    """
-    Flatten nested JSON structures for CSV output.
-    
-    Args:
-        data: The JSON data to flatten
-        parent_key: The parent key for nested structures
-        sep: The separator to use between nested keys
-        use_fast: If True, will attempt to use jonq_fast if available
-    
-    Returns:
-        A flattened dictionary
-    """
-    if use_fast:
-        try:
-            import jonq_fast
-            return jonq_fast.flatten(data, sep)
-        except ImportError:
-            pass
     
     items = []
     
     if isinstance(data, dict):
         for k, v in data.items():
-            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            if parent_key:
+                new_key = parent_key + sep + k
+            else:
+                new_key = k
             if isinstance(v, (dict, list)):
                 items.extend(flatten_json(v, new_key, sep=sep).items())
             else:
                 items.append((new_key, v))
     elif isinstance(data, list):
         for i, v in enumerate(data):
-            new_key = f"{parent_key}{sep}{i}" if parent_key else str(i)
+            if parent_key:
+                new_key = parent_key + sep + str(i)
+            else:
+                new_key = str(i)
             if isinstance(v, (dict, list)):
                 items.extend(flatten_json(v, new_key, sep=sep).items())
             else:
@@ -57,13 +45,7 @@ def flatten_json(data, parent_key='', sep='.', use_fast=False):
     return dict(items)
 
 def json_to_csv(json_data, use_fast=False):
-    """
-    Convert JSON to CSV format.
-    
-    Args:
-        json_data: The JSON data to convert
-        use_fast: If True, will use jonq_fast for flattening if available
-    """
+
     if isinstance(json_data, str):
         try:
             data = _loads(json_data)

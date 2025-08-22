@@ -45,7 +45,6 @@ def generate_jq_filter(fields, condition=None, group_by=None, having=None,
     if legacy_call:
         order_by, sort_direction, limit = having, order_by, sort_direction
         having = None
-        # normalise
         sort_direction = sort_direction or 'asc'
         limit = str(limit)
 

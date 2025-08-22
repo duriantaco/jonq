@@ -7,21 +7,17 @@ import shutil
 from jonq.json_utils import dumps, loads 
 import shutil
 import asyncio
-import aiofiles
 
 logger = logging.getLogger(__name__)
 
 def detect_json_structure(json_file):
-    """
-    Detect if the JSON file contains an array at the root level.
-    """
     with open(json_file, 'r') as f:
         char = ' '
         while char.isspace() and char:
             char = f.read(1)
         return char == '['
 
-def split_json_array(json_file: str, chunk_size: int = 1000) -> tuple[str, list[str]]:
+def split_json_array(json_file, chunk_size = 1000):
 
     temp_dir = tempfile.mkdtemp(prefix="jonq_")
     chunk_files: list[str] = []
@@ -51,7 +47,6 @@ def split_json_array(json_file: str, chunk_size: int = 1000) -> tuple[str, list[
                 current_handle.close()
                 chunk_files.append(current_path)
 
-                # reset counters 
                 current_chunk_idx += 1
                 current_line_count = 0
                 current_path = os.path.join(temp_dir, f"chunk_{current_chunk_idx:06d}")
@@ -104,10 +99,7 @@ def process_json_streaming(json_file, process_func, chunk_size=1000):
         logger.error(f"Error in streaming process: {str(e)}")
         raise
 
-#### adding async version for streaming processing ####
-
-async def split_json_array_async(json_file: str, chunk_size: int = 1000) -> tuple[str, list[str]]:
-    """Async wrapper around sync split_json_array"""
+async def split_json_array_async(json_file, chunk_size = 1000):
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, split_json_array, json_file, chunk_size)
 

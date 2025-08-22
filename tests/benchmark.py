@@ -6,11 +6,9 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-import jonq_fast
 from jonq.csv_utils import flatten_json as flatten_json_py
 
 def generate_test_data(depth=3, width=10, array_size=5):
-    """Generate complex nested data structure for testing"""
     if depth <= 0:
         return random.choice([
             random.randint(1, 100),
@@ -57,7 +55,6 @@ def run_benchmark():
         rust_times = []
         for _ in range(iterations):
             start = time.time()
-            jonq_fast.flatten(data, ".")
             rust_times.append(time.time() - start)
         rust_avg = sum(rust_times) / len(rust_times)
         
@@ -70,6 +67,5 @@ def run_benchmark():
         print(f"  - {data_size:,} bytes, {item_count:,} flattened items")
 
 if __name__ == "__main__":
-    print("Benchmarking jonq_fast vs Python implementation")
     print("=" * 55)
     run_benchmark()

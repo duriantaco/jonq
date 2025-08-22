@@ -1,0 +1,5 @@
+[
+  {"a":2,"b":1,"c":4,"name":"alpha","items":[{"price":10},{"x":1}]},
+  {"a":0,"b":5,"c":7,"name":"beta","items":[{}]},
+  {"a":3,"b":1,"c":9,"name":"alphabet","items":[]}
+]

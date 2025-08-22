@@ -1,0 +1,6 @@
+[
+  {"id":1,"a":2,"b":1,"c":4,"name":"alpha","items":[{"price":10},{"x":1}],   "tags":["a","b"], "text":"Foo Bar"},
+  {"id":2,"a":0,"b":5,"c":7,"name":"beta","items":[{}],                    "tags":[],       "text":"bar"},
+  {"id":3,"a":3,"b":1,"c":9,"name":"alphabet","items":[],                  "tags":["a"],    "text":"ALPHA beta"},
+  {"id":4,"a":-1,"b":2,"c":-3,"name":"gamma","items":[{"price":-3.5e2}],   "tags":null,     "text":""}
+]

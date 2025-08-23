@@ -1,24 +1,20 @@
-# jonq/error_handler.py
 import json
 import re
-from typing import Optional, Dict, Any, List
+import os
+import sys
 
 class JonqError(Exception):
-    """Base exception for jonq errors with helpful messages"""
     
-    def __init__(self, message: str, suggestion: Optional[str] = None, 
-                 context: Optional[Dict[str, Any]] = None):
+    def __init__(self, message, suggestion= None, context = None):
         super().__init__(message)
         self.suggestion = suggestion
         self.context = context or {}
     
-    def format_error(self) -> str:
-        """Format error with colors and suggestions"""
+    def format_error(self):
         RED = '\033[0;31m'
         YELLOW = '\033[1;33m'
         GREEN = '\033[0;32m'
-        BLUE = '\033[0;34m'
-        NC = '\033[0m' ### no color
+        NC = '\033[0m'
         
         output = [f"{RED}Error: {self.args[0]}{NC}"]
         
@@ -33,28 +29,23 @@ class JonqError(Exception):
         return "\n".join(output)
 
 class QuerySyntaxError(JonqError):
-    """Raised when query syntax is invalid"""
     pass
 
 class FieldNotFoundError(JonqError):
-    """Raised when a field doesn't exist in the JSON"""
     pass
 
 class AggregationError(JonqError):
-    """Raised when aggregation fails"""
     pass
 
 class ErrorAnalyzer:
-    """Analyzes errors and provides helpful suggestions"""
     
-    def __init__(self, json_file: str, query: str, jq_filter: str):
+    def __init__(self, json_file, query, jq_filter):
         self.json_file = json_file
         self.query = query
         self.jq_filter = jq_filter
         self.data = self._load_json_sample()
         
-    def _load_json_sample(self) -> Any:
-        """Load a sample of the JSON data for analysis"""
+    def _load_json_sample(self):
         try:
             with open(self.json_file, 'r') as f:
                 sample = f.read(1024 * 1024)
@@ -62,7 +53,7 @@ class ErrorAnalyzer:
         except:
             return None
     
-    def analyze_jq_error(self, stderr: str) -> JonqError:
+    def analyze_jq_error(self, stderr):
         
         if "Cannot iterate over null" in stderr:
             return self._analyze_null_iteration_error(stderr)
@@ -90,8 +81,7 @@ class ErrorAnalyzer:
             context={"query": self.query, "jq_filter": self.jq_filter}
         )
     
-    def _analyze_null_iteration_error(self, stderr: str) -> JonqError:
-        """Analyze null iteration errors"""
+    def _analyze_null_iteration_error(self, stderr):
         fields = re.findall(r'\.(\w+)', self.query)
         
         if self.data:
@@ -113,7 +103,7 @@ class ErrorAnalyzer:
             context={"query": self.query}
         )
     
-    def _analyze_undefined_error(self, stderr: str) -> JonqError:
+    def _analyze_undefined_error(self, stderr):
         if any(func in stderr for func in ["avg/1", "max/1", "min/1", "sum/1"]):
             return AggregationError(
                 "Aggregation function failed - field might not exist or contain non-numeric values",
@@ -126,8 +116,7 @@ class ErrorAnalyzer:
             context={"query": self.query, "error": stderr}
         )
     
-    def _find_null_fields(self, data: Any, fields: List[str]) -> List[str]:
-        """Find which fields are null or missing"""
+    def _find_null_fields(self, data, fields):
         null_fields = []
         
         if isinstance(data, list) and data:
@@ -150,8 +139,7 @@ class ErrorAnalyzer:
         
         return null_fields
 
-    def _get_available_fields(self, data: Any, prefix: str = "") -> List[str]:
-        """Get list of available fields in the data"""
+    def _get_available_fields(self, data, prefix = ""):
         fields = []
         
         if isinstance(data, list) and data:
@@ -159,7 +147,11 @@ class ErrorAnalyzer:
         
         if isinstance(data, dict):
             for key, value in data.items():
-                full_key = f"{prefix}.{key}" if prefix else key
+                if prefix:
+                    full_key = f"{prefix}.{key}"
+                else:
+                    full_key = key
+
                 fields.append(full_key)
                 
                 if isinstance(value, dict) and len(full_key.split('.')) < 3:
@@ -167,49 +159,86 @@ class ErrorAnalyzer:
         
         return fields
     
-    def _extract_field_from_error(self, stderr: str) -> str:
-        """Extract field name from error message"""
+    def _extract_field_from_error(self, stderr):
         match = re.search(r'"(\w+)"', stderr)
-        return match.group(1) if match else "unknown"
+        
+        if match:
+            return match.group(1)
+        else:
+            return "unknown"
 
-def validate_query_against_schema(json_file: str, query: str) -> Optional[str]:
-    """Pre-validate query against JSON schema"""
+def validate_query_against_schema(json_file: str, query: str) -> str | None:
+
     try:
-        with open(json_file, 'r') as f:
-            sample = f.read(1024 * 1024)
-            data = json.loads(sample)
-        
-        if any(x in query.lower() for x in ['count(', 'sum(', 'avg(', 'min(', 'max(', ' as ', '+', '-', '*', '/']):
-            return None
-            
-        fields = re.findall(r'select\s+(.+?)(?:\s+if|\s+group|\s+sort|\s+from|$)', query, re.IGNORECASE)
-        if not fields:
-            return None
-            
-        field_list = [f.strip() for f in fields[0].split(',') if f.strip() not in ['*']]
-        
+        with open(json_file, "r", encoding="utf-8") as fp:
+            data = json.load(fp)
+
         if isinstance(data, list) and data:
-            data = data[0]
-        
-        if isinstance(data, dict):
-            for field in field_list:
-                if field == '*':
-                    continue
-                    
-                parts = field.split('.')
-                current = data
-                for part in parts:
-                    if not isinstance(current, dict) or part not in current:
-                        return f"Field '{field}' not found. Available fields: {', '.join(data.keys())}"
-                    current = current[part]
-        
+            sample = data[0]
+        else:
+            sample = data
+            
+        if not isinstance(sample, dict):
+            return None
+
+        top_keys = set(sample.keys())
+
+        m = re.search(r"\bselect\s+(.*?)\s+(from|if|group|order|limit|$)", query, flags=re.IGNORECASE | re.DOTALL)
+        if not m:
+            return None
+        field_list = m.group(1)
+
+        raw_fields = []
+        split_fields = field_list.split(",")
+
+        for f in split_fields:
+            cleaned_field = f.strip()
+            if cleaned_field and cleaned_field != "*":
+                raw_fields.append(cleaned_field)
+
+        def head_of(path):
+            p = path.strip().strip('"').strip("'")
+            if p.startswith("."):
+                p = p[1:]
+            for sep in ("[", "."):
+                if sep in p:
+                    return p.split(sep, 1)[0]
+            return p
+
+        bad = []
+        special_chars = ["{", "}", "(", ")"]
+
+        for f in raw_fields:
+            has_special_chars = False
+            for ch in special_chars:
+                if ch in f:
+                    has_special_chars = True
+                    break
+            
+            if has_special_chars:
+                continue
+            
+            h = head_of(f)
+            
+            field_exists = bool(h)
+            is_new_field = h not in top_keys
+            is_not_wildcard = f != "*"
+            
+            if field_exists and is_new_field and is_not_wildcard:
+                bad.append(f)
+
+        if os.environ.get("JONQ_DEBUG_SCHEMA"):
+            print(f"[schema] fields={raw_fields} heads={[head_of(f) for f in raw_fields]} top={sorted(top_keys)}", file=sys.stderr)
+
+        if bad:
+            avail = ", ".join(sorted(top_keys))
+            return f"Field(s) {', '.join(bad)!r} not found. Available fields: {avail}"
         return None
-        
     except Exception:
         return None
 
-def handle_error_with_context(error: Exception, json_file: str = None, 
-                            query: str = None, jq_filter: str = None):
+
+def handle_error_with_context(error, json_file = None, query = None, jq_filter = None):
     
     if isinstance(error, JonqError):
         print(error.format_error())

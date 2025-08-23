@@ -6,14 +6,18 @@ def parse_path(path_str):
         return Path([])
         
     elements = []
-    parts = re.split(r'\.(?![^\[]*\])', path_str.lstrip('.'))
+    cleaned_path = path_str.lstrip('.')
+    parts = re.split(r'\.(?![^\[]*\])', cleaned_path)
     
     for part in parts:
         if '[]' in part:
             base, *rest = part.split('[]', 1)
             elements.append(PathElement(PathType.ARRAY, base))
             if rest:
-                elements.extend(parse_path(rest[0]).elements)
+                remaining_path = rest[0]
+                parsed_remaining = parse_path(remaining_path)
+                elements.extend(parsed_remaining.elements)
+                
         elif '[' in part and ']' in part:
             idx_matches = list(re.finditer(r'\[(\d+)\]', part))
             if idx_matches:
@@ -72,19 +76,46 @@ def parse_expression(expr_str):
         if func in ["sum", "avg", "min", "max", "count"]:
             return Expression(ExprType.AGGREGATION, func, [arg.strip()])
 
-    if expr_str.isdigit() or (expr_str.startswith('"') and expr_str.endswith('"')):
+    _NUM_RE = re.compile(r"""
+        ^[+-]?(
+            (\d+(\.\d*)?)|(\.\d+)
+        )([eE][+-]?\d+)?$
+    """, re.VERBOSE)
+
+    if _NUM_RE.match(expr_str) or (expr_str.startswith('"') and expr_str.endswith('"')):
         return Expression(ExprType.LITERAL, expr_str)
 
     return Expression(ExprType.FIELD, expr_str)
 
+
+def _split_top_level(s, needle):
+    n = len(needle)
+    depth = 0
+    in_single = in_double = False
+    i = 0
+    while i <= len(s) - n:
+        ch = s[i]
+        if ch == "'" and not in_double:
+            in_single = not in_single
+        elif ch == '"' and not in_single:
+            in_double = not in_double
+        elif ch == '(' and not in_single and not in_double:
+            depth += 1
+        elif ch == ')' and not in_single and not in_double:
+            depth -= 1
+        if depth == 0 and not in_single and not in_double and s[i:i+n] == needle:
+            return s[:i], s[i+n:]
+        i += 1
+    return None, None
+
 def parse_condition(cond_str):
-    if " and " in cond_str:
-        left, right = cond_str.split(" and ", 1)
-        return AndCondition(parse_condition(left), parse_condition(right))
-    
-    if " or " in cond_str:
-        left, right = cond_str.split(" or ", 1)
+    left, right = _split_top_level(cond_str, " or ")
+    if left is not None:
         return OrCondition(parse_condition(left), parse_condition(right))
+
+    left, right = _split_top_level(cond_str, " and ")
+    if left is not None:
+        return AndCondition(parse_condition(left), parse_condition(right))
     
     between_match = re.match(r'(.*?)\s+between\s+(\S+)\s+and\s+(\S+)', cond_str, re.IGNORECASE)
     if between_match:
@@ -96,30 +127,19 @@ def parse_condition(cond_str):
             left, right = cond_str.split(f" {op} ", 1)
             left_expr = parse_expression(left)
             right_expr = parse_expression(right)
-            return Condition(Expression(
-                ExprType.BINARY_CONDITION,
-                op,
-                [left_expr, right_expr]
-            ))
-    
+            return Condition(Expression(ExprType.BINARY_CONDITION, op, [left_expr, right_expr]))
+
     contains_match = re.match(r'(.*?)\s+contains\s+(\S+.*)', cond_str, re.IGNORECASE)
     if contains_match:
         field, value = contains_match.groups()
         field_expr = parse_expression(field.strip())
         value = value.strip()
-        if value.startswith("'") and value.endswith("'"):
-            value_expr = Expression(ExprType.LITERAL, value)
-        elif value.startswith('"') and value.endswith('"'):
+        if (value.startswith("'") and value.endswith("'")) or (value.startswith('"') and value.endswith('"')):
             value_expr = Expression(ExprType.LITERAL, value)
         else:
             value_expr = Expression(ExprType.LITERAL, f'"{value}"')
-        
-        return Condition(Expression(
-            ExprType.BINARY_CONDITION,
-            "contains",
-            [field_expr, value_expr]
-        ))
-    
+        return Condition(Expression(ExprType.BINARY_CONDITION, "contains", [field_expr, value_expr]))
+
     return Condition(parse_expression(cond_str))
 
 def parse_condition_tokens(tokens):

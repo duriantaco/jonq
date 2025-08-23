@@ -35,7 +35,12 @@ def tokenize_with_lexer(query):
         ('INVALID', r'.'),
     ]
 
-    token_regex = '|'.join(f'(?P<{name}>{pattern})' for name, pattern in token_specs)
+    regex_parts = []
+    for name, pattern in token_specs:
+        named_group = f'(?P<{name}>{pattern})'
+        regex_parts.append(named_group)
+
+    token_regex = '|'.join(regex_parts)
 
     pos = 0
     tokens = []

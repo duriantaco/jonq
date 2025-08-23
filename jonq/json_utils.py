@@ -1,7 +1,7 @@
 try:
     import orjson as _json_impl
 
-    def dumps(obj) -> str:
+    def dumps(obj):
         return _json_impl.dumps(obj).decode('utf-8')
 
     def loads(json_str):
@@ -10,7 +10,7 @@ try:
 except ImportError:
     import json as _json_impl
 
-    def dumps(obj) -> str:
+    def dumps(obj):
         return _json_impl.dumps(obj)
 
     def loads(json_str):

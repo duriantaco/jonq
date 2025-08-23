@@ -1,11 +1,10 @@
 from __future__ import annotations
 import json, subprocess, threading, atexit
-from typing import Dict
 from functools import lru_cache
 import asyncio
 
 class JQWorker:
-    def __init__(self, filter_src: str):
+    def __init__(self, filter_src):
         self.filter = filter_src
         self.proc = subprocess.Popen(
             ["jq", "-c", "--unbuffered", filter_src],
@@ -16,7 +15,7 @@ class JQWorker:
         )
         self._lock = threading.Lock()
 
-    def query(self, obj) -> str:
+    def query(self, obj):
         payload = json.dumps(obj, separators=(",", ":")) + "\n"
         with self._lock:                   
             self.proc.stdin.write(payload)
@@ -26,33 +25,34 @@ class JQWorker:
     def close(self):
         self.proc.terminate()
 
-_workers: Dict[str, JQWorker] = {}
+_workers = {}
 
 @lru_cache(maxsize=32)
-def get_worker(filter_src: str) -> "JQWorker":
-    if (w := _workers.get(filter_src)) and w.proc.poll() is None:
-        return w
+def get_worker(filter_src):
+    w = _workers.get(filter_src)
+    if w is not None:
+        process_status = w.proc.poll()
+        if process_status is None:
+            return w
     _workers[filter_src] = JQWorker(filter_src)
     return _workers[filter_src]
 
-##### for async support #####
 class AsyncJQWorker:
-    def __init__(self, filter_src: str):
+    def __init__(self, filter_src):
         self.filter = filter_src
         self.proc = None
         self._lock = asyncio.Lock()
 
     async def start(self):
-        """Start the jq process"""
         self.proc = await asyncio.create_subprocess_exec(
             "jq", "-c", "--unbuffered", self.filter,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE, 
+            stderr=asyncio.subprocess.PIPE,
             text=False
         )
 
-    async def query(self, obj) -> str:
+    async def query(self, obj):
         if not self.proc:
             await self.start()
             
@@ -68,9 +68,9 @@ class AsyncJQWorker:
             self.proc.terminate()
             await self.proc.wait()
 
-_async_workers: Dict[tuple, AsyncJQWorker] = {}
+_async_workers = {}
 
-async def get_worker_async(filter_src: str) -> "AsyncJQWorker":
+async def get_worker_async(filter_src):
     current_loop = asyncio.get_running_loop()
     
     cache_key = (filter_src, id(current_loop))
@@ -86,7 +86,6 @@ async def get_worker_async(filter_src: str) -> "AsyncJQWorker":
     return worker
 
 async def _cleanup_async():
-    """Cleanup async workers"""
     for w in _async_workers.values():
         try:
             await w.close()
@@ -94,7 +93,6 @@ async def _cleanup_async():
             pass
 
 def _cleanup():
-    """Cleanup sync workers"""
     for w in _workers.values():
         try:
             w.close()

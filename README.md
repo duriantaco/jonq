@@ -77,10 +77,10 @@
 | Aspect | **jonq** | **DuckDB** | **Pandas** |
 |--------|------------|----------|----------|
 | Primary Use Case | Fast, lightweight JSON querying directly from the command line | General-purpose data manipulation and analysis in Python | Analytical SQL queries on large datasets, including JSON |
-| Setup | No DB, streams any JSON | Requires DB file / extension | Requires a Python environment with pandas and its dependencies installed |
+| Setup | No DB, can stream **root-array** JSON | Requires DB file / extension | Requires a Python environment with pandas and its dependencies installed |
 | Query language | Familiar SQL‑ish, no funky `json_extract`| SQL + JSON functions | Python code for data manipulation and analysis |
 | Footprint | Minimal: requires only jq (a ~500 KB binary); no environment setup | ~ 140 MB binary | Larger: ~20 MB for pandas and its dependencies |
-| Streaming | `--stream` processes line‑delimited JSON lazily | Must load into table | Can process large files using chunking, but not as memory-efficient as streaming |
+| Streaming | `--stream` processes **root-array** JSON in chunks concurrently | Must load into table | Can process large files using chunking, but not as memory-efficient |
 | Memory Usage | Low; streams data to avoid loading full JSON into memory | In-memory database, but optimized for large data with columnar storage | Loads data into memory; can strain RAM with large datasets |
 | jq ecosystem | Leverages **all** jq filters for post‑processing | No | Part of the Python data science ecosystem; integrates with NumPy, Matplotlib, scikit-learn, etc |
 
@@ -92,7 +92,7 @@
 
 You have a JSON file (data.json) and need to extract all records where age > 30 in seconds.
 
-* With `jonq`: Run `jonq "SELECT * FROM data.json WHERE age > 30"`. Done. No environment setup, no imports—just install jq and go.
+* With `jonq`: Run `jonq data.json "select * if age > 30"`. Done. No environment setup, no imports. Just install jq and go.
 
 * Pandas: Fire up Python, write a script (`import pandas as pd; df = pd.read_json('data.json'); df[df['age'] > 30]`), and run it. More steps. 
 
@@ -100,19 +100,19 @@ You have a JSON file (data.json) and need to extract all records where age > 30 
 
 2. **Command-Line Power**
 
-Use Case: Chain commands in a pipeline, like cat data.json | jonq "SELECT name, age FROM stdin" | grep "John".
+Use Case: Chain commands in a pipeline, like cat data.json | jonq - "select name, age" | grep "John".
 
 `Jonq` thrives in shell scripts or CI/CD workflows. Pandas and DuckDB require scripting or a heavier integration layer. 
 
 3. **Lightweight and Efficient**
 
-`Jonq` uses `jq’s` streaming mode (`--stream`) for large JSON files, processing data piece-by-piece instead of loading it all into memory.
+`Jonq` streams large **root-array** JSON files by chunking (`jq -c '.[]'`) and processing chunks concurrently — no jq `--stream`. This avoids loading the entire file into memory.
 
 Comparison: Pandas loads everything into a DataFrame (RAM-intensive), and while DuckDB is memory-efficient for analytics, it’s still a full database engine, thus there'll be significant overhead.
 
 4. **SQL Simplicity for JSON**
 
-Example: `jonq "SELECT name, email FROM users.json WHERE status = 'active' ORDER BY name"`.
+Example: `jonq users.json "select name, email if status = 'active' sort name"`.
 
 Advantage: If you know SQL, "jonq" feels natural for JSON—no need to learn jq’s super difficult syntax.
 
@@ -150,14 +150,6 @@ cd jonq && pip install -e .
  
 **Verify Installation**: After installation, run `jonq --version` to ensure it's working correctly.
 
-### Optional: Rust-powered extension
-
-For users dealing with large or complex nested JSON structures, we recommend installing the optional `jonq_fast` Rust extension. 
-
-```bash
-pip install jonq-fast
-```
-
 We will explain more about this down below
 
 ### Quick Start 
@@ -179,7 +171,7 @@ jonq data.json "select name, age if age > 25"
 The query syntax follows a simplified format:
 
 ```bash
-select <fields> [if <condition>] [sort <field> [asc|desc] [limit]]
+select <fields> [if <condition>] [group by <fields> [having <condition>]] [sort <field> [asc|desc] [limit]] [from <path>]
 ```
 where:
 
@@ -315,63 +307,6 @@ flattened = flatten_json(data, sep=".")
 print(flattened)
 ```
 
-## Optional: Rust-powered extension
-
-For users dealing with large or complex nested JSON structures, we recommend installing the optional `jonq_fast` Rust extension for significantly improved performance.
-
-### Using jonq_fast on the command line:
-
-Once installed, you can use jonq_fast from the command line with the `--fast` or `-F` flag:
-
-```bash
-jonq data.json "select name, age" --format csv --fast > output.csv
-```
-
-This flag improves performance when converting to CSV format by using a faster JSON flattening implementation. The performance benefit is most noticeable with large or deeply nested JSON structures.
-
-### Using jonq_fast in your code
-You can also use jonq_fast directly in your Python code:
-
-```python
-import jonq_fast
-import csv 
-
-# fake data
-data = {
-    "user": {
-        "name": "Alice",
-        "address": {"city": "New York"},
-        "orders": [
-            {"id": 1, "item": "Laptop", "price": 1200},
-            {"id": 2, "item": "Phone", "price": 800}
-        ]
-    }
-}
-
-flattened = jonq_fast.flatten(data, ".")
-
-print(flattened)
-# Output: {
-#   "user.name": "Alice", 
-#   "user.address.city": "New York",
-#   "user.orders.0.id": 1,
-#   "user.orders.0.item": "Laptop",
-#   "user.orders.0.price": 1200,
-#   "user.orders.1.id": 2,
-#   "user.orders.1.item": "Phone",
-#   "user.orders.1.price": 800
-# }
-
-## write to your csv here
-with open('output.csv', 'w', newline='') as csvfile:
-    writer = csv.writer(csvfile)
-    
-    writer.writerow(flattened.keys())
-    
-    writer.writerow(flattened.values())
-
-```
-
 ## Streaming Mode
 
 For processing large JSON files efficiently, jonq supports streaming mode with the `--stream` or `-s` option:
@@ -380,7 +315,30 @@ For processing large JSON files efficiently, jonq supports streaming mode with t
 jonq path/to/large.json "select name, age" --stream
 ```
 
-**New**: Streaming now uses async processing to handle chunks concurrently, providing performance improvements on large files. No changes to commands. Same flags, same syntax, just faster thats all.
+## NDJSON (newline-delimited JSON)
+
+Enable NDJSON input with `--ndjson`. Jonq will read each **non-empty line** as a JSON value and wrap them into a single array before running your query
+
+```bash
+# from .ndjson file
+jonq data.ndjson "select name, age if age > 25" --ndjson
+
+# from stdin
+cat data.ndjson | jonq - "select name, age if age > 25" --ndjson
+```
+
+**Notes**
+- `--ndjson` cannot be combined with `--stream`
+- Lines must be valid JSON values (objects, arrays, strings, etc.). Blank lines are ignored.
+
+### CLI Options (quick reference)
+- `--format, -f csv|json`  Output format (default: json)
+- `--stream, -s`           Stream root-array JSON in chunks
+- `--ndjson`               Input one JSON object per line (not compatible with `--stream`)
+- `--limit, -n N`          Limit rows post-query
+- `--out, -o PATH`         Output
+- `--jq`                   Print generated jq filter and exit
+- `--pretty, -p`           Pretty-print output
 
 ## Troubleshooting
 ### Common Errors

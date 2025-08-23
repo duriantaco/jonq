@@ -30,7 +30,7 @@ _HAVING_REGEXES = {
     key: re.compile(rf'\b{key}\b') for key in _HAVING_REPLACEMENTS
 }
 
-def _quote(name: str) -> str:
+def _quote(name):
     if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
         return name
     return '"' + name.replace('"', r'\"') + '"'
@@ -145,6 +145,7 @@ def generate_jq_expression(expr, context="root"):
                     return f"([.[] | {arg_jq} | select(type == \"number\")] | if length > 0 then max else null end)"
                 elif func == "min":
                     return f"([.[] | {arg_jq} | select(type == \"number\")] | if length > 0 then min else null end)"
+    
     elif expr.type == ExprType.LITERAL:
         return str(expr.value)
     elif expr.type == ExprType.OPERATION:
@@ -158,7 +159,7 @@ def generate_jq_expression(expr, context="root"):
         right = generate_jq_expression(expr.args[1], context)
         
         if op == "contains":
-            return f"({left} != null and ({left} | tostring) | contains({right}))"
+            return f"(({left} != null) and (({left} | tostring) | contains({right})))"
         else:
             return f"{left} {op} {right}"
     
@@ -182,7 +183,7 @@ def generate_jq_condition(cond, context="root"):
     
     return ""
 
-def split_base_array(path: str):
+def split_base_array(path):
     if '[]' not in path:
         return None, path
     before, after = path.split('[]', 1)
@@ -190,7 +191,7 @@ def split_base_array(path: str):
     after  = after.lstrip('.')
     return before, after
 
-def strip_prefix(path: str, prefix: str) -> str:
+def strip_prefix(path, prefix):
     needle = f'{prefix}[]'
     return path[len(needle):].lstrip('.') if path.startswith(needle) else path
 
@@ -252,7 +253,7 @@ def process_having_condition(having):
     
     return having
 
-def make_selector_from_path(path_with_arrays: str) -> str:
+def make_selector_from_path(path_with_arrays):
     pieces = []
     remaining = path_with_arrays.lstrip('.')
     while '[]' in remaining:
@@ -270,26 +271,55 @@ def generate_jq_filter(fields, condition, group_by, having, order_by, sort_direc
         if from_path == '[]':
             base_selector = '.[]'
             base_context = "array"
+
         elif from_path.startswith('[]'):
             nested_path = from_path[2:]
             if nested_path.startswith('.'):
                 nested_path = nested_path[1:]
             base_selector = f'.[] | .{nested_path}[]'
             base_context = "array"
+
         elif '[]' in from_path:
             parts = from_path.split('[]', 1)
-            base = f'.{parts[0].lstrip(".")}' if parts[0] else '.'
-            rest = parts[1].lstrip('.') if len(parts) > 1 else ''
-            base_selector = f'{base}[]' + (f' | .{rest}' if rest else '')
+
+            if parts[0]:
+                base = f'.{parts[0].lstrip(".")}'
+            else:
+                base = '.'
+
+            if len(parts) > 1:
+                rest = parts[1].lstrip('.')
+            else:
+                rest = ''
+
+            base_selector = f'{base}[]'
+            if rest:
+                base_selector += f' | .{rest}'
             base_context = "array"
+
         else:
             base_selector = f'.{from_path}'
             base_context = "object"
-    if not from_path and group_by and any('[]' in g for g in group_by):
+            
+    has_no_from_path = not from_path
+    has_group_by = bool(group_by)
+    group_by_has_arrays = any('[]' in g for g in group_by) if group_by else False
+
+    if has_no_from_path and has_group_by and group_by_has_arrays:
+        
         implicit_base, _ = split_base_array(group_by[0])
         base_selector = make_selector_from_path(group_by[0])
         base_context = "array"
-        group_by = [g.split('[]')[-1].lstrip('.') for g in group_by]
+
+        updated_group_by = []
+        for g in group_by:
+            parts = g.split('[]')
+            last_part = parts[-1]
+            cleaned = last_part.lstrip('.')
+            updated_group_by.append(cleaned)
+
+        group_by = updated_group_by
+
         new_fields = []
         for tup in fields:
             if tup[0] == 'field':
@@ -320,18 +350,27 @@ def generate_jq_filter(fields, condition, group_by, having, order_by, sort_direc
                 for tup in fields
                 for ftype, func, param, alias in [tup] if ftype == 'aggregation'
             ] + [tup for tup in fields if tup[0] != 'aggregation']
+            
     all_aggregations = all(ft == 'aggregation' for ft, *_ in fields)
     if all_aggregations and not group_by:
         base_data = base_selector or '(if type=="array" then .[] else . end)'
         if condition:
             base_data += f' | select({condition})'
-        def wrap(expr): return expr if expr.lstrip().startswith('[') else f'[ {expr} ]'
+        
+        def wrap(expr):
+            stripped = expr.lstrip()
+            if stripped.startswith('['):
+                return expr
+            else:
+                return f'[ {expr} ]'
+    
         selection = []
         for _, func, param, alias in fields:
             raw = f'{base_data} | .{param.lstrip(".")}'
             wrapped = wrap(raw)
             if func == 'count' and param == '*':
-                selection.append(f'"{alias}": length'); continue
+                selection.append(f'"{alias}": length'); 
+                continue
             if func == 'sum':
                 selection.append(f'"{alias}": ({wrapped} | map(select(type=="number")) | add // 0)')
             elif func == 'avg':
@@ -343,8 +382,14 @@ def generate_jq_filter(fields, condition, group_by, having, order_by, sort_direc
             elif func == 'count':
                 selection.append(f'"{alias}": ({wrapped} | length)')
         jq_filter = f'{{ {", ".join(selection)} }}'
+
     elif group_by:
-        group_keys = [generate_jq_path(parse_path(g), context="root", null_check=False) for g in group_by]
+        group_keys = []
+        for g in group_by:
+            parsed = parse_path(g)
+            jq_path = generate_jq_path(parsed, context="root", null_check=False)
+            group_keys.append(jq_path)
+
         group_key = ', '.join(group_keys)
         agg_sel = []
         for ftype, *data in fields:
@@ -360,14 +405,25 @@ def generate_jq_filter(fields, condition, group_by, having, order_by, sort_direc
                 expr_txt, alias = data
                 expr = parse_expression(expr_txt)
                 agg_sel.append(f'"{alias}": {generate_jq_expression(expr,"group")}')
-        prefix = f'[ {base_selector} ] | ' if base_selector else '[ .[] ] | '
+
+        if base_selector:
+            prefix = f'[ {base_selector} ] | '
+        else:
+            prefix = '[ .[] ] | '
+
         jq_filter = f'{prefix}map(select(. != null)) | group_by({group_key}) | map({{ {", ".join(agg_sel)} }})'
         if having:
             jq_filter += f' | map(select({process_having_condition(having)}))'
     else:
         if fields == [('field', '*', '*')]:
-            jq_filter = f'[{base_selector}]' if from_path else '.'
-        elif not any(ft[0] == 'field' for ft in fields) and not from_path and not group_by:
+            if from_path:
+                jq_filter = f'[{base_selector}]'
+            else:
+                jq_filter = '.'
+
+        elif (not any(ft[0] == 'field' for ft in fields) and 
+        not from_path and 
+        not group_by):
             sel = []
             for ftype, *data in fields:
                 if ftype == 'aggregation':

@@ -1,5 +1,22 @@
 # Changelog
 
+## [v0.1.1] - 2025-08-22
+
+### Added
+
+- NDJSON input mode: --ndjson (supports - stdin). Lines are wrapped into a JSON array for querying. Currently incompatible with `--stream`.. prints a friendly message if combined
+
+### Fixed
+
+- Properly await aclose()/close() to eliminate RuntimeWarning: coroutine ... was never awaited etc etc.
+- Schema validation now allows nested paths (e.g., items[].price) by validating only the top level head
+- Better handling of comparisons (`== != >= <= > <`), numbers (ints/floats), and `contains`
+
+### Changed
+
+- CSV pipeline. Convert JSON -> CSV before applying `--limit`
+- Pretty printing applies only to JSON output
+
 ## [v0.1.0] - 2025-06-22
 
 ### Added

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jonq"
-version = "0.1.0"
+version = "0.1.1"
 description = "SQL-like query tool for JSON files"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -28,7 +28,7 @@ classifiers = [
 ]
 
 [project.scripts]
-jonq = "jonq.main:main"
+jonq = "jonq.main:entrypoint"
 
 [project.urls]
 "Homepage" = "https://github.com/duriantaco/jonq"

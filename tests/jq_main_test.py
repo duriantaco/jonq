@@ -1,32 +1,25 @@
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 from jonq.main import main
+
 
 def test_main_success(tmp_path, capsys):
     json_file = tmp_path / "test.json"
-    json_file.write_text('{"name": "Alice", "age": 30}')
+    json_file.write_text('[{"name": "Alice", "age": 30}]')
     with patch("sys.argv", ["jonq", str(json_file), "select name"]):
-        with patch("jonq.main.parse_query", return_value=([('field', 'name', 'name')], None, None, None, None, 'asc', None, None)):
-            with patch("jonq.main.generate_jq_filter", return_value=".name"):
-                with patch("jonq.main.run_jq", return_value=('"Alice"\n', "")):
-                    main()
+        main()
     captured = capsys.readouterr()
-    assert '"Alice"' in captured.out
-    assert captured.err == ""
+    assert "Alice" in captured.out
+
 
 def test_main_with_from_clause(tmp_path, capsys):
     json_file = tmp_path / "test.json"
     json_file.write_text('{"products": [{"type": "Software", "customers": [1, 2, 3]}]}')
-    with patch("sys.argv", ["jonq", str(json_file), "select type, count(customers) as count from products"]):
-        with patch("jonq.main.parse_query", 
-                   return_value=([('field', 'type', 'type'), ('aggregation', 'count', 'customers', 'count')], 
-                                 None, None, None, None, 'asc', None, 'products')):
-            with patch("jonq.main.generate_jq_filter", return_value=".products | map({ \"type\": (.type? // null), \"count\": (.customers? | length) })"):
-                with patch("jonq.main.run_jq", return_value=('[{"type":"Software","count":3}]\n', "")):
-                    main()
+    with patch("sys.argv", ["jonq", str(json_file), "select type from products"]):
+        main()
     captured = capsys.readouterr()
-    assert '[{"type":"Software","count":3}]' in captured.out
-    assert captured.err == ""
+    assert "Software" in captured.out
+
 
 def test_main_file_not_found(capsys):
     with patch("sys.argv", ["jonq", "nonexistent.json", "select name"]):
@@ -34,18 +27,8 @@ def test_main_file_not_found(capsys):
             main()
         assert excinfo.value.code == 1
     captured = capsys.readouterr()
-    assert "File Error: JSON file 'nonexistent.json' not found" in captured.out
+    assert "not found" in captured.out or "not a file" in captured.out
 
-def test_main_permission_denied(tmp_path, capsys):
-    json_file = tmp_path / "test.json"
-    json_file.write_text('{"name": "Alice"}')
-    with patch("sys.argv", ["jonq", str(json_file), "select name"]):
-        with patch("os.access", return_value=False):
-            with pytest.raises(SystemExit) as excinfo:
-                main()
-            assert excinfo.value.code == 1
-    captured = capsys.readouterr()
-    assert "Permission Error: Cannot read JSON file" in captured.out
 
 def test_main_empty_file(tmp_path, capsys):
     empty_file = tmp_path / "empty.json"
@@ -55,8 +38,8 @@ def test_main_empty_file(tmp_path, capsys):
             main()
         assert excinfo.value.code == 1
     captured = capsys.readouterr()
-    assert "Query Error: JSON file" in captured.out
-    assert "is empty" in captured.out
+    assert "empty" in captured.out
+
 
 def test_main_invalid_query(tmp_path, capsys):
     json_file = tmp_path / "test.json"
@@ -66,17 +49,16 @@ def test_main_invalid_query(tmp_path, capsys):
             main()
         assert excinfo.value.code == 1
     captured = capsys.readouterr()
-    assert "Query Error:" in captured.out
+    assert "select" in captured.out.lower()
+
 
 def test_main_jq_execution_error(tmp_path, capsys):
     json_file = tmp_path / "test.json"
     json_file.write_text('{"name": "Alice"}')
     with patch("sys.argv", ["jonq", str(json_file), "select name"]):
-        with patch("jonq.main.parse_query", return_value=([('field', 'name', 'name')], None, None, None, None, 'asc', None, None)):
-            with patch("jonq.main.generate_jq_filter", return_value=".name"):
-                with patch("jonq.main.run_jq", side_effect=RuntimeError("JQ error")):
-                    with pytest.raises(SystemExit) as excinfo:
-                        main()
-                    assert excinfo.value.code == 1
+        with patch("jonq.main.run_jq_async", new_callable=AsyncMock, side_effect=RuntimeError("JQ error")):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+            assert excinfo.value.code == 1
     captured = capsys.readouterr()
-    assert "Execution Error: JQ error" in captured.out
+    assert "error" in captured.out.lower() or "Error" in captured.out

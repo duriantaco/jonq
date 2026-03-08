@@ -10,7 +10,7 @@ def print_parsed_query(query):
         tokens = tokenize_query(query)
         print(f"Tokens: {tokens}")
         
-        fields, condition, group_by, having, order_by, sort_direction, limit = parse_query(tokens)
+        fields, condition, group_by, having, order_by, sort_direction, limit, from_path, distinct = parse_query(tokens)
         
         print("\nParsed Components:")
         print(f"  Fields: {fields}")

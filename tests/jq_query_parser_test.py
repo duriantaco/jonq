@@ -3,9 +3,9 @@ from jonq.query_parser import tokenize, parse_query
 
 
 def _assert_no_extra(t):
-    cond, grp, hav, ob, dir_, lim, src = t
+    cond, grp, hav, ob, dir_, lim, src, dist = t
     assert cond is None and grp is None and hav is None and ob is None
-    assert dir_ == "asc" and lim is None and src is None
+    assert dir_ == "asc" and lim is None and src is None and dist is False
 
 
 def _extract(q):
@@ -44,7 +44,7 @@ def test_if_conditions(q, bits):
 
 
 def test_sort_and_limit():
-    _, _, _, _, ob, dir_, lim, src = _extract("select name, age sort age desc 5")
+    _, _, _, _, ob, dir_, lim, src, _ = _extract("select name, age sort age desc 5")
     assert (ob, dir_, lim, src) == ("age", "desc", "5", None)
 
 
@@ -66,17 +66,17 @@ def test_nested_group_by():
 
 
 def test_from_simple():
-    *_, src = _extract("select type, count(customers) as customer_count from products")
+    *_, src, _dist = _extract("select type, count(customers) as customer_count from products")
     assert src == "products"
 
 
 def test_from_with_condition():
-    f, cond, *_, src = _extract("select type, price from products if price > 100")
-    assert ("field", "price", "price") in f and "price > 100" in cond and src == "products"
+    f, cond, *_, src, _dist = _extract("select type, price from products if price > 100")
+    assert ("field", "price", "price") in f and "price" in cond and "> 100" in cond and src == "products"
 
 
 def test_from_group_by_having_sort_limit():
-    f, cond, grp, hav, ob, dir_, lim, src = _extract(
+    f, cond, grp, hav, ob, dir_, lim, src, _ = _extract(
         "select type, count(customers) as customer_count "
         "from products if launched > 2010 "
         "group by type having customer_count > 2 "
@@ -97,6 +97,13 @@ def test_hyphen_and_apostrophe_idents():
     f2, *_ = _extract('select "user\'s name" as username')
     assert f1[0] == ("field", "first-name", "first_name")
     assert f2[0] == ("field", "user's name", "username")
+
+
+def test_expression_with_function_calls_parses_as_expression():
+    f, *_ = _extract("select max(age) - min(age) as age_range")
+    assert f[0][0] == "expression"
+    assert f[0][2] == "age_range"
+    assert "max" in f[0][1] and "min" in f[0][1]
 
 
 def test_invalid_start_keyword():

@@ -67,6 +67,22 @@ def test_mixed_field_and_count():
     _has(r, ['"name"', '"item_count"', "length"])
 
 
+def test_mixed_field_and_array_aggregations_without_group_by():
+    r = generate_jq_filter(
+        [
+            ("field", "products[].name", "name"),
+            ("aggregation", "count", "products[].versions[]", "version_count"),
+            ("aggregation", "count", "products[].customers[]", "customer_count"),
+        ],
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    _has(r, ['"name"', '"version_count"', '"customer_count"'])
+
+
 def test_simple_expression():
     r = generate_jq_filter([("expression", ".age + 10", "age_plus_10")], None, None, None, None, None)
     _has(r, ['"age_plus_10"', "+ 10"])
@@ -86,7 +102,7 @@ def test_expression_with_inner_sum():
     r = generate_jq_filter(
         [("expression", "sum(items.price) * 2", "double_total")], None, None, None, None, None
     )
-    _has(r, ['"double_total"', "sum", "* 2"])
+    _has(r, ['"double_total"', "add", "* 2"])
 
 
 @pytest.mark.parametrize(

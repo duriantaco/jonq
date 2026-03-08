@@ -10,6 +10,7 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+
 def _run_jq_raw(jq_filter, json_text):
     worker = None
     try:
@@ -23,22 +24,27 @@ def _run_jq_raw(jq_filter, json_text):
     finally:
         try:
             if worker:
-                closer = getattr(worker, "aclose", None) or getattr(worker, "close", None)
+                closer = getattr(worker, "aclose", None) or getattr(
+                    worker, "close", None
+                )
                 if closer:
                     if inspect.iscoroutinefunction(closer):
                         try:
                             asyncio.run(closer())
                         except RuntimeError:
                             import threading
+
                             def _runner():
                                 asyncio.run(closer())
+
                             t = threading.Thread(target=_runner, daemon=True)
                             t.start()
                             t.join()
                     else:
                         closer()
-        except Exception:
-            pass
+        except (OSError, RuntimeError):
+            logger.debug("Failed to close jq worker")
+
 
 def run_jq(arg1, arg2):
     if os.path.exists(arg1):
@@ -51,10 +57,13 @@ def run_jq(arg1, arg2):
 
         out, err = _run_jq_raw(jq_filter, json_txt)
         if err:
-            raise RuntimeError(f"Error in jq filter: {err}")
+            if err.startswith("Invalid JSON"):
+                raise ValueError(err)
+            raise ValueError(f"Error in jq filter: {err}")
         return out, err
 
     return _run_jq_raw(arg1, arg2)
+
 
 def run_jq_streaming(json_file, jq_filter, chunk_size=1000):
     emits_objects = jq_filter.startswith(".[]") or "| .[" in jq_filter
@@ -70,9 +79,7 @@ def run_jq_streaming(json_file, jq_filter, chunk_size=1000):
 
     try:
         merged_json = process_json_streaming(
-            json_file,
-            _process_chunk,
-            chunk_size=chunk_size
+            json_file, _process_chunk, chunk_size=chunk_size
         )
     except Exception as exc:
         logger.error("Streaming execution error: %s", exc)
@@ -89,6 +96,7 @@ def run_jq_streaming(json_file, jq_filter, chunk_size=1000):
 
     return merged_json, ""
 
+
 async def _run_jq_raw_async(jq_filter, json_text):
     worker = None
     try:
@@ -102,14 +110,17 @@ async def _run_jq_raw_async(jq_filter, json_text):
     finally:
         try:
             if worker:
-                closer = getattr(worker, "aclose", None) or getattr(worker, "close", None)
+                closer = getattr(worker, "aclose", None) or getattr(
+                    worker, "close", None
+                )
                 if closer:
                     if inspect.iscoroutinefunction(closer):
                         await closer()
                     else:
                         closer()
-        except Exception:
-            pass
+        except (OSError, RuntimeError):
+            logger.debug("Failed to close async jq worker")
+
 
 async def run_jq_async(arg1, arg2):
     if os.path.exists(arg1):
@@ -122,10 +133,13 @@ async def run_jq_async(arg1, arg2):
 
         out, err = await _run_jq_raw_async(jq_filter, json_txt)
         if err:
-            raise RuntimeError(f"Error in jq filter: {err}")
+            if err.startswith("Invalid JSON"):
+                raise ValueError(err)
+            raise ValueError(f"Error in jq filter: {err}")
         return out, err
 
     return await _run_jq_raw_async(arg1, arg2)
+
 
 async def run_jq_streaming_async(json_file, jq_filter, chunk_size=1000):
     emits_objects = jq_filter.startswith(".[]") or "| .[" in jq_filter
@@ -141,9 +155,7 @@ async def run_jq_streaming_async(json_file, jq_filter, chunk_size=1000):
 
     try:
         merged_json = await process_json_streaming_async(
-            json_file,
-            _process_chunk_async,
-            chunk_size=chunk_size
+            json_file, _process_chunk_async, chunk_size=chunk_size
         )
     except Exception as exc:
         logger.error("Streaming execution error: %s", exc)

@@ -1,7 +1,15 @@
 from __future__ import annotations
-import json, subprocess, threading, atexit
+import atexit
+import json
+import logging
+import subprocess
+import threading
 from functools import lru_cache
 import asyncio
+from jonq.constants import WORKER_CACHE_SIZE
+
+logger = logging.getLogger(__name__)
+
 
 class JQWorker:
     def __init__(self, filter_src):
@@ -11,13 +19,13 @@ class JQWorker:
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             text=True,
-            bufsize=1
+            bufsize=1,
         )
         self._lock = threading.Lock()
 
     def query(self, obj):
         payload = json.dumps(obj, separators=(",", ":")) + "\n"
-        with self._lock:                   
+        with self._lock:
             self.proc.stdin.write(payload)
             self.proc.stdin.flush()
             return self.proc.stdout.readline().rstrip("\n")
@@ -25,9 +33,11 @@ class JQWorker:
     def close(self):
         self.proc.terminate()
 
+
 _workers = {}
 
-@lru_cache(maxsize=32)
+
+@lru_cache(maxsize=WORKER_CACHE_SIZE)
 def get_worker(filter_src):
     w = _workers.get(filter_src)
     if w is not None:
@@ -37,6 +47,7 @@ def get_worker(filter_src):
     _workers[filter_src] = JQWorker(filter_src)
     return _workers[filter_src]
 
+
 class AsyncJQWorker:
     def __init__(self, filter_src):
         self.filter = filter_src
@@ -45,17 +56,20 @@ class AsyncJQWorker:
 
     async def start(self):
         self.proc = await asyncio.create_subprocess_exec(
-            "jq", "-c", "--unbuffered", self.filter,
+            "jq",
+            "-c",
+            "--unbuffered",
+            self.filter,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            text=False
+            text=False,
         )
 
     async def query(self, obj):
         if not self.proc:
             await self.start()
-            
+
         payload = json.dumps(obj, separators=(",", ":")) + "\n"
         async with self._lock:
             self.proc.stdin.write(payload.encode())
@@ -68,37 +82,41 @@ class AsyncJQWorker:
             self.proc.terminate()
             await self.proc.wait()
 
+
 _async_workers = {}
+
 
 async def get_worker_async(filter_src):
     current_loop = asyncio.get_running_loop()
-    
+
     cache_key = (filter_src, id(current_loop))
-    
+
     if cache_key in _async_workers:
         worker = _async_workers[cache_key]
         if worker.proc and worker.proc.returncode is None:
             return worker
-    
+
     worker = AsyncJQWorker(filter_src)
     await worker.start()
     _async_workers[cache_key] = worker
     return worker
 
+
 async def _cleanup_async():
     for w in _async_workers.values():
         try:
             await w.close()
-        except Exception:
-            pass
+        except (OSError, RuntimeError):
+            logger.debug("Failed to close async worker during cleanup")
+
 
 def _cleanup():
     for w in _workers.values():
         try:
             w.close()
-        except Exception:
-            pass
-    
+        except (OSError, RuntimeError):
+            logger.debug("Failed to close worker during cleanup")
+
     try:
         loop = asyncio.get_running_loop()
         if loop and not loop.is_closed():
@@ -106,7 +124,8 @@ def _cleanup():
     except RuntimeError:
         try:
             asyncio.run(_cleanup_async())
-        except Exception:
-            pass
+        except (OSError, RuntimeError):
+            logger.debug("Failed to run async cleanup")
+
 
 atexit.register(_cleanup)

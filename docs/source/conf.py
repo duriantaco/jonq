@@ -4,7 +4,7 @@ import os
 project = 'jonq'
 copyright = f'{datetime.datetime.now().year}, oha'
 author = 'oha'
-release = '0.0.2'
+release = '0.2.0'
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 
@@ -76,7 +76,7 @@ html_theme_options = {
     },
     
     "navigation_with_keys": True,
-    "announcement": "📢 jonq v0.0.2 is now available! Check the installation guide for details.",
+    "announcement": "jonq v0.2.0 is now available! Check the installation guide for details.",
 }
 
 html_static_path = ['_static']

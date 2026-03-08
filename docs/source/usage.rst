@@ -4,11 +4,12 @@ Usage
 Overview
 ---------
 
-`jonq` is a command-line tool that lets you query JSON files using a SQL-like syntax, making it approachable for users familiar with SQL while leveraging the power of the `jq` utility behind the scenes. Whether you're working with simple flat data or complex nested structures, `jonq` provides an intuitive way to select, filter, sort, group, and aggregate JSON data.
+``jonq`` is a command-line tool that lets you query JSON files using a SQL-like syntax, making it approachable for users familiar with SQL while leveraging the power of the ``jq`` utility behind the scenes. Whether you're working with simple flat data or complex nested structures, ``jonq`` provides an intuitive way to select, filter, sort, group, and aggregate JSON data.
 
-### Basic Command Structure
+Basic Command Structure
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-Run `jonq` with the following syntax:
+Run ``jonq`` with the following syntax:
 
 .. code-block:: bash
 
@@ -16,13 +17,34 @@ Run `jonq` with the following syntax:
 
 **Available Options:**
 
-- `--format, -f <csv|json>`: Choose output format (default: `json`).
-- `--stream, -s`: Enable streaming mode for processing large files efficiently.
-- `--fast, -F`: Use the Rust extension for faster processing (requires `jonq-fast`).
-- `--format csv`: Output results in CSV format.
-- `-h, --help`: Display the help message and exit.
-- `format csv --fast > output.csv`: Redirect output to a file.
-- `--version`: Show the version of `jonq`.
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Option
+     - Description
+   * - ``--format, -f csv|json``
+     - Output format (default: ``json``)
+   * - ``--stream, -s``
+     - Stream root-array JSON in chunks
+   * - ``--ndjson``
+     - Force NDJSON mode (auto-detected by default)
+   * - ``--limit, -n N``
+     - Limit rows post-query
+   * - ``--out, -o PATH``
+     - Write output to file
+   * - ``--jq``
+     - Print generated jq filter and exit
+   * - ``--pretty, -p``
+     - Pretty-print JSON output
+   * - ``--watch, -w``
+     - Re-run query when file changes
+   * - ``--no-color``
+     - Disable colorized output
+   * - ``-i <file>``
+     - Interactive query mode (REPL)
+   * - ``-h, --help``
+     - Show help message
 
 **Quick Example:**
 
@@ -30,36 +52,36 @@ Run `jonq` with the following syntax:
 
    jonq users.json "select name, age if age > 30"
 
-This command selects the `name` and `age` fields from `users.json` where the `age` is greater than 30.
+This command selects the ``name`` and ``age`` fields from ``users.json`` where the ``age`` is greater than 30.
 
 Query Syntax Breakdown
 -----------------------
 
-The `jonq` query syntax mirrors SQL but is tailored for JSON. Here’s the full structure:
+The ``jonq`` query syntax mirrors SQL but is tailored for JSON. Here's the full structure:
 
 .. code-block:: sql
 
-   select <fields> [from <path>] [if <condition>] [group by <fields>] [having <condition>] [sort <field> [asc|desc] [limit]]
+   select [distinct] <fields> [from <path>] [if <condition>] [group by <fields> [having <condition>]] [sort <field> [asc|desc]] [limit N]
 
-- **`<fields>`**: Fields to select (e.g., `name`, `age`), including aliases, expressions, or aggregations.
-- **`from <path>`**: Optional path to query a specific part of the JSON (e.g., `from [].orders`).
-- **`if <condition>`**: Optional filter (e.g., `age > 30`).
-- **`group by <fields>`**: Optional grouping (e.g., `group by city`).
-- **`having <condition>`**: Optional filter on grouped results (e.g., `having count > 2`).
-- **`sort <field>`**: Optional sorting field (e.g., `sort age`).
-- **`asc|desc`**: Optional sort direction (default: `asc`).
-- **`limit`**: Optional number of results (e.g., `5`).
-
-Let’s dive into each part with detailed explanations and examples!
+- **``<fields>``**: Fields to select (e.g., ``name``, ``age``), including aliases, expressions, or aggregations.
+- **``distinct``**: Optional keyword to return only unique rows.
+- **``from <path>``**: Optional path to query a specific part of the JSON (e.g., ``from products``).
+- **``if <condition>``**: Optional filter (e.g., ``age > 30``).
+- **``group by <fields>``**: Optional grouping (e.g., ``group by city``).
+- **``having <condition>``**: Optional filter on grouped results (e.g., ``having count > 2``).
+- **``sort <field>``**: Optional sorting field (e.g., ``sort age``).
+- **``asc|desc``**: Optional sort direction (default: ``asc``).
+- **``limit N``**: Optional number of results (e.g., ``limit 5``).
 
 Field Selection
 ----------------
 
 You can select specific fields, all fields, or even compute new values from your JSON data.
 
-### Selecting Fields
+Selecting Fields
+~~~~~~~~~~~~~~~~~
 
-- **All Fields (`*`):**
+- **All Fields (``*``):**
 
   .. code-block:: bash
 
@@ -73,7 +95,7 @@ You can select specific fields, all fields, or even compute new values from your
 
      jonq data.json "select name, age"
 
-  Returns only `name` and `age` from each object.
+  Returns only ``name`` and ``age`` from each object.
 
 - **Nested Fields (Using Dot Notation):**
 
@@ -81,7 +103,7 @@ You can select specific fields, all fields, or even compute new values from your
 
      jonq data.json "select profile.age, profile.address.city"
 
-  Accesses nested fields like `age` inside `profile` and `city` inside `address`.
+  Accesses nested fields like ``age`` inside ``profile`` and ``city`` inside ``address``.
 
 - **Array Elements (Using Brackets):**
 
@@ -89,7 +111,7 @@ You can select specific fields, all fields, or even compute new values from your
 
      jonq data.json "select orders[0].item"
 
-  Retrieves the `item` from the first element of the `orders` array.
+  Retrieves the ``item`` from the first element of the ``orders`` array.
 
 - **Fields with Spaces or Special Characters (Quotes):**
 
@@ -99,9 +121,20 @@ You can select specific fields, all fields, or even compute new values from your
 
   Use single or double quotes for field names with spaces or special characters.
 
-### Aliases
+DISTINCT
+~~~~~~~~~
 
-Rename fields in the output using `as`:
+Return only unique rows:
+
+.. code-block:: bash
+
+   jonq data.json "select distinct city"
+   jonq data.json "select distinct name, city"
+
+Aliases
+~~~~~~~~
+
+Rename fields in the output using ``as``:
 
 .. code-block:: bash
 
@@ -116,35 +149,50 @@ Rename fields in the output using `as`:
      {"full_name": "Bob", "years": 25}
    ]
 
-### Arithmetic Expressions
+Arithmetic Expressions
+~~~~~~~~~~~~~~~~~~~~~~~
 
-Perform calculations within the `select` clause:
+Perform calculations within the ``select`` clause:
 
 .. code-block:: bash
 
    jonq data.json "select name, age + 10 as age_plus_10, price * 2 as doubled_price"
 
-**Output Example:**
+String Functions
+~~~~~~~~~~~~~~~~~
 
-.. code-block:: json
+Transform string values with built-in functions:
 
-   [
-     {"name": "Alice", "age_plus_10": 40, "doubled_price": 2400},
-     {"name": "Bob", "age_plus_10": 35, "doubled_price": 1000}
-   ]
+.. code-block:: bash
+
+   jonq data.json "select upper(name) as name_upper"     # ALICE, BOB, ...
+   jonq data.json "select lower(city) as city_lower"     # new york, ...
+   jonq data.json "select length(name) as name_len"      # 5, 3, ...
+
+Math Functions
+~~~~~~~~~~~~~~~
+
+Apply math functions to numeric values:
+
+.. code-block:: bash
+
+   jonq data.json "select round(price) as price_rounded"
+   jonq data.json "select abs(balance) as abs_balance"
+   jonq data.json "select ceil(score) as score_ceil"
+   jonq data.json "select floor(score) as score_floor"
 
 FROM Clause
 ------------
 
-The `FROM` clause lets you target a specific part of the JSON structure, such as a nested array.
+The ``FROM`` clause lets you target a specific part of the JSON structure, such as a nested array.
 
 - **Basic Usage:**
 
   .. code-block:: bash
 
-     jonq data.json "select order_id, item from [].orders"
+     jonq data.json "select type, name from products"
 
-  Queries the `orders` array within each top-level object.
+  Queries the ``products`` array within the JSON.
 
 - **With Filtering:**
 
@@ -152,33 +200,17 @@ The `FROM` clause lets you target a specific part of the JSON structure, such as
 
      jonq data.json "select order_id, price from [].orders if price > 800"
 
-  Filters `orders` where `price` exceeds 800.
-
-**Example JSON:**
-
-.. code-block:: json
-
-   [
-     {"id": 1, "orders": [{"order_id": 101, "price": 1200}, {"order_id": 102, "price": 800}]},
-     {"id": 2, "orders": [{"order_id": 103, "price": 500}]}
-   ]
-
-**Output:**
-
-.. code-block:: json
-
-   [
-     {"order_id": 101, "price": 1200}
-   ]
+  Filters ``orders`` where ``price`` exceeds 800.
 
 Filtering with Conditions
 --------------------------
 
-The `if` clause filters data based on conditions using comparison and logical operators.
+The ``if`` clause filters data based on conditions using comparison and logical operators.
 
-### Basic Filtering
+Basic Filtering
+~~~~~~~~~~~~~~~~
 
-- **Comparison Operators:** `=`, `==`, `!=`, `>`, `<`, `>=`, `<=`
+- **Comparison Operators:** ``=``, ``==``, ``!=``, ``>``, ``<``, ``>=``, ``<=``
 
   .. code-block:: bash
 
@@ -190,9 +222,10 @@ The `if` clause filters data based on conditions using comparison and logical op
 
      jonq data.json "select name if city = 'New York'"
 
-### Logical Operators
+Logical Operators
+~~~~~~~~~~~~~~~~~~
 
-Combine conditions with `and`, `or`, and parentheses:
+Combine conditions with ``and``, ``or``, and parentheses:
 
 - **Multiple Conditions:**
 
@@ -200,7 +233,7 @@ Combine conditions with `and`, `or`, and parentheses:
 
      jonq data.json "select name if age > 25 and city = 'Chicago'"
 
-- **With `or`:**
+- **With ``or``:**
 
   .. code-block:: bash
 
@@ -212,7 +245,34 @@ Combine conditions with `and`, `or`, and parentheses:
 
      jonq data.json "select name if (age > 30 and city = 'Chicago') or profile.active = true"
 
-### Advanced Operators
+Advanced Operators
+~~~~~~~~~~~~~~~~~~~
+
+- **IN (Set membership):**
+
+  .. code-block:: bash
+
+     jonq data.json "select * if city in ('New York', 'Chicago', 'Los Angeles')"
+
+  Matches values in the given set.
+
+- **NOT (Logical negation):**
+
+  .. code-block:: bash
+
+     jonq data.json "select * if not age > 30"
+
+  Negates the condition.
+
+- **LIKE (Pattern matching):**
+
+  .. code-block:: bash
+
+     jonq data.json "select * if name like 'Al%'"      # starts with "Al"
+     jonq data.json "select * if name like '%ice'"      # ends with "ice"
+     jonq data.json "select * if name like '%li%'"      # contains "li"
+
+  Uses ``%`` as wildcard for pattern matching.
 
 - **BETWEEN (Numeric Ranges):**
 
@@ -247,18 +307,28 @@ Control the order and number of results.
 
      jonq data.json "select name, age sort age desc"
 
-- **Limit Results:**
+- **Inline Limit (after sort):**
 
   .. code-block:: bash
 
      jonq data.json "select name, age sort age desc 3"
 
-  Returns the top 3 results sorted by `age` descending.
+  Returns the top 3 results sorted by ``age`` descending.
+
+- **Standalone Limit:**
+
+  .. code-block:: bash
+
+     jonq data.json "select * limit 5"
+     jonq data.json "select name, age if age > 25 limit 10"
+     jonq data.json "select city, count(*) as cnt group by city limit 3"
+
+  Can be used anywhere after the main query, independent of sorting.
 
 Aggregation Functions
 ----------------------
 
-Summarize data with built-in functions: `sum`, `avg`, `count`, `max`, `min`.
+Summarize data with built-in functions: ``sum``, ``avg``, ``count``, ``max``, ``min``.
 
 - **Sum:**
 
@@ -278,11 +348,17 @@ Summarize data with built-in functions: `sum`, `avg`, `count`, `max`, `min`.
 
      jonq data.json "select count(*) as total_users"
 
+- **Count Distinct:**
+
+  .. code-block:: bash
+
+     jonq data.json "select count(distinct city) as unique_cities"
+
 - **Maximum:**
 
   .. code-block:: bash
 
-     jonq data.json "select max(orders.price) as highest_price"
+     jonq data.json "select max(age) as oldest"
 
 - **Minimum:**
 
@@ -290,22 +366,17 @@ Summarize data with built-in functions: `sum`, `avg`, `count`, `max`, `min`.
 
      jonq data.json "select min(age) as youngest"
 
-### Combining Aggregations
+Combining Aggregations
+~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
    jonq data.json "select sum(price) as total, avg(price) as avg_price from [].orders"
 
-**Output Example:**
-
-.. code-block:: json
-
-   {"total": 2500, "avg_price": 833.33}
-
 Grouping Data
 --------------
 
-Use `group by` to aggregate data by categories.
+Use ``group by`` to aggregate data by categories.
 
 - **Simple Grouping:**
 
@@ -322,13 +393,13 @@ Use `group by` to aggregate data by categories.
 Having Clause
 -------------
 
-Filter grouped results with `having`:
+Filter grouped results with ``having``:
 
 - **Basic Example:**
 
   .. code-block:: bash
 
-     jonq data.json "select city, count(*) as count group by city having count > 2"
+     jonq data.json "select city, count(*) as cnt group by city having cnt > 2"
 
 - **With Aggregation:**
 
@@ -340,7 +411,7 @@ Filter grouped results with `having`:
 
   .. code-block:: bash
 
-     jonq data.json "select city, sum(price) as total group by city having total > 1000 and count(*) > 1"
+     jonq data.json "select city, count(*) as cnt, avg(age) as avg_age group by city having cnt > 1 and avg_age > 25"
 
 Output Formats
 ---------------
@@ -367,14 +438,94 @@ Choose how results are displayed:
      Alice,30
      Bob,25
 
-Optional
----------
+Schema Preview
+---------------
 
-For users dealing with large or complex nested JSON structures, we recommend installing the optional `jonq_fast` Rust extension. 
+Run ``jonq`` with just a file (no query) to inspect the JSON structure:
 
-- **Fast:**
+.. code-block:: bash
 
-      jonq data.json "select name, age" --fast
+   jonq data.json
+
+This shows the file info, field names with types and sample values, and a truncated sample object.
+
+Interactive REPL
+-----------------
+
+Launch an interactive session to run multiple queries against the same file:
+
+.. code-block:: bash
+
+   jonq -i data.json
+
+.. code-block:: text
+
+   jonq interactive mode -- querying data.json
+   Type a query (without jonq/filename), or 'quit' to exit.
+
+   jonq> select name, age
+   [{"name":"Alice","age":30},{"name":"Bob","age":25}]
+   jonq> select * if age > 28
+   [{"id":1,"name":"Alice","age":30,"city":"New York"}]
+   jonq> quit
+
+Watch Mode
+-----------
+
+Re-run a query automatically whenever the file changes:
+
+.. code-block:: bash
+
+   jonq data.json "select name, age" --watch
+
+Multiple Input Sources
+-----------------------
+
+**URL Fetch:**
+
+.. code-block:: bash
+
+   jonq https://api.example.com/users.json "select name, email"
+
+**Multi-File Glob:**
+
+.. code-block:: bash
+
+   jonq 'logs/*.json' "select * if level = 'error'"
+
+**Stdin:**
+
+.. code-block:: bash
+
+   cat data.json | jonq - "select name, age"
+   curl -s https://api.example.com/data | jonq - "select id, name"
+
+Auto-detect NDJSON
+-------------------
+
+jonq auto-detects NDJSON (newline-delimited JSON) files. No flag needed:
+
+.. code-block:: bash
+
+   jonq data.ndjson "select name, age if age > 25"
+
+You can still force it with ``--ndjson`` if needed. ``--ndjson`` cannot be combined with ``--stream``.
+
+Fuzzy Field Suggestions
+------------------------
+
+When you mistype a field name, jonq suggests similar fields:
+
+.. code-block:: text
+
+   $ jonq data.json "select nme, agge"
+   Field(s) 'nme, agge' not found. Available fields: age, city, id, name.
+   Did you mean: 'nme' -> name; 'agge' -> age?
+
+Colorized Output
+-----------------
+
+When outputting to a terminal, jonq auto-pretty-prints and colorizes JSON output with syntax highlighting. Pipe to a file or use ``--no-color`` to disable.
 
 Handling Large Files
 ---------------------
@@ -391,46 +542,38 @@ For big JSON files, use streaming mode:
 Tips and Tricks
 ----------------
 
-### Debugging Queries
+Debugging Queries
+~~~~~~~~~~~~~~~~~~
 
-- **Test Small:** Start with a simple `select *` to verify the JSON structure.
-- **Check Paths:** Use tools like `jq '.' data.json` to inspect nested paths.
-- **Quote Strings:** Always quote string literals in conditions (e.g., `'New York'`).
+- **Test Small:** Start with a simple ``select *`` to verify the JSON structure.
+- **Use Schema Preview:** Run ``jonq data.json`` (no query) to inspect fields and types.
+- **See the jq filter:** Use ``--jq`` to see the generated jq filter without running it.
+- **Quote Strings:** Always quote string literals in conditions (e.g., ``'New York'``).
 
-### Optimizing Performance
+Optimizing Performance
+~~~~~~~~~~~~~~~~~~~~~~~
 
-- **Use FROM:** Narrow down the data with `from` to avoid processing unnecessary parts.
-- **Limit Early:** Apply `limit` or strict `if` conditions to reduce output size.
-- **Stream Large Files:** Always use `--stream` for files over 100MB.
+- **Use FROM:** Narrow down the data with ``from`` to avoid processing unnecessary parts.
+- **Limit Early:** Apply ``limit`` or strict ``if`` conditions to reduce output size.
+- **Stream Large Files:** Always use ``--stream`` for files over 100MB.
 
-### Working with Arrays
+Working with Arrays
+~~~~~~~~~~~~~~~~~~~~
 
-- **Unpack Arrays:** Use `from [].path` to query array elements directly.
+- **Unpack Arrays:** Use ``from [].path`` to query array elements directly.
 - **Index Safely:** Check array lengths in your data to avoid out-of-bounds errors.
 
-### Handling Nulls
+Handling Nulls
+~~~~~~~~~~~~~~~
 
-- **Filter Nulls:** Add `if field != null` to exclude missing values.
-- **Default Values:** Use expressions like `field + 0` to treat null as zero in calculations.
-
-Best Practices
----------------
-
-To optimize your experience with ``jonq``, follow these best practices:
-
-- **Use the `from` Clause**: Specify a `from` clause (e.g., ``from [].orders``) to target specific JSON structures, reducing processed data (supported in `SYNTAX.md` and `jonq/query_parser.py`).
-- **Limit Results Early**: Apply filters (e.g., ``if price > 1000``) and limits (e.g., ``sort age desc 5``) early in queries to minimize data handling (see `USAGE.md` examples).
-- **Stream Large Files**: Use the ``--stream`` option for large JSON files to process data in chunks and avoid memory overload (implemented in `jonq/main.py` and `jonq/stream_utils.py`).
-- **Test Queries on Small Data**: Validate queries on smaller JSON subsets before running on large datasets to ensure correctness and performance (a practical tip from usage patterns).
-- **Handle Nulls Carefully**: Use conditions like ``age is not null`` to manage null values explicitly, as ``jonq`` handles them automatically but may need specific filtering (noted in `SYNTAX.md`).
+- **Filter Nulls:** Add ``if field != null`` to exclude missing values.
+- **Default Values:** Use expressions like ``field + 0`` to treat null as zero in calculations.
 
 Known Limitations
 ------------------
 
-While ``jonq`` excels at lightweight JSON querying, it has some constraints based on its design and implementation:
-
-- **Performance with Very Large Files**: Processing JSON files exceeding 100MB may be slow, even with streaming (``--stream``), due to JSON parsing overhead (noted in `README.md`).
-- **Advanced jq Features**: Some complex ``jq`` functionalities (e.g., recursive descent or custom filters) are not exposed through ``jonq``’s SQL-like syntax (see `jonq/jq_filter.py`).
-- **Multiple File Joins**: ``jonq`` does not support joining data across multiple JSON files, limiting it to single-file operations (evident from `jonq/main.py` accepting one file).
-- **Custom Functions**: Users cannot define custom functions within queries, restricting extensibility (confirmed by `SYNTAX.md` lacking such syntax).
-- **Date/Time Operations**: Limited support for parsing or manipulating date/time data (e.g., no date-specific functions in `SYNTAX.md` or test cases like `test_manual_edge.sh`).
+- **Performance with Very Large Files**: Processing JSON files exceeding 100MB may be slow, even with streaming.
+- **Advanced jq Features**: Some complex ``jq`` functionalities (e.g., recursive descent or custom filters) are not exposed through ``jonq``'s SQL-like syntax.
+- **Joins**: ``jonq`` does not support joining data across multiple JSON files.
+- **Custom Functions**: Users cannot define custom functions within queries.
+- **Date/Time Operations**: Limited support for parsing or manipulating date/time data.

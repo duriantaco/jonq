@@ -4,7 +4,7 @@ Examples
 Simple JSON
 -----------
 
-Consider `simple.json`:
+Consider ``simple.json``:
 
 .. code-block:: json
 
@@ -20,16 +20,6 @@ Consider `simple.json`:
 
      jonq simple.json "select *"
 
-  **Output:**
-
-  .. code-block:: json
-
-     [
-       {"id": 1, "name": "Alice", "age": 30, "city": "New York"},
-       {"id": 2, "name": "Bob", "age": 25, "city": "Los Angeles"},
-       {"id": 3, "name": "Charlie", "age": 35, "city": "Chicago"}
-     ]
-
 - **Filter and sort:**
 
   .. code-block:: bash
@@ -44,6 +34,64 @@ Consider `simple.json`:
        {"name": "Charlie", "age": 35},
        {"name": "Alice", "age": 30}
      ]
+
+- **Distinct values:**
+
+  .. code-block:: bash
+
+     jonq simple.json "select distinct city"
+
+- **Standalone limit:**
+
+  .. code-block:: bash
+
+     jonq simple.json "select * limit 2"
+
+- **IN operator:**
+
+  .. code-block:: bash
+
+     jonq simple.json "select * if city in ('New York', 'Chicago')"
+
+- **NOT operator:**
+
+  .. code-block:: bash
+
+     jonq simple.json "select * if not age > 30"
+
+- **LIKE operator:**
+
+  .. code-block:: bash
+
+     jonq simple.json "select * if name like 'Al%'"
+
+- **String functions:**
+
+  .. code-block:: bash
+
+     jonq simple.json "select upper(name) as name_upper"
+
+  **Output:**
+
+  .. code-block:: json
+
+     [
+       {"name_upper": "ALICE"},
+       {"name_upper": "BOB"},
+       {"name_upper": "CHARLIE"}
+     ]
+
+- **Math functions:**
+
+  .. code-block:: bash
+
+     jonq simple.json "select round(age) as rounded_age"
+
+- **Count distinct:**
+
+  .. code-block:: bash
+
+     jonq simple.json "select count(distinct city) as unique_cities"
 
 - **Aggregation with having:**
 
@@ -75,7 +123,7 @@ Consider `simple.json`:
 Nested JSON
 -----------
 
-Consider `nested.json`:
+Consider ``nested.json``:
 
 .. code-block:: json
 
@@ -156,64 +204,35 @@ Consider `nested.json`:
        {"order_id": 103, "item": "Tablet"}
      ]
 
-Complex JSON
-------------
-
-Consider `complex.json` (abbreviated):
-
-.. code-block:: json
-
-   {
-     "company": {
-       "subsidiaries": [
-         {"name": "TechCorp Asia", "employees": 250, "financials": {"revenue": 42000000}},
-         {"name": "TechCorp Europe", "employees": 300, "financials": {"revenue": 58000000}}
-       ]
-     },
-     "products": [
-       {"id": "P001", "type": "Software", "versions": [{"pricing": {"monthly": 199.99}}]},
-       {"id": "P002", "type": "Software", "versions": [{"pricing": {"monthly": 149.99}}]}
-     ]
-   }
-  
-- **Filtering:**
+- **FROM clause:**
 
   .. code-block:: bash
 
-      jonq complex.json "select name, founded from company.subsidiaries[] if founded > 2008"
+     jonq nested.json "select type, name from products"
 
-  **Output:**
+Multiple Input Sources
+-----------------------
 
-  .. code-block:: json
-
-     [
-       {"name": "TechCorp Asia", "founded": 2010},
-     ]
-
-- **Deep nesting:**
+- **URL fetch:**
 
   .. code-block:: bash
 
-     jonq complex.json "select company.headquarters.coordinates.latitude"
+     jonq https://api.example.com/users.json "select name, email"
 
-  **Output:**
-  
-  .. code-block:: json
-
-     {
-       "latitude": 37.7749
-     }
-
-- **Complex grouping:**
+- **Glob multiple files:**
 
   .. code-block:: bash
 
-     jonq complex.json "select type, avg(versions[].pricing.monthly) as avg_price group by type from products[]"
+     jonq 'logs/*.json' "select * if level = 'error'"
 
-  **Output:**
+- **Stdin:**
 
-  .. code-block:: json
+  .. code-block:: bash
 
-     [
-       {"type": "Software", "avg_price": 216.67}
-     ]
+     cat data.json | jonq - "select name, age"
+
+- **NDJSON (auto-detected):**
+
+  .. code-block:: bash
+
+     jonq data.ndjson "select name, age if age > 25"

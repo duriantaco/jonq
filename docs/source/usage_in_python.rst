@@ -1,89 +1,104 @@
 Usage in Python
 =====================
 
-While ``jonq`` is designed as a command-line tool, you can integrate its functionality into Python scripts.
+``jonq`` ships with a small Python API for compiling and executing queries directly.
 
-Calling jonq via subprocess
-----------------------------
+Quick Start
+-----------
 
-To use ``jonq``'s querying capabilities from within a Python script, you can call it via the ``subprocess`` module:
+Use ``query(...)`` when you want Python data back immediately:
 
 .. code-block:: python
 
-   import subprocess
-   import json
+   from jonq import query
 
-   def run_jonq(json_file, query):
-       result = subprocess.run(['jonq', json_file, query], capture_output=True, text=True)
-       if result.returncode == 0:
-           return json.loads(result.stdout)
-       else:
-           raise Exception(result.stderr or result.stdout)
-
-   try:
-       data = run_jonq('simple.json', 'select name, age if age > 25')
-       print(data)
-   except Exception as e:
-       print(f"Error: {e}")
-
-**Example Output (using ``simple.json``):**
-
-.. code-block:: json
-
-   [
-     {"name": "Alice", "age": 30},
-     {"name": "Charlie", "age": 35}
+   data = [
+       {"name": "Alice", "age": 30, "city": "New York"},
+       {"name": "Bob", "age": 25, "city": "LA"},
    ]
 
-Using jonq's Python modules directly
---------------------------------------
-
-You can also import and use jonq's internal modules:
+   rows = query(data, "select name, city if age > 26")
+   print(rows)
 
 .. code-block:: python
 
-   from jonq.csv_utils import flatten_json
+   [{"name": "Alice", "city": "New York"}]
 
-   data = {
-       "user": {
-           "name": "Alice",
-           "address": {"city": "New York"},
-           "orders": [
-               {"id": 1, "item": "Laptop", "price": 1200},
-               {"id": 2, "item": "Phone", "price": 800}
-           ]
-       }
-   }
+Compiling Once, Reusing Many Times
+----------------------------------
 
-   flattened = flatten_json(data, sep=".")
-   print(flattened)
+Use ``compile_query(...)`` when you want to reuse the generated jq filter:
 
-**Output:**
+.. code-block:: python
 
-.. code-block:: json
+   from jonq import compile_query, query
 
-   {
-     "user.name": "Alice",
-     "user.address.city": "New York",
-     "user.orders.0.id": 1,
-     "user.orders.0.item": "Laptop",
-     "user.orders.0.price": 1200,
-     "user.orders.1.id": 2,
-     "user.orders.1.item": "Phone",
-     "user.orders.1.price": 800
-   }
+   compiled = compile_query("select name if age > 25")
 
-Additional Considerations
---------------------------
+   result_1 = query([{"name": "Alice", "age": 30}], compiled)
+   result_2 = query([{"name": "Bob", "age": 20}], compiled)
 
-- **Performance**: For large JSON files, use the ``--stream`` option when calling ``jonq`` via ``subprocess``:
+   print(compiled.jq_filter)
+   print(result_1)
+   print(result_2)
 
-  .. code-block:: python
+Structured Results
+------------------
 
-     result = subprocess.run(['jonq', 'large_data.json', 'select name, age', '--stream'], capture_output=True, text=True)
+Use ``execute(...)`` when you want metadata such as the generated jq filter or raw text output:
 
-- **Error Handling**: Always check the return code and handle errors appropriately, as shown in the example.
-- **Output Parsing**: The output from ``jonq`` is typically a JSON array or object. Use ``json.loads()`` to parse it into a Python data structure.
+.. code-block:: python
 
-.. warning::
-   Ensure that ``jonq`` is installed and accessible in your system's PATH. Verify this by running ``jonq --version`` from the command line.
+   from jonq import execute
+
+   result = execute(
+       [{"name": "Alice", "age": 30}],
+       "select name, age",
+       format="csv",
+   )
+
+   print(result.output_format)
+   print(result.text)
+
+Supported Inputs
+----------------
+
+The high-level API accepts:
+
+- Python objects like ``dict`` and ``list``
+- Raw JSON strings
+- File paths (``str`` or ``pathlib.Path``)
+
+Async Usage
+-----------
+
+Async variants are also available:
+
+.. code-block:: python
+
+   import asyncio
+   from jonq import query_async
+
+   async def main():
+       rows = await query_async([{"name": "Alice"}], "select name")
+       print(rows)
+
+   asyncio.run(main())
+
+CLI Fallback
+------------
+
+If you still prefer the CLI from Python, ``subprocess`` works as expected:
+
+.. code-block:: python
+
+   import json
+   import subprocess
+
+   result = subprocess.run(
+       ["jonq", "simple.json", "select name, age if age > 25"],
+       capture_output=True,
+       text=True,
+       check=True,
+   )
+   rows = json.loads(result.stdout)

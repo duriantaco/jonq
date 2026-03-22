@@ -1,5 +1,48 @@
 # Changelog
 
+## [Unreleased]
+
+## [v0.3.0] - 2026-03-22
+
+### Added
+
+#### Output & Display
+- **Table output**: `--format table` or `-t` renders results as aligned terminal tables with headers and separators
+- **YAML output**: `--format yaml` renders results as YAML (uses pyyaml if available, built-in fallback otherwise)
+- **`--explain` mode**: shows parsed query breakdown (fields, conditions, grouping) and the generated jq filter
+- **`--time` flag**: prints parse/execute/format timing to stderr
+- **Auto-detect stdin**: `curl ... | jonq "select name"` works without needing `-` as source
+
+#### Query Language
+- **CASE/WHEN/THEN/ELSE/END**: conditional expressions — `select case when age > 30 then "senior" else "junior" end as level`
+- **COALESCE**: null fallback with nested function support — `select coalesce(nickname, name) as display`
+- **`||` operator**: SQL-standard string concatenation — `select first || ' ' || last as full_name`
+- **IS NULL / IS NOT NULL**: null checks in conditions — `select * if email is not null`
+- **Type casting**: `int()`, `float()`, `str()` / `string()`, `type()`
+- **Date/time functions**: `todate()`, `fromdate()`, `date()`, `timestamp()` with null-safe execution
+- **Utility functions**: `keys()`, `values()`, `trim()`, `ltrim()`, `rtrim()`, `tojson()`, `fromjson()`, `reverse()`, `sort()`, `unique()`, `flatten()`, `not_null()`, `to_entries()`, `from_entries()`
+
+#### Terminal UX
+- **Rich REPL**: readline with persistent history (`~/.jonq_history`) and tab completion for field names + keywords
+- **`--follow` mode**: stream NDJSON from stdin line-by-line — `tail -f app.log | jonq --follow "select level, msg if level = 'error'"`
+- **Shell completions**: `jonq --completions bash|zsh|fish` generates completion scripts
+
+### Changed
+- Version bump to 0.3.0
+- Unified all function-name-to-jq-builtin mappings into a single `_FUNC_MAP` constant (eliminated 3 duplicate copies)
+- Expression-only queries now properly map over array elements instead of wrapping the whole input
+- Path-explorer schema preview now shows nested JSON paths like `orders[].price` instead of only shallow field listings
+- Reuse bounded sync and async jq worker pools for repeated identical filters
+- Main streaming execution path now chunks root-array JSON in memory instead of splitting to temp files
+- Repositioned README/package metadata around JSON exploration and extraction
+
+### Fixed
+- Null-sensitive functions (`todate`, `tonumber`) are now guarded against null input instead of crashing
+- Schema validator recognizes CASE expressions, `||` operator, and `coalesce` — no longer rejects them as unknown fields
+- Sync jq runtime errors that only write to `stderr` no longer hang waiting on `stdout`
+- Async jq workers are cleaned up with their event loop, preventing leftover subprocess transport warnings
+- `--follow` mode skips empty results instead of printing `[]` for non-matching lines
+
 ## [v0.2.0] - 2026-03-08
 
 ### Added

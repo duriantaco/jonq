@@ -1,24 +1,50 @@
 API Reference
 =============
 
+High-Level Python API (jonq.api)
+--------------------------------
+
+**compile_query(query)**
+
+Compile a jonq query string into a reusable ``CompiledQuery`` object.
+
+- **Parameters:** ``query`` (str)
+- **Returns:** ``CompiledQuery``
+
+**query(source, query, ...)**
+
+Execute a query and return parsed Python data by default.
+
+- **Parameters:**
+  - ``source``: Python object, raw JSON string, or file path
+  - ``query`` (str or ``CompiledQuery``)
+- **Returns:** Parsed Python data, or raw text when ``format="json"`` or ``format="csv"``
+
+**execute(source, query, ...)**
+
+Execute a query and return a structured ``QueryResult`` object.
+
+- **Parameters:**
+  - ``source``: Python object, raw JSON string, or file path
+  - ``query`` (str or ``CompiledQuery``)
+- **Returns:** ``QueryResult`` with ``text``, ``data``, and ``compiled`` metadata
+
+**query_async(...) / execute_async(...)**
+
+Async variants of the high-level execution helpers.
+
 Main Module (jonq.main)
 -----------------------
 
 **main()**
 
-The entry point for the jonq command-line tool. It:
-
-- Parses command-line arguments
-- Validates the input JSON file
-- Tokenizes and parses the query
-- Generates and executes a jq filter
-- Handles output formatting (JSON or CSV)
+The entry point for the jonq command-line tool.
 
 **Usage:**
 
 .. code-block:: bash
 
-   jonq <path/to/json_file> "<query>" [--format csv|json] [--stream] [--watch] [--jq] [--pretty] [--no-color] [--ndjson] [--limit N] [--out PATH]
+   jonq <path/to/json_file> "<query>" [--format csv|json] [--stream] [--watch] [--jq] [--pretty] [--no-color] [--ndjson] [--limit N] [--out PATH] [--version]
 
 Query Parser (jonq.query_parser)
 --------------------------------

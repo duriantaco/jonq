@@ -4,7 +4,7 @@ Usage
 Overview
 ---------
 
-``jonq`` is a command-line tool that lets you query JSON files using a SQL-like syntax, making it approachable for users familiar with SQL while leveraging the power of the ``jq`` utility behind the scenes. Whether you're working with simple flat data or complex nested structures, ``jonq`` provides an intuitive way to select, filter, sort, group, and aggregate JSON data.
+``jonq`` is a command-line tool for exploring, extracting, and reshaping JSON with readable jq-powered queries. It keeps familiar ``select`` / ``if`` syntax for common cases, but the goal is still JSON-native terminal workflows rather than database-style analytics.
 
 Basic Command Structure
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -23,26 +23,38 @@ Run ``jonq`` with the following syntax:
 
    * - Option
      - Description
-   * - ``--format, -f csv|json``
-     - Output format (default: ``json``)
+   * - ``--format, -f``
+     - Output format: ``json`` (default), ``csv``, ``table``, ``yaml``
+   * - ``-t, --table``
+     - Shorthand for ``--format table``
    * - ``--stream, -s``
-     - Stream root-array JSON in chunks
+     - Process root-array JSON in memory-friendly chunks
    * - ``--ndjson``
      - Force NDJSON mode (auto-detected by default)
+   * - ``--follow``
+     - Stream NDJSON from stdin line-by-line
    * - ``--limit, -n N``
      - Limit rows post-query
    * - ``--out, -o PATH``
      - Write output to file
    * - ``--jq``
      - Print generated jq filter and exit
+   * - ``--explain``
+     - Show parsed query breakdown and generated jq filter
+   * - ``--time``
+     - Print execution timing to stderr
    * - ``--pretty, -p``
      - Pretty-print JSON output
    * - ``--watch, -w``
      - Re-run query when file changes
    * - ``--no-color``
      - Disable colorized output
+   * - ``--completions SHELL``
+     - Print shell completion script (``bash``, ``zsh``, ``fish``)
+   * - ``--version``
+     - Show the installed jonq version
    * - ``-i <file>``
-     - Interactive query mode (REPL)
+     - Interactive query mode (REPL) with tab completion
    * - ``-h, --help``
      - Show help message
 
@@ -180,6 +192,72 @@ Apply math functions to numeric values:
    jonq data.json "select abs(balance) as abs_balance"
    jonq data.json "select ceil(score) as score_ceil"
    jonq data.json "select floor(score) as score_floor"
+
+Type Casting
+~~~~~~~~~~~~~
+
+Convert between types:
+
+.. code-block:: bash
+
+   jonq data.json "select int(price) as price"        # string → integer
+   jonq data.json "select float(amount) as amount"     # string → float
+   jonq data.json "select str(code) as code"           # number → string
+   jonq data.json "select type(value) as t"            # get type name
+
+Date/Time Functions
+~~~~~~~~~~~~~~~~~~~~
+
+Convert between epoch timestamps and ISO dates:
+
+.. code-block:: bash
+
+   jonq data.json "select todate(timestamp) as date"   # epoch → ISO date
+   jonq data.json "select date(created_at) as d"       # alias for todate
+   jonq data.json "select fromdate(iso_date) as epoch"  # ISO → epoch
+
+Null-safe: returns ``null`` instead of crashing on null input.
+
+CASE/WHEN Expressions
+~~~~~~~~~~~~~~~~~~~~~~
+
+Conditional logic inline in queries:
+
+.. code-block:: bash
+
+   jonq data.json "select name, case when age > 30 then 'senior' when age > 25 then 'mid' else 'junior' end as level"
+
+Must include at least one ``WHEN ... THEN ...``, optional ``ELSE``, and close with ``END``.
+
+COALESCE
+~~~~~~~~~
+
+Return the first non-null value:
+
+.. code-block:: bash
+
+   jonq data.json "select coalesce(nickname, name) as display"
+   jonq data.json "select coalesce(todate(ts), 'unknown') as date"
+
+String Concatenation
+~~~~~~~~~~~~~~~~~~~~~
+
+Use ``||`` (SQL standard) or ``+``:
+
+.. code-block:: bash
+
+   jonq data.json "select first || ' ' || last as full_name"
+   jonq data.json "select name + ' (' + city + ')' as label"
+
+IS NULL / IS NOT NULL
+~~~~~~~~~~~~~~~~~~~~~~
+
+Check for null values in conditions:
+
+.. code-block:: bash
+
+   jonq data.json "select name if email is not null"
+   jonq data.json "select * if nickname is null"
 
 FROM Clause
 ------------
@@ -424,35 +502,44 @@ Choose how results are displayed:
 
       jonq data.json "select name, age"
 
+- **Table:**
+
+  .. code-block:: bash
+
+      jonq data.json "select name, age" -t
+      jonq data.json "select name, age" --format table
+
+  Renders aligned columns with headers and separators.
+
 - **CSV:**
 
   .. code-block:: bash
 
       jonq data.json "select name, age" --format csv
 
-  **Output Example:**
+- **YAML:**
 
-  .. code-block:: text
+  .. code-block:: bash
 
-     name,age
-     Alice,30
-     Bob,25
+      jonq data.json "select name, age" --format yaml
 
-Schema Preview
----------------
+  Uses ``pyyaml`` if installed, built-in fallback otherwise.
 
-Run ``jonq`` with just a file (no query) to inspect the JSON structure:
+Path Explorer
+--------------
+
+Run ``jonq`` with just a file (no query) to inspect nested JSON paths before writing a query:
 
 .. code-block:: bash
 
    jonq data.json
 
-This shows the file info, field names with types and sample values, and a truncated sample object.
+This shows file info, nested paths with inferred types, and a truncated sample object.
 
 Interactive REPL
 -----------------
 
-Launch an interactive session to run multiple queries against the same file:
+Launch an interactive session with tab completion and persistent history:
 
 .. code-block:: bash
 
@@ -460,14 +547,16 @@ Launch an interactive session to run multiple queries against the same file:
 
 .. code-block:: text
 
-   jonq interactive mode -- querying data.json
-   Type a query (without jonq/filename), or 'quit' to exit.
+   jonq interactive mode — querying data.json
+   Type a query, or 'quit' to exit. Tab completes field names.
 
    jonq> select name, age
    [{"name":"Alice","age":30},{"name":"Bob","age":25}]
    jonq> select * if age > 28
    [{"id":1,"name":"Alice","age":30,"city":"New York"}]
    jonq> quit
+
+Features: tab completion for field names + keywords, persistent history (``~/.jonq_history``), up/down arrow recall.
 
 Watch Mode
 -----------
@@ -493,12 +582,39 @@ Multiple Input Sources
 
    jonq 'logs/*.json' "select * if level = 'error'"
 
-**Stdin:**
+**Stdin (auto-detected):**
 
 .. code-block:: bash
 
+   curl -s https://api.example.com/data | jonq "select id, name"
    cat data.json | jonq - "select name, age"
-   curl -s https://api.example.com/data | jonq - "select id, name"
+
+Follow Mode
+------------
+
+Stream NDJSON from stdin line-by-line, applying the query to each object:
+
+.. code-block:: bash
+
+   tail -f app.log | jonq --follow "select level, message if level = 'error'" -t
+
+Non-matching lines are silently skipped. Combine with ``-t`` for table output or ``-f yaml`` for YAML.
+
+Shell Completions
+------------------
+
+Generate completion scripts for your shell:
+
+.. code-block:: bash
+
+   # Bash
+   eval "$(jonq --completions bash)"
+
+   # Zsh
+   eval "$(jonq --completions zsh)"
+
+   # Fish
+   jonq --completions fish > ~/.config/fish/completions/jonq.fish
 
 Auto-detect NDJSON
 -------------------
@@ -537,7 +653,7 @@ For big JSON files, use streaming mode:
    jonq large_data.json "select name, age" --stream
 
 - **Requirement:** The JSON must be an array at the root level.
-- **Benefit:** Processes data in chunks, reducing memory usage.
+- **Benefit:** Processes data in chunks in memory, avoiding temp chunk files in the main execution path.
 
 Tips and Tricks
 ----------------
@@ -546,8 +662,8 @@ Debugging Queries
 ~~~~~~~~~~~~~~~~~~
 
 - **Test Small:** Start with a simple ``select *`` to verify the JSON structure.
-- **Use Schema Preview:** Run ``jonq data.json`` (no query) to inspect fields and types.
-- **See the jq filter:** Use ``--jq`` to see the generated jq filter without running it.
+- **Use the Path Explorer:** Run ``jonq data.json`` (no query) to inspect nested paths and types.
+- **See the jq filter:** Use ``--jq`` to see the generated jq filter, or ``--explain`` for a full breakdown.
 - **Quote Strings:** Always quote string literals in conditions (e.g., ``'New York'``).
 
 Optimizing Performance
@@ -555,7 +671,7 @@ Optimizing Performance
 
 - **Use FROM:** Narrow down the data with ``from`` to avoid processing unnecessary parts.
 - **Limit Early:** Apply ``limit`` or strict ``if`` conditions to reduce output size.
-- **Stream Large Files:** Always use ``--stream`` for files over 100MB.
+- **Stream Large Files:** Use ``--stream`` for large root-array JSON files when you want lower-overhead chunk processing.
 
 Working with Arrays
 ~~~~~~~~~~~~~~~~~~~~
@@ -566,14 +682,15 @@ Working with Arrays
 Handling Nulls
 ~~~~~~~~~~~~~~~
 
-- **Filter Nulls:** Add ``if field != null`` to exclude missing values.
-- **Default Values:** Use expressions like ``field + 0`` to treat null as zero in calculations.
+- **Filter Nulls:** Use ``if field is not null`` or ``if field != null`` to exclude missing values.
+- **Default Values:** Use ``coalesce(field, default)`` to provide fallback values.
+- **Null-safe functions:** Date/time and type casting functions return ``null`` on null input instead of crashing.
 
 Known Limitations
 ------------------
 
-- **Performance with Very Large Files**: Processing JSON files exceeding 100MB may be slow, even with streaming.
-- **Advanced jq Features**: Some complex ``jq`` functionalities (e.g., recursive descent or custom filters) are not exposed through ``jonq``'s SQL-like syntax.
+- **Performance with Very Large Files**: Processing JSON files exceeding 100MB may still be slow, even with streaming.
+- **Advanced jq Features**: Some complex ``jq`` functionalities (e.g., recursive descent or custom filters) are not exposed through ``jonq``'s readable query syntax.
 - **Joins**: ``jonq`` does not support joining data across multiple JSON files.
 - **Custom Functions**: Users cannot define custom functions within queries.
-- **Date/Time Operations**: Limited support for parsing or manipulating date/time data.
+- **Window Functions**: Not supported — use DuckDB or Polars for analytical queries.

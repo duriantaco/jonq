@@ -267,7 +267,92 @@ select city, avg(age) as avg_age group by city having avg_age > 30
 select city, count(*) as cnt, avg(age) as avg_age group by city having cnt > 1 and avg_age > 25
 ```
 
-## Expressions
+## CASE/WHEN Expressions
+
+Conditional logic inline:
+```bash
+select case when age > 30 then 'senior' when age > 25 then 'mid' else 'junior' end as level
+select name, case when status = 'active' then 'yes' else 'no' end as is_active
+```
+
+`CASE` must be followed by one or more `WHEN ... THEN ...` pairs, an optional `ELSE`, and closed with `END`.
+
+## COALESCE
+
+Return the first non-null value:
+```bash
+select coalesce(nickname, name) as display_name
+select coalesce(a, b, c) as first_available
+```
+
+Works with nested functions:
+```bash
+select coalesce(todate(timestamp), 'unknown') as date
+```
+
+## String Concatenation
+
+Use `||` (SQL standard) or `+` to concatenate strings:
+```bash
+select first || ' ' || last as full_name
+select name + ' (' + city + ')' as label
+```
+
+## IS NULL / IS NOT NULL
+
+Check for null values in conditions:
+```bash
+select name if email is not null
+select name if nickname is null
+```
+
+## Type Casting Functions
+
+| Function | Description | jq equivalent |
+|----------|-------------|---------------|
+| `int(x)` | Convert to integer | `tonumber \| floor` |
+| `float(x)` | Convert to float | `tonumber` |
+| `str(x)` / `string(x)` | Convert to string | `tostring` |
+| `type(x)` | Get type name | `type` |
+
+```bash
+select int(price) as price
+select str(code) as code_str
+select type(value) as val_type
+```
+
+## Date/Time Functions
+
+| Function | Description | jq equivalent |
+|----------|-------------|---------------|
+| `todate(x)` / `date(x)` | Epoch → ISO 8601 | `todate` |
+| `fromdate(x)` / `timestamp(x)` | ISO 8601 → epoch | `fromdate` |
+
+```bash
+select todate(created_at) as date
+select date(timestamp) as d
+```
+
+Null-safe: returns `null` instead of crashing on null input.
+
+## Utility Functions
+
+| Function | Description |
+|----------|-------------|
+| `keys(x)` | Object keys |
+| `values(x)` | Object values |
+| `trim(x)` | Strip leading/trailing spaces |
+| `ltrim(x)` / `rtrim(x)` | Strip left/right spaces |
+| `tojson(x)` | Value → JSON string |
+| `fromjson(x)` | JSON string → value |
+| `reverse(x)` | Reverse array |
+| `sort(x)` | Sort array |
+| `unique(x)` | Unique array values |
+| `flatten(x)` | Flatten nested arrays |
+| `to_entries(x)` | Object → `[{key, value}]` |
+| `from_entries(x)` | `[{key, value}]` → object |
+
+## Arithmetic Expressions
 jonq supports basic arithmetic expressions:
 ```bash
 select name, age + 10 as age_plus_10

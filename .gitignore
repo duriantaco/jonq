@@ -8,3 +8,4 @@ chunks
 venv
 target/
 dist
+.DS_Store

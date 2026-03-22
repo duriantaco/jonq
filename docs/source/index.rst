@@ -9,26 +9,36 @@ Welcome to jonq's documentation!
    :target: https://github.com/duriantaco/skylos
    :alt: Skylos Grade
 
-jonq is a Python tool that provides a SQL-like syntax for querying JSON files, built as a wrapper around the powerful ``jq`` utility. It simplifies JSON querying for users familiar with SQL, making it easier to extract and manipulate data without needing to master ``jq``'s complex syntax.
+jonq is a Python tool for exploring, extracting, and reshaping JSON with readable jq-powered queries. It keeps familiar ``select`` / ``if`` syntax for common cases while staying focused on JSON-native terminal workflows.
 
 .. important::
 
-   jonq is NOT a database. It is NOT an alternative to DuckDB, Pandas, or Polars.
-   jonq is a thin CLI wrapper that translates human-friendly queries into jq filters.
+   jonq is not a database.
+   Use it to understand and shape JSON quickly, then move to an analytical tool if the problem becomes relational.
 
 Key Features
 -------------
 
-- **SQL-like syntax**: ``select name, age if age > 30``
-- **DISTINCT, LIMIT, IN, NOT, LIKE** operators
-- **String functions**: ``upper``, ``lower``, ``length``
+- **Readable jq syntax**: ``select name, age if age > 30``
+- **DISTINCT, LIMIT, IN, NOT, LIKE, IS NULL** operators
+- **CASE/WHEN**: conditional expressions inline
+- **COALESCE**: null fallback with nested function support
+- **String concat**: ``||`` or ``+`` for concatenation
+- **String functions**: ``upper``, ``lower``, ``length``, ``trim``
 - **Math functions**: ``round``, ``abs``, ``ceil``, ``floor``
+- **Type casting**: ``int``, ``float``, ``str``, ``type``
+- **Date/time**: ``todate``, ``fromdate``, ``date``
 - **Aggregations**: ``sum``, ``avg``, ``min``, ``max``, ``count``, ``count(distinct ...)``
 - **GROUP BY** with **HAVING**
-- **Schema preview**: run ``jonq data.json`` with no query
-- **Interactive REPL**: ``jonq -i data.json``
+- **Table output**: ``-t`` for aligned terminal tables
+- **YAML output**: ``--format yaml``
+- **Path explorer**: run ``jonq data.json`` with no query
+- **Interactive REPL**: ``jonq -i data.json`` with tab completion and history
+- **Follow mode**: ``--follow`` to stream NDJSON line-by-line
 - **Watch mode**: ``--watch`` to re-run on file change
-- **Multiple inputs**: local files, URLs, globs, stdin, NDJSON
+- **Multiple inputs**: local files, URLs, globs, stdin (auto-detected), NDJSON
+- **Shell completions**: ``--completions bash|zsh|fish``
+- **Explain mode**: ``--explain`` to see query breakdown and jq filter
 - **Fuzzy suggestions**: typo correction for field names
 - **Colorized output**: syntax-highlighted JSON in terminal
 

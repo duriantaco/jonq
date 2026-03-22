@@ -1,62 +1,37 @@
 Comparison
 ===========
 
-jonq vs DuckDB vs Pandas
---------------------------
+Where jonq Fits
+----------------
 
-jonq is **not** in the same category as DuckDB or Pandas. This table exists to show **when to reach for what**, not to compare them as competitors.
+jonq is a JSON exploration and extraction tool. It is not a database, dataframe engine, or BI layer.
 
 .. important::
 
-   jonq is a thin CLI wrapper that translates human-friendly queries into jq filters.
-   If you need analytics, joins, window functions, or anything beyond simple JSON wrangling — use a real database.
+   Use jonq while the problem is still "understand this JSON" or "reshape this payload".
+   Once the problem becomes relational analytics, joins, window functions, or large-scale aggregation, move to an analytical tool.
 
-.. list-table::
-   :header-rows: 1
-   :widths: 20 27 27 27
+When to Use jonq
+~~~~~~~~~~~~~~~~~
 
-   * - Aspect
-     - **jonq**
-     - **DuckDB**
-     - **Pandas**
-   * - What it is
-     - CLI wrapper around jq
-     - Embedded analytical database
-     - Data manipulation library
-   * - Use when
-     - Quick JSON field extraction, one-liners, shell scripts
-     - SQL analytics on large datasets, joins, aggregations
-     - Data science, cleaning, transformation in Python
-   * - Install size
-     - ~500 KB (jq)
-     - ~140 MB
-     - ~20 MB
-   * - Query Language
-     - SQL-like syntax (``select name, age if age > 30``)
-     - SQL with JSON functions (``SELECT * FROM read_json(...)``)
-     - Python code (``df[df['age'] > 30]``)
-   * - Joins
-     - No
-     - Yes
-     - Yes
-   * - Window functions
-     - No
-     - Yes
-     - Yes
-   * - Scales to GB+
-     - No
-     - Yes
-     - With effort
-   * - Streaming
-     - Yes (``--stream`` option)
-     - Must load data into tables
-     - Can chunk with ``pd.read_json(..., chunksize=...)``
-   * - Memory Usage
-     - Low, due to streaming capabilities
-     - Optimized with columnar storage
-     - Higher, typically loads data into memory
+- You have raw JSON from an API, config file, or log stream.
+- You want to inspect nested paths before writing a query.
+- You need a readable jq one-liner in a shell script or CI job.
+- You want to reshape nested JSON before handing it to another system.
 
-**TL;DR:** If you need to ``select name, age if age > 30`` from a JSON file in your terminal, use jonq. For anything more, use DuckDB or Pandas.
+When to Use Something Else
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Use **raw jq** when you already know the exact jq filter you want.
+- Use **DuckDB / Polars / Pandas** when the data is now a tabular analytics problem.
+- Use a **database or warehouse** when you need joins, window functions, or repeated analytical queries over larger datasets.
+
+Typical Workflow
+~~~~~~~~~~~~~~~~~
+
+1. Explore unknown JSON with jonq.
+2. Extract or normalize the fields you need.
+3. Pipe the result into DuckDB, Polars, Pandas, or a database if you need analytics afterward.
 
 jonq vs raw jq
 ---------------
@@ -100,3 +75,24 @@ jonq's advantage is readability. The same query in raw jq requires more syntax:
    * - Group & count
      - ``jq 'group_by(.city) | map({city:.[0].city,count:length})'``
      - ``... "select city, count(*) as count group by city"``
+   * - CASE/WHEN
+     - ``jq '.[] | if .age>30 then "senior" else "junior" end'``
+     - ``... "select case when age > 30 then 'senior' else 'junior' end as level"``
+   * - COALESCE
+     - ``jq '.[] | {d: (.nick // .name)}'``
+     - ``... "select coalesce(nickname, name) as display"``
+   * - IS NULL
+     - ``jq '.[] | select(.email != null)'``
+     - ``... "select * if email is not null"``
+   * - String concat
+     - ``jq '.[] | {f: (.first + " " + .last)}'``
+     - ``... "select first || ' ' || last as full"``
+   * - Type cast
+     - ``jq '.[] | {p: (.price | tonumber)}'``
+     - ``... "select float(price) as p"``
+   * - Date convert
+     - ``jq '.[] | {d: (.ts | todate)}'``
+     - ``... "select todate(ts) as d"``
+   * - Table output
+     - (pipe through ``column -t``)
+     - ``jonq data.json "select name, age" -t``

@@ -16,11 +16,23 @@ license = {text = "MIT"}
 authors = [
     {name = "oha", email = "aaronoh2015@gmail.com"},
 ]
-keywords = ["json", "jq", "cli", "exploration", "query"]
+keywords = [
+    "json", "jq", "cli", "query", "sql",
+    "json-query", "json-cli", "json-tool", "json-parser",
+    "jq-alternative", "jq-wrapper", "jq-frontend",
+    "command-line", "terminal", "data-extraction",
+    "ndjson", "jsonl", "csv", "yaml",
+    "api", "log-analysis", "devtools",
+]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
     "License :: OSI Approved :: MIT License",
+    "Topic :: Utilities",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Filters",
+    "Environment :: Console",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -34,6 +46,8 @@ jonq = "jonq.main:entrypoint"
 
 [project.urls]
 "Homepage" = "https://github.com/duriantaco/jonq"
+"Documentation" = "https://jonq.readthedocs.io"
+"Changelog" = "https://github.com/duriantaco/jonq/blob/main/CHANGELOG.md"
 "Bug Tracker" = "https://github.com/duriantaco/jonq/issues"
 
 [tool.hatch.build.targets.wheel]

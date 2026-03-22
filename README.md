@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="docs/source/_static/jonq.png" alt="jonq Logo" width="200"/>
+  <img src="docs/source/_static/jonq.png" alt="jonq — SQL-like JSON query tool for the command line" width="200"/>
 
-# jonq
+# jonq — query JSON with SQL-like syntax from the terminal
 
-### Readable **jq** for JSON extraction and exploration
+### A readable alternative to jq for JSON extraction, filtering, and exploration
 
 [![PyPI version](https://img.shields.io/pypi/v/jonq.svg)](https://pypi.org/project/jonq/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/jonq.svg)](https://pypi.org/project/jonq/)
@@ -15,28 +15,37 @@
 
 ---
 
-## About
+## What is jonq?
 
-`jq` is unbeatable for JSON processing, but its syntax is easy to forget when you just need to inspect an API payload, grab a nested field, or reshape a response in the terminal.
-**jonq** is a JSON-native CLI that makes those jobs readable again while still generating pure jq under the hood.
+**jonq** is a command-line JSON query tool that lets you `select`, `filter`, `group`, and `reshape` JSON data using SQL-like syntax instead of raw jq. It generates pure jq under the hood, so you get jq's speed with a syntax you can actually remember.
 
-> **jonq is not a database.**
-> It is a readable jq frontend for exploring, extracting, and reshaping JSON.
-> If you need joins, window functions, or large-scale analytics, shape the JSON with jonq first and then hand it to a real analytical tool.
+```bash
+# Instead of: jq '.[] | select(.age > 30) | {name, age}'
+jonq data.json "select name, age if age > 30" -t
+```
+
+```
+name    | age
+--------|----
+Alice   | 35
+Charlie | 42
+```
+
+> **jonq is not a database.** It is a readable jq frontend for exploring, extracting, and reshaping JSON. If you need joins, window functions, or large-scale analytics, shape the JSON with jonq first and then hand it to DuckDB, Polars, or Pandas.
 
 ---
 
-### What jonq IS for
-- You want to inspect an API response, config file, or log payload quickly
-- You want a built-in path explorer before writing a query
-- You need a readable jq one-liner in a shell script or CI pipeline
-- You want to extract or reshape nested JSON without memorizing jq syntax
+### Use jonq when you need to
+- Query JSON from APIs, config files, or log streams in the terminal
+- Explore unfamiliar JSON with the built-in path explorer
+- Write readable jq one-liners in shell scripts and CI pipelines
+- Filter, aggregate, or reshape nested JSON without memorizing jq syntax
+- Stream and filter NDJSON log output in real time
 
-### What jonq is NOT for
-- **Tabular analytics** — use DuckDB, Polars, Pandas, or a real database
-- **Joins across files** — use a database or dataframe engine
-- **Large-scale ETL** — use tools built for analytical pipelines
-- **Business intelligence** — use proper BI tools
+### Use something else when you need
+- **Tabular analytics** — DuckDB, Polars, Pandas
+- **Joins across files** — a database or dataframe engine
+- **Large-scale ETL** — tools built for analytical pipelines
 
 **Rule of thumb:** if the problem is still "I need to understand this JSON", jonq is a good fit. If the problem has become relational analytics, move to a database.
 

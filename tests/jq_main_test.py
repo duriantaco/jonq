@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import patch, AsyncMock
 from jonq.main import main
+from jonq.constants import VERSION
 
 
 def test_main_success(tmp_path, capsys):
@@ -56,9 +57,35 @@ def test_main_jq_execution_error(tmp_path, capsys):
     json_file = tmp_path / "test.json"
     json_file.write_text('{"name": "Alice"}')
     with patch("sys.argv", ["jonq", str(json_file), "select name"]):
-        with patch("jonq.main.run_jq_async", new_callable=AsyncMock, side_effect=RuntimeError("JQ error")):
+        with patch("jonq.main.execute_async", new_callable=AsyncMock, side_effect=RuntimeError("JQ error")):
             with pytest.raises(SystemExit) as excinfo:
                 main()
             assert excinfo.value.code == 1
     captured = capsys.readouterr()
     assert "error" in captured.out.lower() or "Error" in captured.out
+
+
+def test_main_version(capsys):
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--version"])
+    assert excinfo.value.code == 0
+
+    captured = capsys.readouterr()
+    assert VERSION in captured.out
+
+
+def test_main_schema_preview_shows_nested_paths(tmp_path, capsys):
+    json_file = tmp_path / "nested.json"
+    json_file.write_text(
+        '{"user":{"name":"Alice","address":{"city":"New York"}},"orders":[{"id":1,"price":1200}]}'
+    )
+
+    with patch("sys.argv", ["jonq", str(json_file)]):
+        main()
+
+    captured = capsys.readouterr()
+    assert "Paths:" in captured.out
+    assert "user.name" in captured.out
+    assert "user.address.city" in captured.out
+    assert "orders[]" in captured.out
+    assert "orders[].price" in captured.out

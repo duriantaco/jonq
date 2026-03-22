@@ -5,7 +5,12 @@ import tempfile
 import json as stdlib_json
 import aiofiles
 from jonq.json_utils import dumps, loads
-from jonq.stream_utils import process_json_streaming, process_json_streaming_async
+from jonq.stream_utils import (
+    iter_json_array_chunks,
+    iter_json_array_chunks_async,
+    process_json_streaming,
+    process_json_streaming_async,
+)
 from jonq.executor import run_jq, run_jq_streaming, run_jq_async, run_jq_streaming_async
 
 class TestJsonOptimization:
@@ -84,6 +89,20 @@ class TestJsonOptimization:
         finally:
             os.unlink(temp_path)
 
+    def test_iter_json_array_chunks_in_memory(self, test_data):
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as temp_file:
+            temp_file.write(dumps(test_data["medium"]))
+            temp_path = temp_file.name
+
+        try:
+            chunks = list(iter_json_array_chunks(temp_path, chunk_size=20))
+            assert len(chunks) == 5
+            first_chunk = loads(chunks[0])
+            assert len(first_chunk) == 20
+            assert first_chunk[0]["id"] == 0
+        finally:
+            os.unlink(temp_path)
+
     @pytest.mark.asyncio
     async def test_stream_utils_integration_async(self, test_data):
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as temp_file:
@@ -104,6 +123,24 @@ class TestJsonOptimization:
             assert len(processed_data) == len(test_data["medium"])
             assert processed_data[0]["id"] == test_data["medium"][0]["id"] * 2
             
+        finally:
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_iter_json_array_chunks_async_in_memory(self, test_data):
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as temp_file:
+            temp_file.write(dumps(test_data["medium"]))
+            temp_path = temp_file.name
+
+        try:
+            chunks = []
+            async for chunk in iter_json_array_chunks_async(temp_path, chunk_size=20):
+                chunks.append(chunk)
+
+            assert len(chunks) == 5
+            first_chunk = loads(chunks[0])
+            assert len(first_chunk) == 20
+            assert first_chunk[0]["id"] == 0
         finally:
             os.unlink(temp_path)
     

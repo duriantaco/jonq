@@ -3,6 +3,7 @@ import os
 import json
 import tempfile
 from jonq.executor import run_jq
+from jonq.jq_worker_cli import get_worker, _cleanup
 
 def test_run_jq_success():
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp:
@@ -32,7 +33,6 @@ def test_run_jq_malformed_json():
     finally:
         os.unlink(temp_path)
 
-@pytest.mark.skip(reason="Sync JQWorker hangs on invalid filter — stdout.readline blocks when jq writes only to stderr")
 def test_run_jq_invalid_filter():
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp:
         json.dump({"name": "Alice", "age": 30}, temp)
@@ -43,4 +43,30 @@ def test_run_jq_invalid_filter():
             run_jq(temp_path, '.name[]')
         assert "Error in jq filter" in str(excinfo.value)
     finally:
+        os.unlink(temp_path)
+
+def test_run_jq_reuses_cached_worker():
+    _cleanup()
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp:
+        json.dump({"name": "Alice", "age": 30}, temp)
+        temp_path = temp.name
+
+    try:
+        stdout, stderr = run_jq(temp_path, '.name')
+        assert '"Alice"' in stdout
+        assert stderr == ''
+
+        worker = get_worker('.name')
+        first_pid = worker.proc.pid
+        assert worker.proc.poll() is None
+
+        stdout, stderr = run_jq(temp_path, '.name')
+        assert '"Alice"' in stdout
+        assert stderr == ''
+
+        worker = get_worker('.name')
+        assert worker.proc.pid == first_pid
+        assert worker.proc.poll() is None
+    finally:
+        _cleanup()
         os.unlink(temp_path)

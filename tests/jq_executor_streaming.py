@@ -3,6 +3,7 @@ import json
 import tempfile
 from jonq.executor import run_jq, run_jq_streaming
 from jonq.executor import run_jq_async, run_jq_streaming_async
+from jonq.jq_worker_cli import get_worker_async, _cleanup_async
 import pytest
 import asyncio
 
@@ -134,3 +135,44 @@ class TestExecutorStreamingAsync:
             assert stderr == ""
             data = json.loads(stdout)
             assert len(data) > 0
+
+    @pytest.mark.asyncio
+    async def test_run_jq_async_runtime_error(self):
+        single_json = tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False)
+        try:
+            json.dump({"name": "Alice", "age": 30}, single_json)
+            single_json.close()
+
+            with pytest.raises(ValueError) as excinfo:
+                await run_jq_async(single_json.name, '.name[]')
+
+            assert "Error in jq filter" in str(excinfo.value)
+            assert "Cannot iterate over string" in str(excinfo.value)
+        finally:
+            os.unlink(single_json.name)
+
+    @pytest.mark.asyncio
+    async def test_run_jq_async_reuses_cached_worker(self):
+        await _cleanup_async()
+
+        stdout, stderr = await run_jq_async(
+            self.large_json.name, '[.[] | select(.id > 498)]'
+        )
+        assert stderr == ""
+        assert len(json.loads(stdout)) == 2
+
+        worker = await get_worker_async('[.[] | select(.id > 498)]')
+        first_pid = worker.proc.pid
+        assert worker.proc.returncode is None
+
+        stdout, stderr = await run_jq_async(
+            self.large_json.name, '[.[] | select(.id > 498)]'
+        )
+        assert stderr == ""
+        assert len(json.loads(stdout)) == 2
+
+        worker = await get_worker_async('[.[] | select(.id > 498)]')
+        assert worker.proc.pid == first_pid
+        assert worker.proc.returncode is None
+
+        await _cleanup_async()

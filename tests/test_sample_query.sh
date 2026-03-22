@@ -1,13 +1,11 @@
 #!/bin/bash
 
-# Define colors for better readability
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Function to test a JONQ query
 test_query() {
     local test_name="$1"
     local json_file="$2"

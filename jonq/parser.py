@@ -62,8 +62,90 @@ def parse_path(path_str: str) -> Path:
     return Path(elements)
 
 
+def _split_args(s: str) -> list[str]:
+    args = []
+    depth = 0
+    current = []
+    in_sq = in_dq = False
+    for ch in s:
+        if ch == "'" and not in_dq:
+            in_sq = not in_sq
+        elif ch == '"' and not in_sq:
+            in_dq = not in_dq
+        elif ch == '(' and not in_sq and not in_dq:
+            depth += 1
+        elif ch == ')' and not in_sq and not in_dq:
+            depth -= 1
+        elif ch == ',' and depth == 0 and not in_sq and not in_dq:
+            args.append(''.join(current).strip())
+            current = []
+            continue
+        current.append(ch)
+    if current:
+        args.append(''.join(current).strip())
+    return args
+
+
+def _parse_case_expression(expr_str: str) -> Expression:
+    """Parse CASE WHEN cond THEN val [WHEN ...] [ELSE val] END into a CASE expression."""
+    body = expr_str[4:].strip()  # strip leading 'case'
+    if body.lower().endswith("end"):
+        body = body[:-3].strip()
+
+    whens = []
+    else_val = None
+
+    remaining = body
+    while remaining:
+        remaining = remaining.strip()
+        lower = remaining.lower()
+        if lower.startswith("when "):
+            remaining = remaining[5:]
+            then_pos = _find_keyword(remaining, "then")
+            if then_pos == -1:
+                break
+            cond_str = remaining[:then_pos].strip()
+            remaining = remaining[then_pos + 4:].strip()
+            next_when = _find_keyword(remaining, "when")
+            next_else = _find_keyword(remaining, "else")
+            end_pos = len(remaining)
+            if next_when != -1:
+                end_pos = min(end_pos, next_when)
+            if next_else != -1:
+                end_pos = min(end_pos, next_else)
+            val_str = remaining[:end_pos].strip()
+            whens.append((cond_str, val_str))
+            remaining = remaining[end_pos:]
+        elif lower.startswith("else "):
+            else_val = remaining[5:].strip()
+            break
+        else:
+            break
+
+    return Expression(ExprType.CASE, else_val, whens)
+
+
+def _find_keyword(s: str, keyword: str) -> int:
+    pattern = re.compile(r'\b' + keyword + r'\b', re.IGNORECASE)
+    in_sq = in_dq = False
+    for m in pattern.finditer(s):
+        pos = m.start()
+        in_sq = in_dq = False
+        for ch in s[:pos]:
+            if ch == "'" and not in_dq:
+                in_sq = not in_sq
+            elif ch == '"' and not in_sq:
+                in_dq = not in_dq
+        if not in_sq and not in_dq:
+            return pos
+    return -1
+
+
 def parse_expression(expr_str: str) -> Expression:
     expr_str = expr_str.strip()
+
+    if expr_str.lower().startswith("case "):
+        return _parse_case_expression(expr_str)
 
     depth = 0
     for i, ch in enumerate(expr_str):
@@ -72,9 +154,19 @@ def parse_expression(expr_str: str) -> Expression:
         elif ch == ")":
             depth -= 1
         elif depth == 0:
-            for op in ["+", "-", "*", "/"]:
-                pat = f" {op} "
-                if expr_str.startswith(pat, i):
+            for op in ["||", "+", "-", "*", "/"]:
+                pat = f" {op} " if op != "||" else "||"
+                if op == "||":
+                    for p in [" || ", "||"]:
+                        if expr_str.startswith(p, i):
+                            left = expr_str[:i].rstrip()
+                            right = expr_str[i + len(p) :].lstrip()
+                            return Expression(
+                                ExprType.OPERATION,
+                                "+",  # jq uses + for string concat
+                                [parse_expression(left), parse_expression(right)],
+                            )
+                elif expr_str.startswith(pat, i):
                     left = expr_str[:i].rstrip()
                     right = expr_str[i + len(pat) :].lstrip()
                     return Expression(
@@ -83,12 +175,37 @@ def parse_expression(expr_str: str) -> Expression:
                         [parse_expression(left), parse_expression(right)],
                     )
 
-    agg_match = re.match(r"(\w+)\s*\(\s*([^)]+)\s*\)", expr_str)
+    agg_match = re.match(r"(\w+)\s*\(", expr_str)
     if agg_match:
-        func, arg = agg_match.group(1), agg_match.group(2)
+        func = agg_match.group(1)
+        start = agg_match.end() - 1
+        depth = 0
+        end = start
+        for j in range(start, len(expr_str)):
+            if expr_str[j] == '(':
+                depth += 1
+            elif expr_str[j] == ')':
+                depth -= 1
+                if depth == 0:
+                    end = j
+                    break
+        arg = expr_str[start + 1:end].strip()
+
+        if func == "coalesce":
+            args = _split_args(arg)
+            return Expression(ExprType.FUNCTION, "coalesce", [
+                parse_expression(a) for a in args
+            ])
         if func in ["sum", "avg", "min", "max", "count"]:
             return Expression(ExprType.AGGREGATION, func, [arg.strip()])
-        if func in ["upper", "lower", "length", "round", "abs", "ceil", "floor"]:
+        if func in [
+            "upper", "lower", "length", "round", "abs", "ceil", "floor",
+            "int", "float", "str", "string", "to_number", "to_string",
+            "keys", "values", "type", "trim", "reverse", "sort", "unique",
+            "flatten", "not_null", "to_entries", "from_entries",
+            "todate", "fromdate", "date", "timestamp",
+            "ltrim", "rtrim", "tojson", "fromjson",
+        ]:
             return Expression(
                 ExprType.FUNCTION, func, [Expression(ExprType.FIELD, arg.strip())]
             )
@@ -104,6 +221,11 @@ def parse_expression(expr_str: str) -> Expression:
 
     if _NUM_RE.match(expr_str) or (expr_str.startswith('"') and expr_str.endswith('"')):
         return Expression(ExprType.LITERAL, expr_str)
+
+    # Single-quoted strings → convert to double-quoted literal
+    if expr_str.startswith("'") and expr_str.endswith("'") and len(expr_str) >= 2:
+        inner = expr_str[1:-1]
+        return Expression(ExprType.LITERAL, f'"{inner}"')
 
     return Expression(ExprType.FIELD, expr_str)
 

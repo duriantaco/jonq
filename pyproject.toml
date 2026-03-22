@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jonq"
-version = "0.2.0"
-description = "SQL-like query tool for JSON files"
+version = "0.3.0"
+description = "Readable jq for JSON extraction and exploration"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -16,7 +16,7 @@ license = {text = "MIT"}
 authors = [
     {name = "oha", email = "aaronoh2015@gmail.com"},
 ]
-keywords = ["json", "query", "sql", "jq"]
+keywords = ["json", "jq", "cli", "exploration", "query"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

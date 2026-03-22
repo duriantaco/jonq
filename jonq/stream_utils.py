@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import subprocess
-import tempfile
-import os
 import logging
+import os
 import shutil
+import tempfile
 from jonq.json_utils import dumps, loads
 import asyncio
 
@@ -70,6 +70,70 @@ def split_json_array(json_file, chunk_size=1000):
         raise
 
 
+def iter_json_array_chunks(json_file, chunk_size=1000):
+    if not detect_json_structure(json_file):
+        raise ValueError(
+            "Streaming mode only works with JSON files containing an array at the root level"
+        )
+
+    proc = subprocess.Popen(
+        ["jq", "-c", ".[]", json_file],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    chunk: list[str] = []
+    try:
+        for line in proc.stdout:
+            item = line.strip()
+            if not item:
+                continue
+            chunk.append(item)
+            if len(chunk) >= chunk_size:
+                yield "[" + ",".join(chunk) + "]"
+                chunk.clear()
+
+        if chunk:
+            yield "[" + ",".join(chunk) + "]"
+
+        jq_err = proc.stderr.read().strip()
+        if proc.wait() != 0:
+            raise RuntimeError(f"jq failed: {jq_err}")
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            proc.wait()
+
+
+def merge_stream_results(chunk_results):
+    all_results = []
+    for chunk_result in chunk_results:
+        try:
+            result_data = loads(chunk_result)
+            if isinstance(result_data, list):
+                all_results.extend(result_data)
+            else:
+                all_results.append(result_data)
+        except json.JSONDecodeError:
+            all_results.append(chunk_result)
+
+    if all(isinstance(r, (dict, list)) for r in all_results):
+        return dumps(all_results)
+    return "\n".join(str(r) for r in all_results)
+
+
+def process_json_streaming_inline(json_file, process_func, chunk_size=1000):
+    try:
+        chunk_results = []
+        for chunk_json in iter_json_array_chunks(json_file, chunk_size=chunk_size):
+            chunk_results.append(process_func(chunk_json))
+        return merge_stream_results(chunk_results)
+    except Exception as e:
+        logger.error(f"Error in streaming process: {str(e)}")
+        raise
+
+
 def process_json_streaming(json_file, process_func, chunk_size=1000):
     if not detect_json_structure(json_file):
         raise ValueError(
@@ -108,6 +172,60 @@ def process_json_streaming(json_file, process_func, chunk_size=1000):
 async def split_json_array_async(json_file, chunk_size=1000):
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, split_json_array, json_file, chunk_size)
+
+
+async def iter_json_array_chunks_async(json_file, chunk_size=1000):
+    if not detect_json_structure(json_file):
+        raise ValueError(
+            "Streaming mode only works with JSON files containing an array at the root level"
+        )
+
+    proc = await asyncio.create_subprocess_exec(
+        "jq",
+        "-c",
+        ".[]",
+        json_file,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    chunk: list[str] = []
+    try:
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                break
+            item = line.decode().strip()
+            if not item:
+                continue
+            chunk.append(item)
+            if len(chunk) >= chunk_size:
+                yield "[" + ",".join(chunk) + "]"
+                chunk.clear()
+
+        if chunk:
+            yield "[" + ",".join(chunk) + "]"
+
+        jq_err = (await proc.stderr.read()).decode().strip()
+        if await proc.wait() != 0:
+            raise RuntimeError(f"jq failed: {jq_err}")
+    finally:
+        if proc.returncode is None:
+            proc.terminate()
+            await proc.wait()
+
+
+async def process_json_streaming_inline_async(json_file, process_func, chunk_size=1000):
+    try:
+        chunk_results = []
+        async for chunk_json in iter_json_array_chunks_async(
+            json_file, chunk_size=chunk_size
+        ):
+            chunk_results.append(await process_func(chunk_json))
+        return merge_stream_results(chunk_results)
+    except Exception as e:
+        logger.error(f"Error in streaming process: {str(e)}")
+        raise
 
 
 async def process_json_streaming_async(json_file, process_func, chunk_size=1000):

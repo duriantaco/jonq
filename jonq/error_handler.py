@@ -14,7 +14,6 @@ from jonq.constants import (
 
 
 def _edit_distance(a: str, b: str) -> int:
-    """Levenshtein distance between two strings."""
     la, lb = len(a), len(b)
     if la == 0:
         return lb
@@ -33,7 +32,6 @@ def _edit_distance(a: str, b: str) -> int:
 def _fuzzy_suggest(
     name: str, available: list[str], max_dist: int = FUZZY_MAX_DISTANCE
 ) -> list[str]:
-    """Return available field names within edit distance of `name`, sorted by distance."""
     name_lower = name.lower()
     candidates = []
     for field in available:
@@ -270,7 +268,8 @@ def validate_query_against_schema(json_file: str, query: str) -> str | None:
             return p
 
         bad = []
-        special_chars = ["{", "}", "(", ")", "+", "-", "*", "/"]
+        special_chars = ["{", "}", "(", ")", "+", "-", "*", "/", "||"]
+        _skip_prefixes = {"case ", "coalesce", "if_null"}
 
         for f in raw_fields:
             has_special_chars = False
@@ -280,6 +279,10 @@ def validate_query_against_schema(json_file: str, query: str) -> str | None:
                     break
 
             if has_special_chars:
+                continue
+
+            f_lower = f.lower().strip()
+            if any(f_lower.startswith(p) for p in _skip_prefixes):
                 continue
 
             h = head_of(f)

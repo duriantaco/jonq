@@ -116,6 +116,26 @@ def parse_condition_string(cond_str: str):
         return OrCondition(parse_condition_string(left), parse_condition_string(right))
 
     stripped = s.strip()
+
+    m = re.match(r"^(.+?)\s+is\s+not\s+null\s*$", stripped, flags=re.IGNORECASE)
+    if m:
+        field = m.group(1).strip()
+        return Condition(
+            Expression(ExprType.BINARY_CONDITION, "!=", [
+                _expr_from_string(field),
+                Expression(ExprType.LITERAL, "null"),
+            ])
+        )
+    m = re.match(r"^(.+?)\s+is\s+null\s*$", stripped, flags=re.IGNORECASE)
+    if m:
+        field = m.group(1).strip()
+        return Condition(
+            Expression(ExprType.BINARY_CONDITION, "==", [
+                _expr_from_string(field),
+                Expression(ExprType.LITERAL, "null"),
+            ])
+        )
+
     if stripped.lower().startswith("not "):
         inner = stripped[4:].strip()
         return NotCondition(parse_condition_string(inner))
@@ -214,8 +234,16 @@ def parse_condition(tokens: list[str]) -> Optional[str]:
     return generate_jq_condition(cond, "root")
 
 
-_SCALAR_FUNCTIONS = {"upper", "lower", "length", "round", "abs", "ceil", "floor"}
-_ARITHMETIC_OPS = {"+", "-", "*", "/", "%", "^"}
+_SCALAR_FUNCTIONS = {
+    "upper", "lower", "length", "round", "abs", "ceil", "floor",
+    "int", "float", "str", "string", "to_number", "to_string",
+    "keys", "values", "type", "trim", "reverse", "sort", "unique",
+    "flatten", "not_null", "to_entries", "from_entries",
+    "todate", "fromdate", "date", "timestamp",
+    "ltrim", "rtrim", "tojson", "fromjson",
+}
+_MULTI_ARG_FUNCTIONS = {"coalesce", "if_null"}
+_ARITHMETIC_OPS = {"+", "-", "*", "/", "%", "^", "||"}
 
 
 def parse_query(tokens: list[str]) -> tuple:
@@ -247,6 +275,29 @@ def parse_query(tokens: list[str]) -> tuple:
             if tokens[i] == "*":
                 fields.append(("field", "*", "*"))
                 i += 1
+                expecting_field = False
+                continue
+            if tokens[i].lower() == "case":
+                case_tokens = []
+                i += 1
+                while i < len(tokens) and tokens[i].lower() != "end":
+                    case_tokens.append(tokens[i])
+                    i += 1
+                if i < len(tokens) and tokens[i].lower() == "end":
+                    i += 1
+                case_expr = " ".join(case_tokens)
+                alias = None
+                if i < len(tokens) and tokens[i] == "as":
+                    i += 1
+                    if i < len(tokens) and tokens[i].lower() not in [
+                        "if", "sort", "group", "having", ",", "from", "limit",
+                    ]:
+                        alias = tokens[i]
+                        i += 1
+                    else:
+                        raise ValueError("Expected alias after 'as'")
+                alias = alias or f"case_{len(fields) + 1}"
+                fields.append(("expression", f"case {case_expr} end", alias))
                 expecting_field = False
                 continue
             if i + 1 < len(tokens) and tokens[i + 1] == "(":
@@ -331,6 +382,9 @@ def parse_query(tokens: list[str]) -> tuple:
                     cd_field = " ".join(inner_tokens[1:])
                     alias = alias or f"count_distinct_{cd_field.replace('.', '_')}"
                     fields.append(("count_distinct", cd_field, alias))
+                elif func_lower in _MULTI_ARG_FUNCTIONS:
+                    alias = alias or f"{func_lower}_{len(fields) + 1}"
+                    fields.append(("expression", f"{func_lower}({inner_expr})", alias))
                 elif func_lower in _SCALAR_FUNCTIONS:
                     alias = alias or f"{func_lower}_{inner_expr.replace('.', '_')}"
                     fields.append(("function", func_lower, inner_expr, alias))

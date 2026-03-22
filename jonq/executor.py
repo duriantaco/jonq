@@ -1,18 +1,18 @@
 import json
 import logging
 import os
-import inspect
 
 from jonq.jq_worker_cli import get_worker, get_worker_async
-from jonq.stream_utils import process_json_streaming, process_json_streaming_async
+from jonq.stream_utils import (
+    process_json_streaming_inline,
+    process_json_streaming_inline_async,
+)
 import aiofiles
-import asyncio
 
 logger = logging.getLogger(__name__)
 
 
 def _run_jq_raw(jq_filter, json_text):
-    worker = None
     try:
         worker = get_worker(jq_filter)
         out = worker.query(json.loads(json_text))
@@ -21,29 +21,6 @@ def _run_jq_raw(jq_filter, json_text):
         return "", f"Invalid JSON: {exc}"
     except Exception as exc:
         return "", f"Error in jq filter: {exc}"
-    finally:
-        try:
-            if worker:
-                closer = getattr(worker, "aclose", None) or getattr(
-                    worker, "close", None
-                )
-                if closer:
-                    if inspect.iscoroutinefunction(closer):
-                        try:
-                            asyncio.run(closer())
-                        except RuntimeError:
-                            import threading
-
-                            def _runner():
-                                asyncio.run(closer())
-
-                            t = threading.Thread(target=_runner, daemon=True)
-                            t.start()
-                            t.join()
-                    else:
-                        closer()
-        except (OSError, RuntimeError):
-            logger.debug("Failed to close jq worker")
 
 
 def run_jq(arg1, arg2):
@@ -69,16 +46,14 @@ def run_jq_streaming(json_file, jq_filter, chunk_size=1000):
     emits_objects = jq_filter.startswith(".[]") or "| .[" in jq_filter
     wrapper = f"[{jq_filter}]" if emits_objects else jq_filter
 
-    def _process_chunk(chunk_path):
-        with open(chunk_path, "r", encoding="utf-8") as fp:
-            chunk_json = fp.read()
+    def _process_chunk(chunk_json):
         stdout, stderr = run_jq(wrapper, chunk_json)
         if stderr:
             raise RuntimeError(stderr)
         return stdout
 
     try:
-        merged_json = process_json_streaming(
+        merged_json = process_json_streaming_inline(
             json_file, _process_chunk, chunk_size=chunk_size
         )
     except Exception as exc:
@@ -98,7 +73,6 @@ def run_jq_streaming(json_file, jq_filter, chunk_size=1000):
 
 
 async def _run_jq_raw_async(jq_filter, json_text):
-    worker = None
     try:
         worker = await get_worker_async(jq_filter)
         out = await worker.query(json.loads(json_text))
@@ -107,19 +81,6 @@ async def _run_jq_raw_async(jq_filter, json_text):
         return "", f"Invalid JSON: {exc}"
     except Exception as exc:
         return "", f"Error in jq filter: {exc}"
-    finally:
-        try:
-            if worker:
-                closer = getattr(worker, "aclose", None) or getattr(
-                    worker, "close", None
-                )
-                if closer:
-                    if inspect.iscoroutinefunction(closer):
-                        await closer()
-                    else:
-                        closer()
-        except (OSError, RuntimeError):
-            logger.debug("Failed to close async jq worker")
 
 
 async def run_jq_async(arg1, arg2):
@@ -145,16 +106,14 @@ async def run_jq_streaming_async(json_file, jq_filter, chunk_size=1000):
     emits_objects = jq_filter.startswith(".[]") or "| .[" in jq_filter
     wrapper = f"[{jq_filter}]" if emits_objects else jq_filter
 
-    async def _process_chunk_async(chunk_path):
-        async with aiofiles.open(chunk_path, "r", encoding="utf-8") as fp:
-            chunk_json = await fp.read()
+    async def _process_chunk_async(chunk_json):
         stdout, stderr = await run_jq_async(wrapper, chunk_json)
         if stderr:
             raise RuntimeError(stderr)
         return stdout
 
     try:
-        merged_json = await process_json_streaming_async(
+        merged_json = await process_json_streaming_inline_async(
             json_file, _process_chunk_async, chunk_size=chunk_size
         )
     except Exception as exc:

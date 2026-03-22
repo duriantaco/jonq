@@ -28,11 +28,11 @@ def tokenize_with_lexer(query):
         ("WHITESPACE", r"\s+"),
         (
             "KEYWORD",
-            r"\b(?i:select|if|sort|group|by|having|as|and|or|asc|desc|from|distinct|limit|in|not|like|between|contains)\b",
+            r"\b(?i:select|if|sort|group|by|having|as|and|or|asc|desc|from|distinct|limit|in|not|like|between|contains|case|when|then|else|end|is|null|coalesce)\b",
         ),
         ("FUNCTION_CALL", r"\w+\s*\(\s*\*\s*\)"),
         ("FUNCTION_PARAM", r"\w+\s*\(\s*[\w\.\[\]]+\s*\)"),
-        ("OPERATOR", r"<=|>=|!=|=|<|>|\+|\*|\/"),
+        ("OPERATOR", r"\|\||<=|>=|!=|=|<|>|\+|\*|\/"),
         ("ARITHMETIC_MINUS", r"\s-\s"),
         ("STRING", r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\''),
         ("NUMBER", r"\d+(?:\.\d+)?"),

@@ -1,10 +1,6 @@
-"""Shared constants for jonq — no hardcoded magic values in the rest of the codebase."""
-
 from __future__ import annotations
 
-# ── Version ──────────────────────────────────────────────────────────────────
-
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 USER_AGENT = f"jonq/{VERSION}"
 
 
@@ -64,6 +60,9 @@ WATCH_RETRY_INTERVAL = 1.0  # seconds on OS error
 NDJSON_SNIFF_LINES = 10  # how many lines to check
 NDJSON_MIN_VALID = 2  # minimum valid JSON lines to consider it NDJSON
 SCHEMA_SAMPLE_TRUNCATE = 500  # max chars for sample JSON display
+SCHEMA_PATH_SAMPLE_ROWS = 25  # sample this many array items for path exploration
+SCHEMA_PATH_MAX_DEPTH = 4  # max nested depth to display in schema preview
+SCHEMA_PATH_PREVIEW_ITEMS = 3  # preview this many scalar array values
 ERROR_SAMPLE_SIZE = 1024 * 1024  # 1 MB sample for schema validation
 FUZZY_MAX_DISTANCE = 3  # max edit distance for suggestions
 FUZZY_MAX_RESULTS = 3  # max number of suggestions to show

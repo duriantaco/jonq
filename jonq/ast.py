@@ -27,6 +27,7 @@ class ExprType(Enum):
     OPERATION = 4
     BINARY_CONDITION = 5
     FUNCTION = 6
+    CASE = 7
 
 
 @dataclass

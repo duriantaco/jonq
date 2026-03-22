@@ -18,6 +18,41 @@ from jonq.parser import parse_path, parse_expression
 
 logger = logging.getLogger(__name__)
 
+_FUNC_MAP = {
+    "upper": "ascii_upcase",
+    "lower": "ascii_downcase",
+    "length": "length",
+    "round": "round",
+    "abs": "fabs",
+    "ceil": "ceil",
+    "floor": "floor",
+    "int": "tonumber | floor",
+    "float": "tonumber",
+    "str": "tostring",
+    "string": "tostring",
+    "to_number": "tonumber",
+    "to_string": "tostring",
+    "keys": "keys",
+    "values": "values",
+    "type": "type",
+    "trim": 'ltrimstr(" ") | rtrimstr(" ")',
+    "reverse": "reverse",
+    "sort": "sort",
+    "unique": "unique",
+    "flatten": "flatten",
+    "not_null": "values",
+    "to_entries": "to_entries",
+    "from_entries": "from_entries",
+    "todate": "todate",
+    "fromdate": "fromdate",
+    "date": "todate",
+    "timestamp": "fromdate",
+    "ltrim": 'ltrimstr(" ")',
+    "rtrim": 'rtrimstr(" ")',
+    "tojson": "tojson",
+    "fromjson": "fromjson",
+}
+
 
 def _quote(name: str) -> str:
     if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
@@ -168,18 +203,42 @@ def generate_jq_expression(expr: Expression, context: str = "root") -> str:
 
     elif expr.type == ExprType.FUNCTION:
         func = expr.value
+        if func == "coalesce" and expr.args:
+            parts = [generate_jq_expression(a, context) for a in expr.args]
+            return "(" + " // ".join(parts) + ")"
+        if func == "if_null" and expr.args and len(expr.args) == 2:
+            val = generate_jq_expression(expr.args[0], context)
+            default = generate_jq_expression(expr.args[1], context)
+            return f"({val} // {default})"
         arg = generate_jq_expression(expr.args[0], context) if expr.args else "."
-        func_map = {
-            "upper": "ascii_upcase",
-            "lower": "ascii_downcase",
-            "length": "length",
-            "round": "round",
-            "abs": "fabs",
-            "ceil": "ceil",
-            "floor": "floor",
-        }
-        jq_func = func_map.get(func, func)
+        jq_func = _FUNC_MAP.get(func, func)
+        _NULL_SENSITIVE = {"todate", "fromdate", "date", "timestamp", "tonumber", "tonumber | floor"}
+        if jq_func in _NULL_SENSITIVE:
+            return f"(if {arg} != null then ({arg} | {jq_func}) else null end)"
         return f"({arg} | {jq_func})"
+
+    elif expr.type == ExprType.CASE:
+        from jonq.query_parser import parse_condition_string
+        whens = expr.args or []
+        else_val = expr.value
+        parts = []
+        for i, (cond_str, val_str) in enumerate(whens):
+            cond_ast = parse_condition_string(cond_str)
+            cond_jq = generate_jq_condition(cond_ast, context)
+            val_expr = parse_expression(val_str)
+            val_jq = generate_jq_expression(val_expr, context)
+            if i == 0:
+                parts.append(f"if {cond_jq} then {val_jq}")
+            else:
+                parts.append(f"elif {cond_jq} then {val_jq}")
+        if else_val:
+            else_expr = parse_expression(else_val)
+            else_jq = generate_jq_expression(else_expr, context)
+            parts.append(f"else {else_jq}")
+        else:
+            parts.append("else null")
+        parts.append("end")
+        return "(" + " ".join(parts) + ")"
 
     return str(expr.value)
 
@@ -320,17 +379,11 @@ def _gen_field_selector(ftype: str, data: list, base_context: str) -> Optional[s
         return f'"{alias}": {jq_expr}'
     elif ftype == "function":
         func, param, alias = data
-        func_map = {
-            "upper": "ascii_upcase",
-            "lower": "ascii_downcase",
-            "length": "length",
-            "round": "round",
-            "abs": "fabs",
-            "ceil": "ceil",
-            "floor": "floor",
-        }
-        jq_func = func_map.get(func, func)
+        jq_func = _FUNC_MAP.get(func, func)
         path_jq = generate_jq_path(parse_path(param), base_context)
+        _NULL_SENSITIVE = {"todate", "fromdate", "date", "timestamp", "tonumber", "tonumber | floor"}
+        if jq_func in _NULL_SENSITIVE:
+            return f'"{alias}": (if {path_jq} != null then ({path_jq} | {jq_func}) else null end)'
         return f'"{alias}": ({path_jq} | {jq_func})'
     elif ftype == "count_distinct":
         param, alias = data
@@ -428,8 +481,6 @@ def generate_jq_filter(
             implicit_base, _ = split_base_array(first_param_with_array)
             base_selector = f".{implicit_base}[]"
             base_context = "array"
-            # Keep tuple handling safe for mixed field types (field/expression tuples
-            # are length 3, aggregation tuples are length 4).
             updated_fields = []
             for tup in fields:
                 if tup[0] == "aggregation":
@@ -518,17 +569,12 @@ def generate_jq_filter(
                 agg_sel.append(f'"{alias}": ([.[] | {path_jq}] | unique | length)')
             elif ftype == "function":
                 func, param, alias = data
-                func_map = {
-                    "upper": "ascii_upcase",
-                    "lower": "ascii_downcase",
-                    "length": "length",
-                    "round": "round",
-                    "abs": "fabs",
-                    "ceil": "ceil",
-                    "floor": "floor",
-                }
-                jq_func = func_map.get(func, func)
-                agg_sel.append(f'"{alias}": (.[0].{param} | {jq_func})')
+                jq_func = _FUNC_MAP.get(func, func)
+                _NULL_SENSITIVE = {"todate", "fromdate", "date", "timestamp", "tonumber", "tonumber | floor"}
+                if jq_func in _NULL_SENSITIVE:
+                    agg_sel.append(f'"{alias}": (if .[0].{param} != null then (.[0].{param} | {jq_func}) else null end)')
+                else:
+                    agg_sel.append(f'"{alias}": (.[0].{param} | {jq_func})')
             elif ftype == "expression":
                 expr_txt, alias = data
                 expr = parse_expression(expr_txt)
@@ -578,7 +624,16 @@ def generate_jq_filter(
                 s = _gen_field_selector(ftype, data, base_context)
                 if s:
                     sel.append(s)
-            jq_filter = f"[{{ {', '.join(sel)} }}]"
+            map_filter = f"{{ {', '.join(sel)} }}"
+            has_aggregation = any(ft[0] == "aggregation" for ft in fields)
+            if has_aggregation:
+                jq_filter = f"[{map_filter}]"
+            else:
+                jq_filter = (
+                    f'if type=="array" then . | map({map_filter}) '
+                    f'elif type=="object" then [{map_filter}] '
+                    f"else [] end"
+                )
         else:
             sel = []
             for ftype, *data in fields:

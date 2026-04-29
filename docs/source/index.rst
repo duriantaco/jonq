@@ -31,7 +31,7 @@ Key Features
 - **Aggregations**: ``sum``, ``avg``, ``min``, ``max``, ``count``, ``count(distinct ...)``
 - **GROUP BY** with **HAVING**
 - **Table output**: ``-t`` for aligned terminal tables
-- **YAML output**: ``--format yaml``
+- **JSONL / YAML output**: ``--format jsonl`` and ``--format yaml``
 - **Path explorer**: run ``jonq data.json`` with no query
 - **Interactive REPL**: ``jonq -i data.json`` with tab completion and history
 - **Follow mode**: ``--follow`` to stream NDJSON line-by-line

@@ -153,14 +153,17 @@ def _sample_json_for_schema(json_file: str):
                 stderr=subprocess.PIPE,
             )
             samples = []
+            reached_sample_limit = False
             for i, line in enumerate(proc.stdout):
                 if i >= SCHEMA_PATH_SAMPLE_ROWS:
+                    reached_sample_limit = True
                     break
                 line = line.strip()
                 if line:
                     samples.append(json.loads(line))
+            if reached_sample_limit and proc.poll() is None:
+                proc.terminate()
             stderr = proc.stderr.read().strip()
-            proc.terminate()
             proc.wait(timeout=1)
             if proc.returncode not in (0, -15):
                 raise RuntimeError(stderr or "jq failed while sampling array")
@@ -501,6 +504,20 @@ def _json_to_yaml(json_text: str) -> str:
         return json_text
 
 
+def _json_to_jsonl(json_text: str) -> str:
+    try:
+        data = json.loads(json_text)
+    except (json.JSONDecodeError, TypeError):
+        return json_text
+
+    if isinstance(data, list):
+        return "\n".join(
+            json.dumps(item, ensure_ascii=False, separators=(",", ":"))
+            for item in data
+        )
+    return json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+
+
 def _json_to_yaml_simple(json_text: str) -> str:
     try:
         data = json.loads(json_text)
@@ -605,7 +622,7 @@ compdef _jonq jonq'''
         return '''# jonq fish completion
 # Add to ~/.config/fish/completions/jonq.fish
 complete -c jonq -s i -l interactive -d 'Interactive mode' -r -F
-complete -c jonq -s f -l format -d 'Output format' -x -a 'json csv table yaml'
+complete -c jonq -s f -l format -d 'Output format' -x -a 'json jsonl csv table yaml'
 complete -c jonq -s t -l table -d 'Table output'
 complete -c jonq -s s -l stream -d 'Streaming mode'
 complete -c jonq -s n -l limit -d 'Limit rows' -x
@@ -659,6 +676,8 @@ async def _follow_stdin(query: str, options: dict) -> None:
                         result = json_to_table(result, color=is_tty and not options.get("no_color"))
                     elif options["format"] == "yaml":
                         result = _json_to_yaml(result)
+                    elif options["format"] == "jsonl":
+                        result = _json_to_jsonl(result)
                     elif is_tty and not options.get("no_color"):
                         result = _pretty_json_string(result)
                         result = _colorize_json(result)
@@ -918,9 +937,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-f",
         "--format",
-        choices=("json", "csv", "table", "yaml"),
+        choices=("json", "jsonl", "csv", "table", "yaml"),
         default="json",
-        help="Output format (json, csv, table, yaml)",
+        help="Output format (json, jsonl, csv, table, yaml)",
     )
     parser.add_argument(
         "-t",
@@ -933,7 +952,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--stream",
         dest="streaming",
         action="store_true",
-        help="Process large files in streaming mode",
+        help="Process row-wise root-array queries in streaming mode",
     )
     parser.add_argument(
         "--ndjson",

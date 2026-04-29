@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from os import PathLike
 from typing import Any
 import os
+import re
 
 from jonq.csv_utils import json_to_csv
 from jonq.error_handler import ErrorAnalyzer, QuerySyntaxError, validate_query_against_schema
@@ -107,7 +108,7 @@ def execute(
     limit: int | None = None,
     validate: bool = True,
 ) -> QueryResult:
-    _validate_result_format(format, allowed={"json", "csv"})
+    _validate_result_format(format, allowed={"json", "csv", "jsonl"})
     compiled = _coerce_compiled_query(query)
     source_info = _normalize_source(source)
     _validate_execution_args(source_info, compiled, streaming=streaming, validate=validate)
@@ -139,7 +140,7 @@ async def execute_async(
     limit: int | None = None,
     validate: bool = True,
 ) -> QueryResult:
-    _validate_result_format(format, allowed={"json", "csv"})
+    _validate_result_format(format, allowed={"json", "csv", "jsonl"})
     compiled = _coerce_compiled_query(query)
     source_info = _normalize_source(source)
     _validate_execution_args(source_info, compiled, streaming=streaming, validate=validate)
@@ -173,11 +174,11 @@ def query(
     limit: int | None = None,
     validate: bool = True,
 ) -> Any:
-    _validate_result_format(format, allowed={"python", "json", "csv"})
+    _validate_result_format(format, allowed={"python", "json", "csv", "jsonl"})
     result = execute(
         source,
         query,
-        format="csv" if format == "csv" else "json",
+        format=format if format in {"csv", "jsonl"} else "json",
         streaming=streaming,
         limit=limit,
         validate=validate,
@@ -194,11 +195,11 @@ async def query_async(
     limit: int | None = None,
     validate: bool = True,
 ) -> Any:
-    _validate_result_format(format, allowed={"python", "json", "csv"})
+    _validate_result_format(format, allowed={"python", "json", "csv", "jsonl"})
     result = await execute_async(
         source,
         query,
-        format="csv" if format == "csv" else "json",
+        format=format if format in {"csv", "jsonl"} else "json",
         streaming=streaming,
         limit=limit,
         validate=validate,
@@ -216,7 +217,11 @@ def _normalize_source(source: Any) -> dict[str, str | None]:
     if isinstance(source, PathLike):
         return {"path": os.fspath(source), "json_text": None}
     if isinstance(source, str):
-        if os.path.exists(source) or _looks_like_path(source):
+        if os.path.exists(source):
+            return {"path": source, "json_text": None}
+        if _looks_like_json_text(source):
+            return {"path": None, "json_text": source}
+        if _looks_like_path(source):
             return {"path": source, "json_text": None}
         return {"path": None, "json_text": source}
     if isinstance(source, (bytes, bytearray)):
@@ -233,6 +238,12 @@ def _validate_execution_args(
 ) -> None:
     if streaming and source_info["path"] is None:
         raise ValueError("Streaming mode requires a filesystem path.")
+
+    if streaming and not _supports_chunk_streaming(compiled):
+        raise ValueError(
+            "Streaming mode does not support aggregations, group by, sort, "
+            "distinct, or limit because those require global query state."
+        )
 
     if source_info["path"] is not None:
         if not os.path.exists(source_info["path"]):
@@ -266,14 +277,16 @@ def _build_result(
         raise ValueError(stderr.strip())
 
     text = stdout or ""
+
+    if limit is not None and text and output_format != "csv":
+        text = _apply_limit_to_json_string(text, limit)
+
     if output_format == "csv" and text:
         text = json_to_csv(text)
-
-    if limit is not None and text:
-        if output_format == "csv":
+        if limit is not None:
             text = _apply_limit_to_csv_string(text, limit)
-        else:
-            text = _apply_limit_to_json_string(text, limit)
+    elif output_format == "jsonl" and text:
+        text = _json_to_jsonl(text)
 
     data = None
     if output_format == "json" and text:
@@ -305,6 +318,17 @@ def _apply_limit_to_csv_string(s: str, n: int) -> str:
     return "\n".join(lines[:1] + lines[1 : 1 + max(0, n)])
 
 
+def _json_to_jsonl(s: str) -> str:
+    try:
+        data = loads(s)
+    except (TypeError, ValueError):
+        return s
+
+    if isinstance(data, list):
+        return "\n".join(dumps(item) for item in data)
+    return dumps(data)
+
+
 def transform_nested_array_path(field_path):
     path = parse_path(field_path)
     return generate_jq_path(path)
@@ -332,6 +356,30 @@ def _looks_like_path(source: str) -> bool:
     return source == "-" or source.startswith((".", "~")) or os.sep in source or source.endswith(
         (".json", ".jsonl", ".ndjson")
     )
+
+
+def _looks_like_json_text(source: str) -> bool:
+    stripped = source.lstrip()
+    if not stripped:
+        return False
+    if stripped[0] in "[{":
+        return True
+    if stripped[0] == '"' and len(stripped) >= 2:
+        return True
+    if stripped.startswith(("true", "false", "null")):
+        return True
+    return bool(
+        re.match(r"^[+-]?((\d+(\.\d*)?)|(\.\d+))([eE][+-]?\d+)?\s*$", stripped)
+    )
+
+
+def _supports_chunk_streaming(compiled: CompiledQuery) -> bool:
+    if compiled.group_by or compiled.order_by or compiled.limit or compiled.distinct:
+        return False
+    for field in compiled.fields:
+        if field[0] in {"aggregation", "count_distinct"}:
+            return False
+    return True
 
 
 def _validate_result_format(format: str, *, allowed: set[str]) -> None:

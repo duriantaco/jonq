@@ -24,11 +24,11 @@ Run ``jonq`` with the following syntax:
    * - Option
      - Description
    * - ``--format, -f``
-     - Output format: ``json`` (default), ``csv``, ``table``, ``yaml``
+     - Output format: ``json`` (default), ``jsonl``, ``csv``, ``table``, ``yaml``
    * - ``-t, --table``
      - Shorthand for ``--format table``
    * - ``--stream, -s``
-     - Process root-array JSON in memory-friendly chunks
+     - Process row-wise root-array queries in memory-friendly chunks
    * - ``--ndjson``
      - Force NDJSON mode (auto-detected by default)
    * - ``--follow``
@@ -516,6 +516,12 @@ Choose how results are displayed:
   .. code-block:: bash
 
       jonq data.json "select name, age" --format csv
+
+- **JSONL:**
+
+  .. code-block:: bash
+
+      jonq data.json "select name, age" --format jsonl
 
 - **YAML:**
 

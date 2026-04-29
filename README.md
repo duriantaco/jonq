@@ -74,7 +74,7 @@ Charlie | 42
 | **Inline maths**  | Field expressions | `age + 10 as age_plus_10` |
 | **Table output**  | Aligned terminal tables | `--format table` or `-t` |
 | **YAML output**   | YAML rendering  | `--format yaml` |
-| **CSV / stream**  | `--format csv`, `--stream` | |
+| **CSV / JSONL / stream**  | `--format csv`, `--format jsonl`, `--stream` | |
 | **Follow mode**   | Stream NDJSON line-by-line | `tail -f log \| jonq --follow "..."` |
 | **Worker reuse**  | Reuse jq workers for repeated filters | `--watch`, `--stream`, Python loops |
 | **Path explorer** | Inspect nested JSON paths and types | `jonq data.json` (no query) |
@@ -376,6 +376,11 @@ jonq simple.json "select name, age, city" -t
 jonq simple.json "select name, age" --format csv > output.csv
 ```
 
+### JSONL Output
+```bash
+jonq simple.json "select name, age" --format jsonl > output.jsonl
+```
+
 ### YAML Output
 ```bash
 jonq simple.json "select name, age" --format yaml
@@ -536,9 +541,9 @@ Field(s) 'nme, agge' not found. Available fields: age, city, id, name. Did you m
 
 | Option | Description |
 |--------|-------------|
-| `--format, -f` | Output format: `json` (default), `csv`, `table`, `yaml` |
+| `--format, -f` | Output format: `json` (default), `jsonl`, `csv`, `table`, `yaml` |
 | `-t, --table` | Shorthand for `--format table` |
-| `--stream, -s` | Process root-array JSON in memory-friendly chunks |
+| `--stream, -s` | Process row-wise root-array queries in memory-friendly chunks |
 | `--ndjson` | Force NDJSON mode (auto-detected by default) |
 | `--follow` | Stream NDJSON from stdin line-by-line |
 | `--limit, -n N` | Limit rows post-query |

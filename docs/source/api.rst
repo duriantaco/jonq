@@ -18,7 +18,7 @@ Execute a query and return parsed Python data by default.
 - **Parameters:**
   - ``source``: Python object, raw JSON string, or file path
   - ``query`` (str or ``CompiledQuery``)
-- **Returns:** Parsed Python data, or raw text when ``format="json"`` or ``format="csv"``
+- **Returns:** Parsed Python data, or raw text when ``format="json"``, ``format="jsonl"``, or ``format="csv"``
 
 **execute(source, query, ...)**
 
@@ -44,7 +44,7 @@ The entry point for the jonq command-line tool.
 
 .. code-block:: bash
 
-   jonq <path/to/json_file> "<query>" [--format csv|json] [--stream] [--watch] [--jq] [--pretty] [--no-color] [--ndjson] [--limit N] [--out PATH] [--version]
+   jonq <path/to/json_file> "<query>" [--format json|jsonl|csv|table|yaml] [--stream] [--watch] [--jq] [--pretty] [--no-color] [--ndjson] [--limit N] [--out PATH] [--version]
 
 Query Parser (jonq.query_parser)
 --------------------------------

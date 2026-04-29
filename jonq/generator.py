@@ -362,6 +362,53 @@ def make_selector_from_path(path_with_arrays: str) -> str:
     return " | ".join(pieces)
 
 
+def _split_array_context(path: str) -> tuple[Optional[str], str]:
+    marker = "[]"
+    idx = path.rfind(marker)
+    if idx == -1:
+        return None, path
+    context_path = path[: idx + len(marker)]
+    local_path = path[idx + len(marker) :].lstrip(".")
+    return context_path, local_path
+
+
+def _implicit_field_array_context(fields) -> Optional[str]:
+    contexts = set()
+    has_array_field = False
+    for tup in fields:
+        ftype = tup[0]
+        if ftype == "field":
+            path = tup[1]
+        elif ftype == "function":
+            path = tup[2]
+        else:
+            continue
+        if "[]" not in path:
+            continue
+        context_path, _ = _split_array_context(path)
+        if context_path:
+            has_array_field = True
+            contexts.add(context_path)
+    if has_array_field and len(contexts) == 1:
+        return next(iter(contexts))
+    return None
+
+
+def _strip_array_context(path: str, context_path: str) -> str:
+    if path.startswith(context_path):
+        return path[len(context_path) :].lstrip(".")
+    return path
+
+
+def _sort_filter(order_by: str, sort_direction: str) -> str:
+    sort_expr = generate_jq_path(
+        parse_path(order_by), context="root", null_check=False
+    )
+    return f" | sort_by({sort_expr})" + (
+        " | reverse" if sort_direction == "desc" else ""
+    )
+
+
 def _gen_field_selector(ftype: str, data: list, base_context: str) -> Optional[str]:
     if ftype == "field":
         field, alias = data
@@ -492,6 +539,32 @@ def generate_jq_filter(
                     updated_fields.append(tup)
             fields = updated_fields
 
+    if not from_path and not group_by and not condition:
+        field_array_context = _implicit_field_array_context(fields)
+        if field_array_context:
+            base_selector = make_selector_from_path(field_array_context)
+            base_context = "array"
+            updated_fields = []
+            for tup in fields:
+                if tup[0] == "field":
+                    _, path, alias = tup
+                    updated_fields.append(
+                        ("field", _strip_array_context(path, field_array_context), alias)
+                    )
+                elif tup[0] == "function":
+                    _, func, param, alias = tup
+                    updated_fields.append(
+                        (
+                            "function",
+                            func,
+                            _strip_array_context(param, field_array_context),
+                            alias,
+                        )
+                    )
+                else:
+                    updated_fields.append(tup)
+            fields = updated_fields
+
     all_aggregations = all(ft in ("aggregation", "count_distinct") for ft, *_ in fields)
     if all_aggregations and not group_by:
         base_data = base_selector or '(if type=="array" then .[] else . end)'
@@ -516,11 +589,12 @@ def generate_jq_filter(
                 )
                 continue
             _, func, param, alias = tup
-            raw = f"{base_data} | .{param.lstrip('.')}"
-            wrapped = wrap(raw)
             if func == "count" and param == "*":
-                selection.append(f'"{alias}": length')
+                selection.append(f'"{alias}": ([ {base_data} ] | length)')
                 continue
+            path_jq = generate_jq_path(parse_path(param), base_context)
+            raw = f"{base_data} | {path_jq}"
+            wrapped = wrap(raw)
             if func == "sum":
                 selection.append(
                     f'"{alias}": ({wrapped} | map(select(type=="number")) | add // 0)'
@@ -589,9 +663,7 @@ def generate_jq_filter(
         if having:
             jq_filter += f" | map(select({process_having_condition(having, fields)}))"
         if order_by:
-            jq_filter += f" | sort_by(.{order_by})" + (
-                " | reverse" if sort_direction == "desc" else ""
-            )
+            jq_filter += _sort_filter(order_by, sort_direction)
         if limit:
             jq_filter += f" | .[0:{limit}]"
     else:
@@ -608,9 +680,7 @@ def generate_jq_filter(
             if distinct:
                 jq_filter += " | unique"
             if order_by:
-                jq_filter += f" | sort_by(.{order_by})" + (
-                    " | reverse" if sort_direction == "desc" else ""
-                )
+                jq_filter += _sort_filter(order_by, sort_direction)
             if limit:
                 jq_filter += f" | .[0:{limit}]"
 
@@ -641,7 +711,7 @@ def generate_jq_filter(
                 if s:
                     sel.append(s)
             map_filter = f"{{ {', '.join(sel)} }}"
-            if from_path:
+            if from_path or base_selector:
                 body = (
                     f"{base_selector} | "
                     + ("select({}) | ".format(condition) if condition else "")
@@ -668,9 +738,7 @@ def generate_jq_filter(
             if distinct:
                 jq_filter += " | unique"
             if order_by:
-                jq_filter += f" | sort_by(.{order_by})" + (
-                    " | reverse" if sort_direction == "desc" else ""
-                )
+                jq_filter += _sort_filter(order_by, sort_direction)
             if limit:
                 jq_filter += f" | .[0:{limit}]"
     logging.info(f"Generated jq filter: {jq_filter}")

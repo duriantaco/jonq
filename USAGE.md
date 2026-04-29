@@ -137,6 +137,7 @@ jonq users.json "select name, age" -t              # table
 jonq users.json "select name, age" --format csv    # CSV
 jonq users.json "select name, age" --format jsonl  # JSONL
 jonq users.json "select name, age" --format yaml   # YAML
+jonq users.json "select name" -r                   # raw values
 ```
 
 ## Input Sources

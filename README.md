@@ -29,7 +29,7 @@ Instead of raw jq:
 jq '.[] | select(.age > 30) | {name, age}' users.json
 ```
 
-jonq compiles your query to jq and executes it with a reusable jq worker. It is useful when you need to understand an unfamiliar JSON payload, extract fields, filter rows, flatten nested arrays, or turn JSON into table, CSV, JSONL, or YAML output.
+jonq compiles your query to jq and executes it with a reusable jq worker. It is useful when you need to understand an unfamiliar JSON payload, extract fields, filter rows, flatten nested arrays, or turn JSON into table, CSV, JSONL, YAML, or raw scalar output.
 
 > jonq is not a database, ETL framework, or analytics engine. It is a JSON exploration and shaping tool for terminal workflows.
 
@@ -41,7 +41,7 @@ Use jonq when you need to:
 - select and rename fields without remembering jq object syntax
 - filter JSON with readable conditions
 - query nested objects and arrays
-- produce table, CSV, JSONL, YAML, or compact JSON output
+- produce table, CSV, JSONL, YAML, raw scalar, or compact JSON output
 - run the same query in shell scripts, CI, or Python code
 - follow NDJSON logs line-by-line
 
@@ -99,6 +99,12 @@ Filter rows:
 
 ```bash
 jonq users.json "select name, age if age > 30"
+```
+
+Print raw values for shell pipelines:
+
+```bash
+jonq users.json "select name" -r
 ```
 
 Render a table:
@@ -224,6 +230,12 @@ YAML:
 
 ```bash
 jonq users.json "select name, age" --format yaml
+```
+
+Raw scalar values:
+
+```bash
+jonq users.json "select name" -r
 ```
 
 ## Input Sources
@@ -361,6 +373,7 @@ Async helpers are also available: `query_async(...)` and `execute_async(...)`.
 |--------|-------------|
 | `-f, --format {json,jsonl,csv,table,yaml}` | Output format |
 | `-t, --table` | Shorthand for `--format table` |
+| `-r, --raw, --raw-output` | Print scalar values without JSON quoting |
 | `-s, --stream` | Chunk-safe streaming for root-array JSON |
 | `--ndjson` | Force NDJSON mode |
 | `--follow` | Process NDJSON from stdin line-by-line |

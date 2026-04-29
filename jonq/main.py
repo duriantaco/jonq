@@ -518,6 +518,32 @@ def _json_to_jsonl(json_text: str) -> str:
     return json.dumps(data, ensure_ascii=False, separators=(",", ":"))
 
 
+def _json_to_raw(json_text: str) -> str:
+    try:
+        data = json.loads(json_text)
+    except (json.JSONDecodeError, TypeError):
+        return json_text
+
+    if isinstance(data, list):
+        return "\n".join(_raw_line(item) for item in data)
+    return _raw_line(data)
+
+
+def _raw_line(value) -> str:
+    if isinstance(value, dict) and len(value) == 1:
+        value = next(iter(value.values()))
+
+    if isinstance(value, str):
+        return value
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    return str(value)
+
+
 def _json_to_yaml_simple(json_text: str) -> str:
     try:
         data = json.loads(json_text)
@@ -574,7 +600,7 @@ def _generate_completions(shell: str) -> str:
 # Add to ~/.bashrc: eval "$(jonq --completions bash)"
 _jonq_completions() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
-    local opts="-i -f -t -s -n -o -p -w --format --table --stream --ndjson --limit --out --jq --explain --time --pretty --watch --follow --no-color --version --help --completions"
+    local opts="-i -f -t -r -s -n -o -p -w --format --table --raw --raw-output --stream --ndjson --limit --out --jq --explain --time --pretty --watch --follow --no-color --version --help --completions"
     local keywords="select if where from group by having sort asc desc limit distinct and or not in like between contains as case when then else end is null coalesce count sum avg min max upper lower length round abs ceil floor int float str type keys values trim todate fromdate date tojson fromjson"
 
     if [[ "${cur}" == -* ]]; then
@@ -595,12 +621,15 @@ _jonq() {
         '-i:Interactive mode'
         '-f:Output format'
         '-t:Table output'
+        '-r:Raw scalar output'
         '-s:Streaming mode'
         '-n:Limit rows'
         '-o:Output file'
         '-p:Pretty print'
         '-w:Watch mode'
         '--follow:Follow stdin'
+        '--raw:Raw scalar output'
+        '--raw-output:Raw scalar output'
         '--jq:Show jq filter'
         '--explain:Explain query'
         '--time:Show timing'
@@ -624,6 +653,8 @@ compdef _jonq jonq'''
 complete -c jonq -s i -l interactive -d 'Interactive mode' -r -F
 complete -c jonq -s f -l format -d 'Output format' -x -a 'json jsonl csv table yaml'
 complete -c jonq -s t -l table -d 'Table output'
+complete -c jonq -s r -l raw -d 'Raw scalar output'
+complete -c jonq -l raw-output -d 'Raw scalar output'
 complete -c jonq -s s -l stream -d 'Streaming mode'
 complete -c jonq -s n -l limit -d 'Limit rows' -x
 complete -c jonq -s o -l out -d 'Output file' -r -F
@@ -678,6 +709,8 @@ async def _follow_stdin(query: str, options: dict) -> None:
                         result = _json_to_yaml(result)
                     elif options["format"] == "jsonl":
                         result = _json_to_jsonl(result)
+                    elif options.get("raw_output"):
+                        result = _json_to_raw(result)
                     elif is_tty and not options.get("no_color"):
                         result = _pretty_json_string(result)
                         result = _colorize_json(result)
@@ -727,6 +760,8 @@ async def _run_query(json_file: str, query: str, options: dict) -> str | None:
         out_text = json_to_table(out_text, color=use_color)
     elif options["format"] == "yaml":
         out_text = _json_to_yaml(out_text)
+    elif options.get("raw_output"):
+        out_text = _json_to_raw(out_text)
     elif options["format"] == "json":
         if options.get("pretty") or (is_tty and not options.get("no_color")):
             out_text = _pretty_json_string(out_text)
@@ -792,6 +827,9 @@ async def _amain(argv: list[str] | None = None):
         parser.error("--interactive does not accept positional source/query arguments.")
 
     options = _options_from_args(args)
+
+    if options.get("raw_output") and options["format"] != "json":
+        parser.error("--raw/--raw-output can only be used with JSON output.")
 
     if args.interactive:
         json_file = args.interactive
@@ -948,6 +986,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Shorthand for --format table",
     )
     parser.add_argument(
+        "-r",
+        "--raw",
+        "--raw-output",
+        dest="raw_output",
+        action="store_true",
+        help="Print scalar values without JSON quoting (one value per line)",
+    )
+    parser.add_argument(
         "-s",
         "--stream",
         dest="streaming",
@@ -1033,6 +1079,7 @@ def _options_from_args(args: argparse.Namespace) -> dict:
         "explain": getattr(args, "explain", False),
         "show_time": getattr(args, "show_time", False),
         "pretty": args.pretty,
+        "raw_output": getattr(args, "raw_output", False),
         "watch": args.watch,
         "no_color": args.no_color,
         "follow": getattr(args, "follow", False),

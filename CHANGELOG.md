@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Raw scalar output**: `-r`, `--raw`, and `--raw-output` print selected scalar values without JSON quotes for shell pipelines.
+
 ## [v0.3.0] - 2026-03-22
 
 ### Added

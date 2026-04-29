@@ -32,6 +32,7 @@ Key Features
 - **GROUP BY** with **HAVING**
 - **Table output**: ``-t`` for aligned terminal tables
 - **JSONL / YAML output**: ``--format jsonl`` and ``--format yaml``
+- **Raw scalar output**: ``-r`` for unquoted values in shell pipelines
 - **Path explorer**: run ``jonq data.json`` with no query
 - **Interactive REPL**: ``jonq -i data.json`` with tab completion and history
 - **Follow mode**: ``--follow`` to stream NDJSON line-by-line

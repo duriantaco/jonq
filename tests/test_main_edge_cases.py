@@ -6,6 +6,7 @@ from jonq.main import (
     _concat_glob,
     _type_label,
     _preview_value,
+    _json_to_raw,
     _json_to_yaml,
     _json_to_yaml_simple,
     _yaml_scalar,
@@ -203,6 +204,26 @@ class TestJsonToYamlSimple:
     def test_invalid_json(self):
         result = _json_to_yaml_simple("not json")
         assert result == "not json"
+
+
+class TestJsonToRaw:
+    def test_scalar_values_from_single_field_rows(self):
+        result = _json_to_raw('[{"name":"Alice"},{"name":"Bob"}]')
+
+        assert result == "Alice\nBob"
+
+    def test_multi_field_rows_fall_back_to_compact_jsonl(self):
+        result = _json_to_raw('[{"name":"Alice","age":30},{"name":"Bob","age":25}]')
+
+        assert result == '{"name":"Alice","age":30}\n{"name":"Bob","age":25}'
+
+    def test_json_scalars_match_shell_friendly_values(self):
+        result = _json_to_raw('["Alice",42,true,false,null]')
+
+        assert result == "Alice\n42\ntrue\nfalse\nnull"
+
+    def test_invalid_json_is_unchanged(self):
+        assert _json_to_raw("not json") == "not json"
 
 
 class TestJsonToYaml:

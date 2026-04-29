@@ -27,6 +27,8 @@ Run ``jonq`` with the following syntax:
      - Output format: ``json`` (default), ``jsonl``, ``csv``, ``table``, ``yaml``
    * - ``-t, --table``
      - Shorthand for ``--format table``
+   * - ``-r, --raw, --raw-output``
+     - Print scalar values without JSON quoting
    * - ``--stream, -s``
      - Process row-wise root-array queries in memory-friendly chunks
    * - ``--ndjson``
@@ -530,6 +532,15 @@ Choose how results are displayed:
       jonq data.json "select name, age" --format yaml
 
   Uses ``pyyaml`` if installed, built-in fallback otherwise.
+
+- **Raw scalar values:**
+
+  .. code-block:: bash
+
+      jonq data.json "select name" -r
+
+  Prints one selected value per line, without JSON string quotes. Multi-field
+  rows remain compact JSON objects, one per line.
 
 Path Explorer
 --------------

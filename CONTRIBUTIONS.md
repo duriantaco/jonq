@@ -6,8 +6,8 @@ Thanks for your interest in helping with jonq! Here's how you can contribute:
 
 1. Fork the repo
 2. Clone your fork: `git clone https://github.com/duriantaco/jonq.git`
-3. Install for development: `pip install -e .`
-4. Install test dependencies: `pip install pytest pytest-asyncio`
+3. Install for development: `pip install -e ".[dev]"`
+4. Install hooks: `pre-commit install --install-hooks`
 5. Install docs dependencies when editing docs: `pip install -r docs/requirements.txt`
 
 ## How to Contribute
@@ -27,6 +27,7 @@ Thanks for your interest in helping with jonq! Here's how you can contribute:
 7. Open a pull request
 
 ### Code Style
+- Run `pre-commit run --all-files` before pushing
 - Follow PEP 8 basics
 - Include docstrings for functions and classes
 
@@ -37,6 +38,17 @@ Run `pytest` before submitting your changes.
 Keep `README.md`, `USAGE.md`, `SYNTAX.md`, and the Sphinx docs in `docs/source/`
 in sync when changing CLI behavior, query syntax, output formats, or the Python
 API.
+
+## Releases
+Maintainers publish from GitHub Releases:
+
+1. Update `pyproject.toml`, `jonq/constants.py`, and `CHANGELOG.md`
+2. Open and merge the release prep PR
+3. Create a GitHub Release for the version tag
+4. The release workflow builds the package and publishes it to PyPI
+
+PyPI publishing uses trusted publishing, so the PyPI project must allow this
+repository and the `pypi` GitHub environment.
 
 ## Need Help?
 Open an issue with your question!

@@ -1,4 +1,3 @@
-from jonq.tokenizer import tokenize
 from jonq.query_parser import parse_query, tokenize_query
 
 def print_parsed_query(query):

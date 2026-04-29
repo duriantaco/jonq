@@ -1,4 +1,3 @@
-import re
 import pytest
 from jonq.jq_filter import generate_jq_filter
 

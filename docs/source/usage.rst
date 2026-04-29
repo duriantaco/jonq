@@ -699,4 +699,4 @@ Known Limitations
 - **Advanced jq Features**: Some complex ``jq`` functionalities (e.g., recursive descent or custom filters) are not exposed through ``jonq``'s readable query syntax.
 - **Joins**: ``jonq`` does not support joining data across multiple JSON files.
 - **Custom Functions**: Users cannot define custom functions within queries.
-- **Window Functions**: Not supported — use DuckDB or Polars for analytical queries.
+- **Window Functions**: Not supported — use an analytical query engine for analytical queries.

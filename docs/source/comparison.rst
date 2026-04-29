@@ -4,12 +4,12 @@ Comparison
 Where jonq Fits
 ----------------
 
-jonq is a JSON exploration and extraction tool. It is not a database, dataframe engine, or BI layer.
+jonq is a CLI JSON exploration and extraction tool. It is not a database, ETL system, or BI layer.
 
 .. important::
 
-   Use jonq while the problem is still "understand this JSON" or "reshape this payload".
-   Once the problem becomes relational analytics, joins, window functions, or large-scale aggregation, move to an analytical tool.
+   Use jonq while the problem is still "understand this JSON" or "reshape this payload" from the shell.
+   Once the problem becomes relational analytics, joins, window functions, or large-scale data movement, move to a tool built for that job.
 
 When to Use jonq
 ~~~~~~~~~~~~~~~~~
@@ -23,15 +23,16 @@ When to Use Something Else
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Use **raw jq** when you already know the exact jq filter you want.
-- Use **DuckDB / Polars / Pandas** when the data is now a tabular analytics problem.
-- Use a **database or warehouse** when you need joins, window functions, or repeated analytical queries over larger datasets.
+- Use `jello <https://github.com/kellyjonbrazil/jello>`_ when you want Python expressions over JSON from the CLI.
+- Use `gron <https://github.com/tomnomnom/gron>`_ when you want grep-friendly flattened assignment lines.
+- Use an **analytics engine or database** when you need joins, window functions, or repeated analytical queries over larger datasets.
 
 Typical Workflow
 ~~~~~~~~~~~~~~~~~
 
 1. Explore unknown JSON with jonq.
 2. Extract or normalize the fields you need.
-3. Pipe the result into DuckDB, Polars, Pandas, or a database if you need analytics afterward.
+3. Pipe the result into the next shell command, script, or analytical system if you need more processing afterward.
 
 jonq vs raw jq
 ---------------

@@ -57,7 +57,7 @@ The entry point for the jonq command-line tool.
 
 .. code-block:: bash
 
-   jonq <source> "<query>" [--format json|jsonl|csv|table|yaml] [--stream] [--watch] [--jq] [--explain] [--pretty] [--no-color] [--ndjson] [--limit N] [--out PATH] [--version]
+   jonq <source> "<query>" [--format json|jsonl|csv|table|yaml] [--raw] [--stream] [--watch] [--jq] [--explain] [--pretty] [--no-color] [--ndjson] [--limit N] [--out PATH] [--version]
 
 Query Parser (jonq.query_parser)
 --------------------------------

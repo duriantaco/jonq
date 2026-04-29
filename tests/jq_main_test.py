@@ -50,6 +50,47 @@ def test_main_reads_piped_stdin_with_dash(capsys):
     assert "Alice" in captured.out
 
 
+def test_main_raw_output_prints_single_field_values(tmp_path, capsys):
+    json_file = tmp_path / "test.json"
+    json_file.write_text(
+        '[{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]'
+    )
+
+    with patch("sys.argv", ["jonq", str(json_file), "select name", "-r"]):
+        main()
+
+    captured = capsys.readouterr()
+    assert captured.out == "Alice\nBob\n"
+
+
+def test_main_raw_output_keeps_multi_field_rows_scriptable(tmp_path, capsys):
+    json_file = tmp_path / "test.json"
+    json_file.write_text(
+        '[{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]'
+    )
+
+    with patch("sys.argv", ["jonq", str(json_file), "select name, age", "--raw"]):
+        main()
+
+    captured = capsys.readouterr()
+    assert captured.out == (
+        '{"name":"Alice","age":30}\n{"name":"Bob","age":25}\n'
+    )
+
+
+def test_main_raw_output_rejects_non_json_format(tmp_path, capsys):
+    json_file = tmp_path / "test.json"
+    json_file.write_text('[{"name": "Alice"}]')
+
+    with patch("sys.argv", ["jonq", str(json_file), "select name", "-r", "-t"]):
+        with pytest.raises(SystemExit) as excinfo:
+            main()
+
+    captured = capsys.readouterr()
+    assert excinfo.value.code == 2
+    assert "--raw/--raw-output" in captured.err
+
+
 def test_main_file_not_found(capsys):
     with patch("sys.argv", ["jonq", "nonexistent.json", "select name"]):
         with pytest.raises(SystemExit) as excinfo:

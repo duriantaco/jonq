@@ -32,7 +32,7 @@ def tokenize_with_lexer(query):
         ),
         ("FUNCTION_CALL", r"\w+\s*\(\s*\*\s*\)"),
         ("FUNCTION_PARAM", r"\w+\s*\(\s*[\w\.\[\]]+\s*\)"),
-        ("OPERATOR", r"\|\||<=|>=|!=|=|<|>|\+|\*|\/"),
+        ("OPERATOR", r"\|\||<=|>=|!=|=|<|>|\+|\*|\/|%"),
         ("ARITHMETIC_MINUS", r"\s-\s"),
         ("STRING", r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\''),
         ("NUMBER", r"\d+(?:\.\d+)?"),

@@ -141,39 +141,84 @@ def _find_keyword(s: str, keyword: str) -> int:
     return -1
 
 
-def parse_expression(expr_str: str) -> Expression:
+def _strip_outer_expr_parens(expr_str: str) -> str:
     expr_str = expr_str.strip()
+    while expr_str.startswith("(") and expr_str.endswith(")"):
+        depth = 0
+        in_sq = in_dq = False
+        wraps = True
+        for i, ch in enumerate(expr_str):
+            if ch == "'" and not in_dq:
+                in_sq = not in_sq
+            elif ch == '"' and not in_sq:
+                in_dq = not in_dq
+            elif ch == "(" and not in_sq and not in_dq:
+                depth += 1
+            elif ch == ")" and not in_sq and not in_dq:
+                depth -= 1
+                if depth == 0 and i != len(expr_str) - 1:
+                    wraps = False
+                    break
+        if not wraps:
+            break
+        expr_str = expr_str[1:-1].strip()
+    return expr_str
+
+
+def _find_top_level_operator(expr_str: str, operators: list[str]):
+    depth = 0
+    in_sq = in_dq = False
+    i = len(expr_str) - 1
+    while i >= 0:
+        ch = expr_str[i]
+        if ch == "'" and not in_dq:
+            in_sq = not in_sq
+        elif ch == '"' and not in_sq:
+            in_dq = not in_dq
+        elif ch == ")" and not in_sq and not in_dq:
+            depth += 1
+        elif ch == "(" and not in_sq and not in_dq:
+            depth -= 1
+        elif depth == 0 and not in_sq and not in_dq:
+            for op in operators:
+                if op == "||":
+                    for pat in (" || ", "||"):
+                        start = i - len(pat) + 1
+                        if start >= 0 and expr_str[start : i + 1] == pat:
+                            return start, op
+                else:
+                    pat = f" {op} "
+                    start = i - len(pat) + 1
+                    if start >= 0 and expr_str[start : i + 1] == pat:
+                        return start, op
+        i -= 1
+    return None, None
+
+
+def parse_expression(expr_str: str) -> Expression:
+    expr_str = _strip_outer_expr_parens(expr_str)
 
     if expr_str.lower().startswith("case "):
         return _parse_case_expression(expr_str)
 
-    depth = 0
-    for i, ch in enumerate(expr_str):
-        if ch == "(":
-            depth += 1
-        elif ch == ")":
-            depth -= 1
-        elif depth == 0:
-            for op in ["||", "+", "-", "*", "/"]:
-                pat = f" {op} " if op != "||" else "||"
-                if op == "||":
-                    for p in [" || ", "||"]:
-                        if expr_str.startswith(p, i):
-                            left = expr_str[:i].rstrip()
-                            right = expr_str[i + len(p) :].lstrip()
-                            return Expression(
-                                ExprType.OPERATION,
-                                "+",  # jq uses + for string concat
-                                [parse_expression(left), parse_expression(right)],
-                            )
-                elif expr_str.startswith(pat, i):
-                    left = expr_str[:i].rstrip()
-                    right = expr_str[i + len(pat) :].lstrip()
-                    return Expression(
-                        ExprType.OPERATION,
-                        op,
-                        [parse_expression(left), parse_expression(right)],
-                    )
+    for operators in (["||", "+", "-"], ["*", "/", "%"]):
+        op_index, op = _find_top_level_operator(expr_str, operators)
+        if op_index is not None:
+            pat_len = len(op)
+            if op == "||":
+                if expr_str.startswith(" || ", op_index):
+                    pat_len = 4
+                elif expr_str.startswith("||", op_index):
+                    pat_len = 2
+            else:
+                pat_len = len(f" {op} ")
+            left = expr_str[:op_index].rstrip()
+            right = expr_str[op_index + pat_len :].lstrip()
+            return Expression(
+                ExprType.OPERATION,
+                "+" if op == "||" else op,
+                [parse_expression(left), parse_expression(right)],
+            )
 
     agg_match = re.match(r"(\w+)\s*\(", expr_str)
     if agg_match:

@@ -60,6 +60,18 @@ Use ``execute(...)`` when you want metadata such as the generated jq filter or r
    print(result.output_format)
    print(result.text)
 
+Use ``format="jsonl"`` when you want newline-delimited JSON for downstream tools:
+
+.. code-block:: python
+
+   result = execute(
+       [{"name": "Alice"}, {"name": "Bob"}],
+       "select name",
+       format="jsonl",
+   )
+
+   print(result.text)
+
 Supported Inputs
 ----------------
 

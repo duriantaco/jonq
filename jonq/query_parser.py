@@ -243,6 +243,7 @@ _SCALAR_FUNCTIONS = {
     "ltrim", "rtrim", "tojson", "fromjson",
 }
 _MULTI_ARG_FUNCTIONS = {"coalesce", "if_null"}
+_AGGREGATE_FUNCTIONS = {"count", "sum", "avg", "min", "max"}
 _ARITHMETIC_OPS = {"+", "-", "*", "/", "%", "^", "||"}
 
 
@@ -391,12 +392,14 @@ def parse_query(tokens: list[str]) -> tuple:
                 else:
                     is_plain_path = re.fullmatch(r"[\w\.\[\]]+", inner_expr)
                     is_star = inner_expr.strip() == "*"
+                    if func_lower not in _AGGREGATE_FUNCTIONS:
+                        raise ValueError(f"Unknown function '{func}'")
                     if is_plain_path or is_star:
                         alias = (
                             alias
                             or f"{func}_{inner_expr.replace('.', '_').replace('[', '_').replace(']', '').replace('*', 'star')}"
                         )
-                        fields.append(("aggregation", func, inner_expr, alias))
+                        fields.append(("aggregation", func_lower, inner_expr, alias))
                     else:
                         alias = alias or f"expr_{len(fields) + 1}"
                         fields.append(("expression", f"{func} ( {inner_expr} )", alias))
@@ -411,9 +414,8 @@ def parse_query(tokens: list[str]) -> tuple:
                         depth += 1
                     elif token == ")":
                         depth -= 1
-                    elif (
-                        depth == 0
-                        and token in [",", "as"]
+                    elif depth == 0 and (
+                        token in [",", "as"]
                         or token.lower()
                         in ["if", "sort", "group", "having", "from", "limit"]
                     ):
@@ -460,6 +462,10 @@ def parse_query(tokens: list[str]) -> tuple:
             expecting_field = False
         else:
             break
+    if not fields:
+        raise ValueError("Expected field list after 'select'")
+    if expecting_field:
+        raise ValueError("Expected field name after comma")
     from_path = None
     if i < len(tokens) and tokens[i].lower() == "from":
         i += 1
@@ -468,6 +474,7 @@ def parse_query(tokens: list[str]) -> tuple:
             "sort",
             "group",
             "having",
+            "limit",
         ]:
             from_path = tokens[i]
             i += 1
@@ -533,7 +540,7 @@ def parse_query(tokens: list[str]) -> tuple:
         having = " ".join(having_tokens)
     if i < len(tokens) and tokens[i].lower() == "from":
         i += 1
-        if i < len(tokens) and tokens[i].lower() not in ["sort"]:
+        if i < len(tokens) and tokens[i].lower() not in ["sort", "limit"]:
             from_path = tokens[i]
             i += 1
         else:
@@ -574,6 +581,8 @@ def parse_query(tokens: list[str]) -> tuple:
             i += 1
         else:
             raise ValueError("Expected number after 'limit'")
+    if i < len(tokens):
+        raise ValueError(f"Unexpected token {tokens[i]!r} at position {i}")
     return (
         fields,
         condition,

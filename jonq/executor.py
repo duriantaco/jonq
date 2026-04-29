@@ -12,6 +12,11 @@ import aiofiles
 logger = logging.getLogger(__name__)
 
 
+def _filter_emits_multiple_values(jq_filter: str) -> bool:
+    stripped = jq_filter.lstrip()
+    return stripped.startswith(".[]") or stripped.startswith(".[]?")
+
+
 def _run_jq_raw(jq_filter, json_text):
     try:
         worker = get_worker(jq_filter)
@@ -43,7 +48,7 @@ def run_jq(arg1, arg2):
 
 
 def run_jq_streaming(json_file, jq_filter, chunk_size=1000):
-    emits_objects = jq_filter.startswith(".[]") or "| .[" in jq_filter
+    emits_objects = _filter_emits_multiple_values(jq_filter)
     wrapper = f"[{jq_filter}]" if emits_objects else jq_filter
 
     def _process_chunk(chunk_json):
@@ -103,7 +108,7 @@ async def run_jq_async(arg1, arg2):
 
 
 async def run_jq_streaming_async(json_file, jq_filter, chunk_size=1000):
-    emits_objects = jq_filter.startswith(".[]") or "| .[" in jq_filter
+    emits_objects = _filter_emits_multiple_values(jq_filter)
     wrapper = f"[{jq_filter}]" if emits_objects else jq_filter
 
     async def _process_chunk_async(chunk_json):

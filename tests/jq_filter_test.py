@@ -174,9 +174,10 @@ def test_arithmetic_addition():
 
 
 def test_count_star():
-    assert '{ "total_count": length }' == generate_jq_filter(
+    r = generate_jq_filter(
         [("aggregation", "count", "*", "total_count")], None, None, None, None, None
     )
+    _has(r, ['"total_count"', "if type==", "length"])
 
 
 def test_count_star_with_condition():

@@ -1,570 +1,380 @@
 <div align="center">
-  <img src="docs/source/_static/jonq.png" alt="jonq — SQL-like JSON query tool for the command line" width="200"/>
+  <img src="docs/source/_static/jonq.png" alt="jonq - SQL-like JSON query tool for the command line" width="200"/>
 
-# jonq — query JSON with SQL-like syntax from the terminal
+# jonq - readable JSON queries for the terminal
 
-### A readable alternative to jq for JSON extraction, filtering, and exploration
+### A jq-powered CLI for inspecting, filtering, and reshaping JSON without writing raw jq
 
 [![PyPI version](https://img.shields.io/pypi/v/jonq.svg)](https://pypi.org/project/jonq/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/jonq.svg)](https://pypi.org/project/jonq/)
 [![CI tests](https://github.com/duriantaco/jonq/actions/workflows/tests.yml/badge.svg)](https://github.com/duriantaco/jonq/actions)
 [![Documentation Status](https://readthedocs.org/projects/jonq/badge/?version=latest)](https://jonq.readthedocs.io)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](License)
 [![Skylos Grade](https://img.shields.io/badge/Skylos-A%2B%20%28100%29-brightgreen)](https://github.com/duriantaco/skylos)
 </div>
 
 ---
 
-## What is jonq?
+## What jonq is
 
-**jonq** is a command-line JSON query tool that lets you `select`, `filter`, `group`, and `reshape` JSON data using SQL-like syntax instead of raw jq. It generates pure jq under the hood, so you get jq's speed with a syntax you can actually remember.
+`jonq` is a command-line JSON query tool. It lets you write readable, SQL-like queries such as:
 
 ```bash
-# Instead of: jq '.[] | select(.age > 30) | {name, age}'
-jonq data.json "select name, age if age > 30" -t
+jonq users.json "select name, age if age > 30" -t
 ```
 
+Instead of raw jq:
+
+```bash
+jq '.[] | select(.age > 30) | {name, age}' users.json
 ```
-name    | age
---------|----
-Alice   | 35
-Charlie | 42
-```
 
-> **jonq is not a database.** It is a readable jq frontend for exploring, extracting, and reshaping JSON in terminal workflows.
+jonq compiles your query to jq and executes it with a reusable jq worker. It is useful when you need to understand an unfamiliar JSON payload, extract fields, filter rows, flatten nested arrays, or turn JSON into table, CSV, JSONL, or YAML output.
 
----
+> jonq is not a database, ETL framework, or analytics engine. It is a JSON exploration and shaping tool for terminal workflows.
 
-### Use jonq when you need to
-- Query JSON from APIs, config files, or log streams in the terminal
-- Explore unfamiliar JSON with the built-in path explorer
-- Write readable jq one-liners in shell scripts and CI pipelines
-- Filter, aggregate, or reshape nested JSON without memorizing jq syntax
-- Stream and filter NDJSON log output in real time
+## When to use it
 
-### Use something else when you need
-- **Exact jq control** — raw `jq`
-- **Python expressions over JSON** — [`jello`](https://github.com/kellyjonbrazil/jello)
-- **Flattened assignment-style JSON output** — [`gron`](https://github.com/tomnomnom/gron)
-- **Joins across files** — a database or analytics engine
-- **Large-scale ETL** — tools built for analytical pipelines
+Use jonq when you need to:
 
-**Rule of thumb:** if the problem is still "I need to understand or reshape this JSON from the shell", jonq is a good fit. If the problem has become relational analytics or production data movement, use a tool built for that job.
+- inspect an API response, config file, generated JSON, or log payload
+- select and rename fields without remembering jq object syntax
+- filter JSON with readable conditions
+- query nested objects and arrays
+- produce table, CSV, JSONL, YAML, or compact JSON output
+- run the same query in shell scripts, CI, or Python code
+- follow NDJSON logs line-by-line
 
-## Features at a glance
+Use another tool when you need:
 
-| Category          | What you can do | Example |
-|-------------------|-----------------|---------|
-| **Selection**     | Pick fields     | `select name, age` |
-| **Wildcard**      | All fields      | `select *` |
-| **DISTINCT**      | Unique results  | `select distinct city` |
-| **Filtering**     | `and / or / not / between / contains / in / like` | `if age > 30 and city = 'NY'` |
-| **IS NULL**       | Null checks     | `if email is not null` |
-| **Aggregations**  | `sum avg min max count` | `select avg(price) as avg_price` |
-| **COUNT DISTINCT**| Unique counts   | `select count(distinct city) as n` |
-| **Grouping**      | `group by` + `having`   | `... group by city having count > 2` |
-| **Ordering**      | `sort <field> [asc\|desc]` | `sort age desc` |
-| **LIMIT**         | Standalone limit | `select * limit 10` |
-| **CASE/WHEN**     | Conditional expressions | `case when age > 30 then 'senior' else 'junior' end` |
-| **COALESCE**      | Null fallback   | `coalesce(nickname, name) as display` |
-| **String concat** | `+` or `\|\|`   | `first \|\| ' ' \|\| last as full_name` |
-| **Nested arrays** | `from [].orders` or inline paths | `select products[].name ...` |
-| **String funcs**  | `upper lower length trim` | `select upper(name) as name_upper` |
-| **Math funcs**    | `round abs ceil floor` | `select round(price) as price_r` |
-| **Type casting**  | `int float str type` | `select int(price) as price` |
-| **Date/time**     | `todate fromdate date` | `select todate(ts) as date` |
-| **Inline maths**  | Field expressions | `age + 10 as age_plus_10` |
-| **Table output**  | Aligned terminal tables | `--format table` or `-t` |
-| **YAML output**   | YAML rendering  | `--format yaml` |
-| **CSV / JSONL / stream**  | `--format csv`, `--format jsonl`, `--stream` | |
-| **Follow mode**   | Stream NDJSON line-by-line | `tail -f log \| jonq --follow "..."` |
-| **Worker reuse**  | Reuse jq workers for repeated filters | `--watch`, `--stream`, Python loops |
-| **Path explorer** | Inspect nested JSON paths and types | `jonq data.json` (no query) |
-| **Interactive REPL** | Tab completion + history | `jonq -i data.json` |
-| **Watch mode**    | Re-run on file change | `jonq data.json "select *" --watch` |
-| **URL fetch**     | Query remote JSON | `jonq https://api.example.com/data "select id"` |
-| **Multi-file glob** | Query across files | `jonq 'logs/*.json' "select *"` |
-| **Auto stdin**    | Auto-detect piped input | `curl ... \| jonq "select id"` |
-| **Auto NDJSON**   | Auto-detect line-delimited JSON | No flag needed |
-| **Shell completions** | Bash/Zsh/Fish completions | `jonq --completions bash` |
-| **Explain mode**  | Show query breakdown + jq filter | `--explain` |
-| **Timing**        | Execution timing | `--time` |
-| **Fuzzy suggest** | Typo correction for fields | Suggests similar field names |
-| **Colorized output** | Syntax-highlighted JSON in terminal | Auto when TTY |
+- exact jq language control: use raw `jq`
+- Python expressions over JSON: use [`jello`](https://github.com/kellyjonbrazil/jello)
+- grep-friendly flattened assignment lines: use [`gron`](https://github.com/tomnomnom/gron)
+- joins, window functions, or relational analytics: use a database or analytics engine
+- production ETL, scheduling, or connectors: use an ETL system
 
----
+## Install
 
-## Why Jonq?
+jonq requires Python 3.9+ and the `jq` command-line tool.
 
-### Jonq vs raw jq
-
-| Task | Raw **jq** filter | **jonq** one-liner |
-|------|------------------|--------------------|
-| Select specific fields | `jq '.[]&#124;{name:.name,age:.age}'` | `jonq data.json "select name, age"` |
-| Filter rows | `jq '.[]&#124;select(.age > 30)&#124;{name,age}'` | `... "select name, age if age > 30"` |
-| Sort + limit | `jq 'sort_by(.age) &#124; reverse &#124; .[0:2]'` | `... "select name, age sort age desc 2"` |
-| Standalone limit | `jq '.[0:5]'` | `... "select * limit 5"` |
-| Distinct values | `jq '[.[].city] &#124; unique'` | `... "select distinct city"` |
-| IN filter | `jq '.[] &#124; select(.city=="NY" or .city=="LA")'` | `... "select * if city in ('NY', 'LA')"` |
-| NOT filter | `jq '.[] &#124; select((.age > 30) &#124; not)'` | `... "select * if not age > 30"` |
-| LIKE filter | `jq '.[] &#124; select(.name &#124; startswith("Al"))'` | `... "select * if name like 'Al%'"` |
-| Uppercase | `jq '.[] &#124; {name: (.name &#124; ascii_upcase)}'` | `... "select upper(name) as name"` |
-| Count items | `jq 'map(select(.age>25)) &#124; length'` | `... "select count(*) as over_25 if age > 25"` |
-| Count distinct | `jq '[.[].city] &#124; unique &#124; length'` | `... "select count(distinct city) as n"` |
-| Group & count | `jq 'group_by(.city) &#124; map({city:.[0].city,count:length})'` | `... "select city, count(*) as count group by city"` |
-| Group & HAVING | `jq 'group_by(.city) &#124; map(select(length>2)) &#124; ...'` | `... "select city, count(*) group by city having count > 2"` |
-| Field expression | `jq '.[] &#124; {name, age_plus: (.age + 10)}'` | `... "select name, age + 10 as age_plus"` |
-| CASE/WHEN | `jq '.[] &#124; if .age>30 then "senior" else "junior" end'` | `... "select case when age > 30 then 'senior' else 'junior' end as level"` |
-| COALESCE | `jq '.[] &#124; {d: (.nick // .name)}'` | `... "select coalesce(nickname, name) as display"` |
-| IS NULL | `jq '.[] &#124; select(.email != null)'` | `... "select * if email is not null"` |
-| String concat | `jq '.[] &#124; {f: (.first + " " + .last)}'` | `... "select first &#124;&#124; ' ' &#124;&#124; last as full"` |
-| Type cast | `jq '.[] &#124; {p: (.price &#124; tonumber)}'` | `... "select float(price) as p"` |
-| Date convert | `jq '.[] &#124; {d: (.ts &#124; todate)}'` | `... "select todate(ts) as d"` |
-
-**Take-away:** a single `jonq` string replaces many pipes and brackets while still producing pure jq under the hood.
-
----
-
-### Where jonq fits
-
-- Use **jonq** when the source of truth is still raw JSON and you need to inspect fields, paths, filters, or nested values quickly.
-- Use **raw jq** when you already know the exact jq filter you want and do not need the friendlier syntax.
-- Use **jello** when you want to process JSON with Python expressions from the CLI.
-- Use **gron** when you want to flatten JSON into grep-friendly assignment lines.
-
-**TL;DR:** jonq is the "understand and shape this JSON from the terminal" step, not a database or ETL layer.
-
----
-
-## Installation
-
-**Supported Platforms**: Linux, macOS, and Windows with WSL.
-
-### Prerequisites
-
-- Python 3.9+
-- `jq` command line tool installed (https://stedolan.github.io/jq/download/)
-
-### Setup
-
-**From PyPI**
 ```bash
 pip install jonq
 ```
 
-**From source**
+From source:
+
 ```bash
 git clone https://github.com/duriantaco/jonq.git
-cd jonq && pip install -e .
+cd jonq
+pip install -e .
 ```
 
-### Quick Start
+Check that `jq` is available:
 
 ```bash
-# Create a simple JSON file
-echo '[{"name":"Alice","age":30,"city":"New York"},{"name":"Bob","age":25,"city":"LA"}]' > data.json
+jq --version
+```
 
-# Select fields
-jonq data.json "select name, age if age > 25"
-# Output: [{"name":"Alice","age":30}]
+## Quick Start
 
-# Table output
-jonq data.json "select name, age, city" -t
+Create a sample file:
 
-# Pipe from stdin (no '-' needed)
-curl -s https://api.example.com/data | jonq "select id, name" -t
+```bash
+cat > users.json <<'JSON'
+[
+  {"id": 1, "name": "Alice", "age": 30, "city": "New York"},
+  {"id": 2, "name": "Bob", "age": 25, "city": "Los Angeles"},
+  {"id": 3, "name": "Charlie", "age": 35, "city": "Chicago"}
+]
+JSON
+```
 
-# Conditional expressions
-jonq data.json "select name, case when age > 28 then 'senior' else 'junior' end as level" -t
+Select fields:
 
-# Null handling
-jonq data.json "select coalesce(nickname, name) as display"
+```bash
+jonq users.json "select name, age"
+```
 
-# Type casting
-jonq data.json "select name, str(age) as age_str"
+Filter rows:
 
-# String concatenation
-jonq data.json "select name || ' (' || city || ')' as label"
+```bash
+jonq users.json "select name, age if age > 30"
+```
 
-# YAML output
-jonq data.json "select name, age" -f yaml
+Render a table:
 
-# See what jq jonq generates
-jonq data.json "select name, age if age > 25" --explain
+```bash
+jonq users.json "select name, city, age sort age desc" -t
+```
+
+Get unique values:
+
+```bash
+jonq users.json "select distinct city"
+```
+
+Aggregate:
+
+```bash
+jonq users.json "select count(*) as total, avg(age) as avg_age"
+```
+
+See what jq will run:
+
+```bash
+jonq users.json "select name if age > 30" --explain
 ```
 
 ## Query Syntax
 
-```
-select [distinct] <fields> [from <path>] [if <condition>] [group by <fields> [having <condition>]] [sort <field> [asc|desc]] [limit N]
-```
-
-Where:
-* `distinct` - Optional, returns unique rows
-* `<fields>` - Comma-separated: fields, aliases, `CASE/WHEN`, `coalesce()`, functions, aggregations, expressions
-* `from <path>` - Optional source path for nested data
-* `if <condition>` - Optional filter (supports `=`, `!=`, `>`, `<`, `>=`, `<=`, `and`, `or`, `not`, `in`, `like`, `between`, `contains`, `is null`, `is not null`)
-* `group by <fields>` - Optional grouping by one or more fields
-* `having <condition>` - Optional filter on grouped results
-* `sort <field> [asc|desc]` - Optional ordering
-* `limit N` - Optional result count limit
-
-## Examples
-
-Given this JSON (`simple.json`):
-
-```json
-[
-  { "id": 1, "name": "Alice",   "age": 30, "city": "New York"    },
-  { "id": 2, "name": "Bob",     "age": 25, "city": "Los Angeles" },
-  { "id": 3, "name": "Charlie", "age": 35, "city": "Chicago"     }
-]
+```text
+select [distinct] <fields>
+  [from <path>]
+  [if <condition>]
+  [group by <fields> [having <condition>]]
+  [sort <field> [asc|desc]]
+  [limit N]
 ```
 
-### Selection
-```bash
-jonq simple.json "select *"                    # all fields
-jonq simple.json "select name, age"            # specific fields
-jonq simple.json "select name as full_name"    # with alias
-```
-
-### DISTINCT
-```bash
-jonq simple.json "select distinct city"
-# [{"city":"Chicago"},{"city":"Los Angeles"},{"city":"New York"}]
-```
-
-### Filtering
-```bash
-jonq simple.json "select name, age if age > 30"
-jonq simple.json "select name if age > 25 and city = 'New York'"
-jonq simple.json "select name if age > 30 or city = 'Los Angeles'"
-jonq simple.json "select name if age between 25 and 30"
-```
-
-### IN Operator
-```bash
-jonq simple.json "select * if city in ('New York', 'Chicago')"
-# [{"id":1,"name":"Alice","age":30,"city":"New York"},{"id":3,"name":"Charlie","age":35,"city":"Chicago"}]
-```
-
-### NOT Operator
-```bash
-jonq simple.json "select * if not age > 30"
-# [{"id":1,"name":"Alice","age":30,"city":"New York"},{"id":2,"name":"Bob","age":25,"city":"Los Angeles"}]
-```
-
-### LIKE Operator
-```bash
-jonq simple.json "select * if name like 'Al%'"     # starts with "Al"
-jonq simple.json "select * if name like '%ice'"     # ends with "ice"
-jonq simple.json "select * if name like '%li%'"     # contains "li"
-```
-
-### Sorting and Limiting
-```bash
-jonq simple.json "select name, age sort age desc"
-jonq simple.json "select name, age sort age desc 2"   # sort + inline limit
-jonq simple.json "select * limit 2"                    # standalone limit
-```
-
-### Aggregation
-```bash
-jonq simple.json "select sum(age) as total_age"
-jonq simple.json "select avg(age) as average_age"
-jonq simple.json "select count(*) as total"
-jonq simple.json "select count(distinct city) as unique_cities"
-```
-
-### GROUP BY and HAVING
-```bash
-jonq simple.json "select city, count(*) as cnt group by city"
-jonq simple.json "select city, avg(age) as avg_age group by city"
-jonq simple.json "select city, count(*) as cnt group by city having cnt > 0"
-```
-
-### String Functions
-```bash
-jonq simple.json "select upper(name) as name_upper"
-# [{"name_upper":"ALICE"},{"name_upper":"BOB"},{"name_upper":"CHARLIE"}]
-
-jonq simple.json "select lower(city) as city_lower"
-jonq simple.json "select length(name) as name_len"
-```
-
-### Math Functions
-```bash
-jonq simple.json "select round(age) as rounded_age"
-jonq simple.json "select abs(age) as abs_age"
-jonq simple.json "select ceil(age) as ceil_age"
-jonq simple.json "select floor(age) as floor_age"
-```
-
-### Nested JSON
+Examples:
 
 ```bash
-# nested field access
-jonq nested.json "select name, profile.address.city"
-
-# from: select from nested arrays
-jonq complex.json "select name, type from products"
-
-# boolean logic with nested fields
-jonq nested.json "select name if profile.address.city = 'New York' or orders[0].price > 1000"
+jonq users.json "select *"
+jonq users.json "select name as full_name, age"
+jonq users.json "select name if city in ('New York', 'Chicago')"
+jonq users.json "select name if not age > 30"
+jonq users.json "select name if name like 'Al%'"
+jonq users.json "select name if age between 25 and 35"
+jonq users.json "select city, count(*) as count group by city"
+jonq users.json "select city, avg(age) as avg_age group by city having avg_age > 30"
+jonq users.json "select name, age sort age desc limit 2"
 ```
 
-### CASE/WHEN Expressions
+## Fields and Expressions
+
+Select nested fields with dot notation:
+
 ```bash
-jonq simple.json "select name, case when age > 30 then 'senior' when age > 25 then 'mid' else 'junior' end as level"
-# [{"name":"Alice","level":"mid"},{"name":"Bob","level":"junior"},{"name":"Charlie","level":"senior"}]
+jonq users.json "select profile.email, profile.address.city"
 ```
 
-### COALESCE
+Select from nested arrays with `from`:
+
 ```bash
-jonq data.json "select coalesce(nickname, name) as display_name"
-# Falls back to name when nickname is null
-
-# Works with nested functions
-jonq data.json "select coalesce(todate(timestamp), 'unknown') as date"
+jonq orders.json "select id, total from orders"
+jonq users.json "select order_id, price from [].orders if price > 100"
 ```
 
-### IS NULL / IS NOT NULL
+Use array indexes:
+
 ```bash
-jonq data.json "select name if email is not null"
-jonq data.json "select name if nickname is null"
+jonq users.json "select name, orders[0].item as first_order"
 ```
 
-### String Concatenation
+Use functions and expressions:
+
 ```bash
-# Using || (SQL standard)
-jonq simple.json "select name || ' from ' || city as label"
-
-# Using + (also works)
-jonq simple.json "select name + ' from ' + city as label"
+jonq users.json "select upper(name) as name, str(age) as age"
+jonq users.json "select name || ' (' || city || ')' as label"
+jonq users.json "select age * 2 + 3 as score"
+jonq users.json "select coalesce(nickname, name) as display"
+jonq users.json "select case when age > 30 then 'senior' else 'junior' end as segment"
 ```
 
-### Type Casting
-```bash
-jonq data.json "select int(price) as price"        # string → integer
-jonq data.json "select float(amount) as amount"     # string → float
-jonq data.json "select str(code) as code"           # number → string
-jonq data.json "select type(value) as t"            # get type name
-```
+Common functions:
 
-### Date/Time Functions
-```bash
-jonq data.json "select todate(timestamp) as date"   # epoch → ISO date
-jonq data.json "select date(created_at) as d"       # alias for todate
-```
-
-### Arithmetic Expressions
-```bash
-jonq simple.json "select name, age + 10 as age_plus_10"
-```
+| Category | Functions |
+|----------|-----------|
+| Strings | `upper`, `lower`, `length`, `trim`, `ltrim`, `rtrim` |
+| Math | `round`, `abs`, `ceil`, `floor` |
+| Casting | `int`, `float`, `str`, `string`, `type` |
+| Dates | `todate`, `fromdate`, `date`, `timestamp` |
+| JSON/arrays | `keys`, `values`, `tojson`, `fromjson`, `reverse`, `sort`, `unique`, `flatten` |
+| Nulls | `coalesce`, `is null`, `is not null` |
 
 ## Output Formats
 
-### Table Output
-```bash
-jonq simple.json "select name, age, city" -t
-# name    | age | city
-# --------|-----|-------------
-#  Alice   | 30  | New York
-#  Bob     | 25  | Los Angeles
-#  Charlie | 35  | Chicago
-```
-
-### CSV Output
-```bash
-jonq simple.json "select name, age" --format csv > output.csv
-```
-
-### JSONL Output
-```bash
-jonq simple.json "select name, age" --format jsonl > output.jsonl
-```
-
-### YAML Output
-```bash
-jonq simple.json "select name, age" --format yaml
-# - name: Alice
-#   age: 30
-# - name: Bob
-#   age: 25
-```
-
-### Python API
-
-```python
-from jonq import compile_query, query
-
-data = [
-    {"name": "Alice", "age": 30, "city": "New York"},
-    {"name": "Bob", "age": 25, "city": "LA"},
-]
-
-compiled = compile_query("select name, city if age > 26")
-result = query(data, compiled)
-print(result)
-```
-
-Output:
-
-```python
-[{"name": "Alice", "city": "New York"}]
-```
-
-If you want metadata such as the generated jq filter, use `execute(...)` instead of `query(...)`.
-
-Repeated identical filters reuse a live jq worker in long-lived Python processes, which reduces jq startup overhead in loops and services.
-
-## Streaming Mode
-
-For processing large root-array JSON files more efficiently:
+JSON is the default:
 
 ```bash
-jonq large.json "select name, age" --stream
+jonq users.json "select name, age"
 ```
 
-Chunk execution stays in memory and reuses the same jq worker for the generated filter instead of writing chunk temp files and starting a fresh jq subprocess for every chunk.
+Table:
 
-## Path Explorer
+```bash
+jonq users.json "select name, age, city" -t
+jonq users.json "select name, age, city" --format table
+```
 
-Run `jonq` with just a file (no query) to inspect nested JSON paths before writing a query:
+CSV:
+
+```bash
+jonq users.json "select name, age" --format csv > users.csv
+```
+
+JSONL:
+
+```bash
+jonq users.json "select name, age" --format jsonl > users.jsonl
+```
+
+YAML:
+
+```bash
+jonq users.json "select name, age" --format yaml
+```
+
+## Input Sources
+
+Local file:
+
+```bash
+jonq data.json "select id, name"
+```
+
+Piped stdin:
+
+```bash
+curl -s https://api.example.com/users | jonq "select id, name" -t
+cat data.json | jonq - "select id, name"
+```
+
+URL:
+
+```bash
+jonq https://api.example.com/users.json "select id, email"
+```
+
+Glob:
+
+```bash
+jonq 'logs/*.json' "select * if level = 'error'"
+```
+
+NDJSON file:
+
+```bash
+jonq app.ndjson "select level, message if level = 'error'"
+```
+
+Follow live NDJSON from stdin:
+
+```bash
+tail -f app.ndjson | jonq --follow "select level, message if level = 'error'" -t
+```
+
+## Inspect Before Querying
+
+Run jonq with no query to inspect paths, inferred types, sample values, and a suggested query:
 
 ```bash
 jonq data.json
 ```
 
-Output:
-```
+Example output:
+
+```text
 data.json  (array, sampled 3 items)
 
 Paths:
-  id             int               1
-  name           str               "Alice"
-  age            int               30
-  city           str               "New York"
-  orders[]       array[object]
-  orders[].id    int               1
-  orders[].item  str               "Laptop"
+  id    int  1
+  name  str  "Alice"
+  age   int  30
+  city  str  "New York"
 
 Sample:
-  { "id": 1, "name": "Alice", "age": 30, "city": "New York", "orders": [{ "id": 1, "item": "Laptop" }] }
+  {
+    "id": 1,
+    "name": "Alice",
+    "age": 30,
+    "city": "New York"
+  }
 
-Tip: jonq data.json "select name, orders[].item"
+Tip: jonq data.json "select id, name"
 ```
 
-## Interactive REPL
+## Streaming and Watch Modes
 
-Launch an interactive session with tab completion and persistent history:
+Streaming mode processes root-array JSON in chunks:
 
 ```bash
-jonq -i data.json
+jonq large.json "select id, name if active = true" --stream
 ```
 
-```
-jonq interactive mode — querying data.json
-Type a query, or 'quit' to exit. Tab completes field names.
-Example: select name, age if age > 30
+Streaming is for row-wise queries. It intentionally rejects queries that require global input state, including `group by`, `sort`, `distinct`, `limit`, `count`, `sum`, `avg`, `min`, `max`, and `count(distinct ...)`.
 
-jonq> select name, age
-[{"name":"Alice","age":30},{"name":"Bob","age":25}]
-jonq> select * if age > 28
-[{"id":1,"name":"Alice","age":30,"city":"New York"}]
-jonq> quit
-```
-
-Features:
-- **Tab completion** for field names and SQL keywords
-- **Persistent history** saved to `~/.jonq_history`
-- **Up/down arrow** to recall previous queries
-
-## Watch Mode
-
-Re-run a query automatically whenever the file changes:
+Watch mode reruns a query when a file changes:
 
 ```bash
 jonq data.json "select name, age" --watch
 ```
 
-Because watch mode reruns the same filter repeatedly inside one loop, jonq reuses a live jq worker to reduce refresh overhead.
-
-## Multiple Input Sources
-
-### URL Fetch
-```bash
-jonq https://api.example.com/users.json "select name, email"
-```
-
-### Multi-File Glob
-```bash
-jonq 'logs/*.json' "select * if level = 'error'"
-```
-
-### Stdin
-```bash
-# Auto-detected — no '-' needed
-curl -s https://api.example.com/data | jonq "select id, name"
-
-# Explicit stdin still works
-cat data.json | jonq - "select name, age"
-```
-
-## Follow Mode
-
-Stream NDJSON from stdin line-by-line, applying the query to each object as it arrives:
+Interactive mode provides history and field-aware completion:
 
 ```bash
-tail -f app.log | jonq --follow "select level, message if level = 'error'" -t
+jonq -i data.json
 ```
 
-Only matching lines are printed. Non-matching lines are silently skipped.
+## Python API
 
-## Auto-detect NDJSON
+Use `query(...)` when you want Python data back:
 
-jonq auto-detects NDJSON (newline-delimited JSON) files. No flag needed:
+```python
+from jonq import query
 
-```bash
-jonq data.ndjson "select name, age if age > 25"
+data = [
+    {"name": "Alice", "age": 30},
+    {"name": "Bob", "age": 25},
+]
+
+rows = query(data, "select name if age > 26")
+print(rows)
 ```
 
-You can still force it with `--ndjson` if needed. `--ndjson` cannot be combined with `--stream`.
+Use `execute(...)` when you want text output plus metadata:
 
-## Fuzzy Field Suggestions
+```python
+from jonq import execute
 
-When you mistype a field name, jonq suggests similar fields:
-
+result = execute(data, "select name, age", format="jsonl")
+print(result.text)
+print(result.compiled.jq_filter)
 ```
-$ jonq data.json "select nme, agge"
-Field(s) 'nme, agge' not found. Available fields: age, city, id, name. Did you mean: 'nme' -> name; 'agge' -> age?
+
+Compile once and reuse:
+
+```python
+from jonq import compile_query, query
+
+compiled = compile_query("select name if age > 25")
+print(query([{"name": "Alice", "age": 30}], compiled))
 ```
+
+Async helpers are also available: `query_async(...)` and `execute_async(...)`.
 
 ## CLI Options
 
 | Option | Description |
 |--------|-------------|
-| `--format, -f` | Output format: `json` (default), `jsonl`, `csv`, `table`, `yaml` |
+| `-f, --format {json,jsonl,csv,table,yaml}` | Output format |
 | `-t, --table` | Shorthand for `--format table` |
-| `--stream, -s` | Process row-wise root-array queries in memory-friendly chunks |
-| `--ndjson` | Force NDJSON mode (auto-detected by default) |
-| `--follow` | Stream NDJSON from stdin line-by-line |
-| `--limit, -n N` | Limit rows post-query |
-| `--out, -o PATH` | Write output to file |
-| `--jq` | Print generated jq filter and exit |
-| `--explain` | Show parsed query breakdown and generated jq filter |
-| `--time` | Print execution timing to stderr |
-| `--pretty, -p` | Pretty-print JSON output |
-| `--watch, -w` | Re-run query when file changes |
-| `--no-color` | Disable colorized output |
-| `--completions SHELL` | Print shell completion script (`bash`, `zsh`, `fish`) |
-| `--version` | Show the installed jonq version |
-| `-i <file>` | Interactive query mode (REPL) with tab completion |
-| `-h, --help` | Show help message |
+| `-s, --stream` | Chunk-safe streaming for root-array JSON |
+| `--ndjson` | Force NDJSON mode |
+| `--follow` | Process NDJSON from stdin line-by-line |
+| `-n, --limit N` | Limit rows after query execution |
+| `-o, --out PATH` | Write output to a file |
+| `--jq` | Print the generated jq filter and exit |
+| `--explain` | Show parsed query details and generated jq |
+| `--time` | Print parse/execute/format timing to stderr |
+| `-p, --pretty` | Pretty-print JSON output |
+| `-w, --watch` | Rerun when the input file changes |
+| `--no-color` | Disable terminal color |
+| `--completions {bash,zsh,fish}` | Print shell completions |
+| `--version` | Print version |
+| `-i FILE, --interactive FILE` | Start the REPL |
 
 ## Shell Completions
-
-Generate completion scripts for your shell:
 
 ```bash
 # Bash
@@ -577,48 +387,35 @@ eval "$(jonq --completions zsh)"
 jonq --completions fish > ~/.config/fish/completions/jonq.fish
 ```
 
-## Colorized Output
-
-When outputting to a terminal, jonq auto-pretty-prints and colorizes JSON. Pipe to a file or use `--no-color` to disable.
-
 ## Troubleshooting
 
-### Common Errors
+- **`jq` is not found**: Install jq and make sure it is on `PATH`.
 
-**Command 'jq' not found** - Make sure jq is installed and in your PATH. Install: https://stedolan.github.io/jq/download/
+- **No query was provided**: Run `jonq data.json` to inspect the file, or pass a query such as `jonq data.json "select *"`.
 
-**Invalid JSON in file** - Check your JSON file for syntax errors. Use a JSON validator.
+- **A field is missing or misspelled**: jonq validates top-level fields for normal file inputs and suggests close matches.
 
-**Syntax error in query** - Verify your query follows the correct syntax. Check field names and quotes.
+- **Streaming mode rejected a query**: Use non-streaming mode for global operations like aggregation, grouping, sorting, distinct, or limit.
 
-**Runtime jq error** - Errors like `Cannot iterate over string` or `Cannot iterate over null` are surfaced immediately. Adjust the field path or inspect the input with `jonq data.json`.
-
-**No results returned** - Verify your condition isn't filtering out all records. Check field name casing.
+- **The generated jq looks surprising**: Run the same command with `--explain` to see the parsed query and generated jq filter.
 
 ## Known Limitations
 
-* Performance: For very large JSON files (100MB+), processing may still be slow. `--stream` is more memory-friendly now, but jonq is still not an analytical engine.
-* Advanced jq Features: Some advanced jq features (recursive descent, custom filters) aren't exposed in the jonq syntax.
-* Custom Functions: User-defined functions aren't supported.
-* Joins: Cross-file joins are not supported — use a database for relational queries.
-* Window Functions: Not supported — use an analytical query engine for analytical queries.
+- jonq exposes a practical subset of jq, not the full jq language.
+- Streaming mode supports row-wise queries only.
+- Cross-file joins, window functions, and relational analytics are out of scope.
+- URL fetch is a convenience feature, not a full HTTP client.
+- Very large files can still be slow if the query requires full-input state.
 
-## Docs
+## Documentation
 
-Full documentation: https://jonq.readthedocs.io/en/latest/
-
-See also: [SYNTAX.md](SYNTAX.md) for the complete syntax reference.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+- Full docs: https://jonq.readthedocs.io/en/latest/
+- Syntax reference: [SYNTAX.md](SYNTAX.md)
+- Usage examples: [USAGE.md](USAGE.md)
+- Contributing: [CONTRIBUTIONS.md](CONTRIBUTIONS.md)
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+jonq is licensed under the MIT License. See [License](License).
 
-### Misc.
-
-- **jq**: This tool depends on the [jq command-line JSON processor](https://stedolan.github.io/jq/), which is licensed under the MIT License. jq is copyright (C) 2012 Stephen Dolan.
-
-The jq tool itself is not included in this package - users need to install it separately.
+jonq depends on the [jq command-line JSON processor](https://stedolan.github.io/jq/). jq is licensed under the MIT License and is not bundled with jonq.

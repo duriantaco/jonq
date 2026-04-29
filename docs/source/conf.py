@@ -4,7 +4,7 @@ import os
 project = 'jonq'
 copyright = f'{datetime.datetime.now().year}, oha'
 author = 'oha'
-release = '0.2.0'
+release = '0.3.0'
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 
@@ -12,7 +12,6 @@ all_extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',
-    'sphinx.ext.intersphinx',
     
     'sphinx_copybutton',
     'sphinx_design',
@@ -20,6 +19,9 @@ all_extensions = [
     'sphinxcontrib.mermaid',
     'myst_parser',
 ]
+
+if on_rtd or os.environ.get('JONQ_ENABLE_INTERSPHINX') == '1':
+    all_extensions.append('sphinx.ext.intersphinx')
 
 extensions = []
 
@@ -30,9 +32,11 @@ for extension in all_extensions:
     except ImportError:
         print(f"Warning: Extension {extension} not available, skipping.")
 
-intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
-}
+intersphinx_mapping = (
+    {'python': ('https://docs.python.org/3', None)}
+    if 'sphinx.ext.intersphinx' in extensions
+    else {}
+)
 
 myst_enable_extensions = [
     "colon_fence", 
@@ -76,7 +80,7 @@ html_theme_options = {
     },
     
     "navigation_with_keys": True,
-    "announcement": "jonq v0.2.0 is now available! Check the installation guide for details.",
+    "announcement": "jonq v0.3.0 is now available. Check the usage guide for JSONL, streaming, and Python API examples.",
 }
 
 html_static_path = ['_static']

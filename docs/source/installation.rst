@@ -63,3 +63,9 @@ If you want to contribute to the development of jonq, you can install from sourc
    git clone https://github.com/duriantaco/jonq.git
    cd jonq
    pip install -e .
+
+To build the documentation locally:
+
+.. code-block:: bash
+
+   pip install -r docs/requirements.txt

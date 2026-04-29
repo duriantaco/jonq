@@ -4,7 +4,7 @@ Usage
 Overview
 ---------
 
-``jonq`` is a command-line tool for exploring, extracting, and reshaping JSON with readable jq-powered queries. It keeps familiar ``select`` / ``if`` syntax for common cases, but the goal is still JSON-native terminal workflows rather than database-style analytics.
+``jonq`` is a command-line tool for exploring, extracting, and reshaping JSON with readable jq-powered queries. It is designed for JSON-native terminal workflows: inspect a payload, select the fields you need, filter rows, reshape nested arrays, and hand the result to the next shell command or script.
 
 Basic Command Structure
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -77,7 +77,7 @@ The ``jonq`` query syntax mirrors SQL but is tailored for JSON. Here's the full 
 
 - **``<fields>``**: Fields to select (e.g., ``name``, ``age``), including aliases, expressions, or aggregations.
 - **``distinct``**: Optional keyword to return only unique rows.
-- **``from <path>``**: Optional path to query a specific part of the JSON (e.g., ``from products``).
+- **``from <path>``**: Optional path to query a specific part of the JSON (for example, ``from products`` or ``from [].orders``).
 - **``if <condition>``**: Optional filter (e.g., ``age > 30``).
 - **``group by <fields>``**: Optional grouping (e.g., ``group by city``).
 - **``having <condition>``**: Optional filter on grouped results (e.g., ``having count > 2``).
@@ -200,9 +200,9 @@ Convert between types:
 
 .. code-block:: bash
 
-   jonq data.json "select int(price) as price"        # string → integer
-   jonq data.json "select float(amount) as amount"     # string → float
-   jonq data.json "select str(code) as code"           # number → string
+   jonq data.json "select int(price) as price"        # string -> integer
+   jonq data.json "select float(amount) as amount"     # string -> float
+   jonq data.json "select str(code) as code"           # number -> string
    jonq data.json "select type(value) as t"            # get type name
 
 Date/Time Functions
@@ -212,9 +212,9 @@ Convert between epoch timestamps and ISO dates:
 
 .. code-block:: bash
 
-   jonq data.json "select todate(timestamp) as date"   # epoch → ISO date
+   jonq data.json "select todate(timestamp) as date"   # epoch -> ISO date
    jonq data.json "select date(created_at) as d"       # alias for todate
-   jonq data.json "select fromdate(iso_date) as epoch"  # ISO → epoch
+   jonq data.json "select fromdate(iso_date) as epoch"  # ISO -> epoch
 
 Null-safe: returns ``null`` instead of crashing on null input.
 
@@ -268,7 +268,7 @@ The ``FROM`` clause lets you target a specific part of the JSON structure, such 
 
   .. code-block:: bash
 
-     jonq data.json "select type, name from products"
+     jonq catalog.json "select type, name from products"
 
   Queries the ``products`` array within the JSON.
 
@@ -553,7 +553,7 @@ Launch an interactive session with tab completion and persistent history:
 
 .. code-block:: text
 
-   jonq interactive mode — querying data.json
+   jonq interactive mode - querying data.json
    Type a query, or 'quit' to exit. Tab completes field names.
 
    jonq> select name, age
@@ -660,6 +660,7 @@ For big JSON files, use streaming mode:
 
 - **Requirement:** The JSON must be an array at the root level.
 - **Benefit:** Processes data in chunks in memory, avoiding temp chunk files in the main execution path.
+- **Scope:** Streaming supports row-wise queries only. It rejects aggregations, ``group by``, ``sort``, ``distinct``, and ``limit`` because those need the full input.
 
 Tips and Tricks
 ----------------
@@ -677,7 +678,7 @@ Optimizing Performance
 
 - **Use FROM:** Narrow down the data with ``from`` to avoid processing unnecessary parts.
 - **Limit Early:** Apply ``limit`` or strict ``if`` conditions to reduce output size.
-- **Stream Large Files:** Use ``--stream`` for large root-array JSON files when you want lower-overhead chunk processing.
+- **Stream Row-wise Queries:** Use ``--stream`` for large root-array JSON files when the query can be evaluated one row at a time.
 
 Working with Arrays
 ~~~~~~~~~~~~~~~~~~~~
@@ -696,7 +697,8 @@ Known Limitations
 ------------------
 
 - **Performance with Very Large Files**: Processing JSON files exceeding 100MB may still be slow, even with streaming.
+- **Streaming Scope**: ``--stream`` is intentionally limited to row-wise queries; use normal mode for global operations.
 - **Advanced jq Features**: Some complex ``jq`` functionalities (e.g., recursive descent or custom filters) are not exposed through ``jonq``'s readable query syntax.
 - **Joins**: ``jonq`` does not support joining data across multiple JSON files.
 - **Custom Functions**: Users cannot define custom functions within queries.
-- **Window Functions**: Not supported — use an analytical query engine for analytical queries.
+- **Window Functions**: Not supported; use an analytical query engine for analytical queries.

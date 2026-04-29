@@ -15,6 +15,21 @@ def test_count_star_respects_filter():
     assert result == {"over_25": 2}
 
 
+def test_group_by_respects_filter_before_grouping():
+    data = [
+        {"city": "New York", "age": 30},
+        {"city": "New York", "age": 20},
+        {"city": "Chicago", "age": 35},
+    ]
+
+    result = query(data, "select city, count(*) as count if age > 25 group by city")
+
+    assert result == [
+        {"city": "Chicago", "count": 1},
+        {"city": "New York", "count": 1},
+    ]
+
+
 def test_count_star_respects_from_path():
     data = {"products": [{"name": "A"}, {"name": "B"}]}
 

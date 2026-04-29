@@ -20,7 +20,15 @@ Setting Up Development Environment
 
       python -m venv venv
       source venv/bin/activate  # On Windows: venv\Scripts\activate
-      pip install -e ".[dev]"
+      python -m pip install --upgrade pip
+      pip install -e .
+      pip install pytest pytest-asyncio
+
+   To build the documentation locally, also install the docs requirements:
+
+   .. code-block:: bash
+
+      pip install -r docs/requirements.txt
 
 Running Tests
 --------------
@@ -31,15 +39,18 @@ jonq uses pytest for testing. To run tests:
 
    pytest
 
+Run the full test suite before opening a pull request. If you change only
+documentation, build the Sphinx docs as well.
+
 Manual Testing
 ---------------
 
-You can also use the shell scripts in the ``jonq/json_test_files`` directory to run manual tests:
+You can also use the shell scripts in the ``tests`` directory to run manual checks:
 
 .. code-block:: bash
 
-   bash jonq/json_test_files/jonq_manual_simple_test.sh
-   bash jonq/json_test_files/jonq_manual_nested_test.sh
+   bash tests/test_simple.sh
+   bash tests/test_nested.sh
 
 Contributing Code
 ------------------
@@ -48,7 +59,7 @@ Contributing Code
 
    .. code-block:: bash
 
-      git checkout -b feature-name
+      git switch -c feature-name
 
 2. Make your changes and add tests for new features
 3. Run the test suite to make sure everything passes
@@ -85,7 +96,7 @@ If you're adding new features, please update the documentation as well. jonq use
       cd docs
       make html
 
-   The documentation will be built in ``docs/_build/html``.
+   The documentation will be built in ``docs/build/html``.
 
 Reporting Issues
 -----------------

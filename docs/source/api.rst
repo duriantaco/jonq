@@ -18,7 +18,11 @@ Execute a query and return parsed Python data by default.
 - **Parameters:**
   - ``source``: Python object, raw JSON string, or file path
   - ``query`` (str or ``CompiledQuery``)
-- **Returns:** Parsed Python data, or raw text when ``format="json"``, ``format="jsonl"``, or ``format="csv"``
+  - ``format``: ``"python"`` (default), ``"json"``, ``"jsonl"``, or ``"csv"``. The Python API does not render table or YAML output.
+  - ``streaming``: ``True`` for row-wise root-array file queries
+  - ``limit``: optional post-query limit
+  - ``validate``: validate field names against file input when possible
+- **Returns:** Parsed Python data by default, or raw text for ``json``, ``jsonl``, and ``csv`` formats
 
 **execute(source, query, ...)**
 
@@ -27,11 +31,20 @@ Execute a query and return a structured ``QueryResult`` object.
 - **Parameters:**
   - ``source``: Python object, raw JSON string, or file path
   - ``query`` (str or ``CompiledQuery``)
+  - ``format``: ``"json"`` (default), ``"jsonl"``, or ``"csv"``. The Python API does not render table or YAML output.
+  - ``streaming``: ``True`` for row-wise root-array file queries
+  - ``limit``: optional post-query limit
+  - ``validate``: validate field names against file input when possible
 - **Returns:** ``QueryResult`` with ``text``, ``data``, and ``compiled`` metadata
 
 **query_async(...) / execute_async(...)**
 
 Async variants of the high-level execution helpers.
+
+.. note::
+
+   Streaming mode requires a filesystem path and supports row-wise queries only.
+   It rejects aggregations, ``group by``, ``sort``, ``distinct``, and ``limit`` because those need full-input state.
 
 Main Module (jonq.main)
 -----------------------
@@ -44,7 +57,7 @@ The entry point for the jonq command-line tool.
 
 .. code-block:: bash
 
-   jonq <path/to/json_file> "<query>" [--format json|jsonl|csv|table|yaml] [--stream] [--watch] [--jq] [--pretty] [--no-color] [--ndjson] [--limit N] [--out PATH] [--version]
+   jonq <source> "<query>" [--format json|jsonl|csv|table|yaml] [--stream] [--watch] [--jq] [--explain] [--pretty] [--no-color] [--ndjson] [--limit N] [--out PATH] [--version]
 
 Query Parser (jonq.query_parser)
 --------------------------------
@@ -89,7 +102,7 @@ Executor (jonq.executor)
 
 **run_jq(json_file, jq_filter)**
 
-Executes a jq filter against a JSON file (synchronous).
+Executes a jq filter against a JSON file, or executes a filter against raw JSON text when called as ``run_jq(jq_filter, json_text)``.
 
 - **Parameters:**
   - ``json_file`` (str): Path to JSON file
@@ -99,7 +112,7 @@ Executes a jq filter against a JSON file (synchronous).
 
 **run_jq_async(json_file, jq_filter)**
 
-Executes a jq filter against a JSON file (async).
+Async variant of ``run_jq``.
 
 - **Parameters:**
   - ``json_file`` (str): Path to JSON file

@@ -5,6 +5,10 @@ The general form of a jonq query is:
 select [distinct] <fields> [from <path>] [if <condition>] [group by <fields> [having <condition>]] [sort <field> [asc|desc]] [limit N]
 ```
 
+jonq query syntax is for JSON extraction and reshaping. CLI behavior such as
+output formats, streaming, watch mode, and shell completions is configured with
+command-line flags rather than inside the query string.
+
 ## SELECT Statement
 Every jonq query must begin with select, followed by one or more fields to retrieve.
 
@@ -42,6 +46,14 @@ select name, profile.age, profile.address.city
 Use square brackets to access array elements:
 ```bash
 select name, orders[0].item, scores[1]
+```
+
+#### Nested Arrays with FROM
+Use `from <path>` when each output row should come from a nested array:
+```bash
+select order_id, item, price from [].orders
+select order_id, item, price from [].orders if price > 800
+select type, name from products
 ```
 
 #### Fields with Special Characters
@@ -179,28 +191,28 @@ select count(distinct status) as status_count
 Calculate the sum of numeric values:
 ```bash
 select sum(age) as total_age
-select sum(orders.price) as total_sales
+select sum(price) as total_sales from [].orders
 ```
 
 ### avg
 Calculate the average of numeric values:
 ```bash
 select avg(age) as average_age
-select avg(orders.price) as average_price
+select avg(price) as average_price from [].orders
 ```
 
 ### max
 Find the maximum value:
 ```bash
 select max(age) as oldest
-select max(orders.price) as highest_price
+select max(price) as highest_price from [].orders
 ```
 
 ### min
 Find the minimum value:
 ```bash
 select min(age) as youngest
-select min(orders.price) as lowest_price
+select min(price) as lowest_price from [].orders
 ```
 
 ## String Functions
@@ -325,8 +337,8 @@ select type(value) as val_type
 
 | Function | Description | jq equivalent |
 |----------|-------------|---------------|
-| `todate(x)` / `date(x)` | Epoch → ISO 8601 | `todate` |
-| `fromdate(x)` / `timestamp(x)` | ISO 8601 → epoch | `fromdate` |
+| `todate(x)` / `date(x)` | Epoch -> ISO 8601 | `todate` |
+| `fromdate(x)` / `timestamp(x)` | ISO 8601 -> epoch | `fromdate` |
 
 ```bash
 select todate(created_at) as date
@@ -343,20 +355,20 @@ Null-safe: returns `null` instead of crashing on null input.
 | `values(x)` | Object values |
 | `trim(x)` | Strip leading/trailing spaces |
 | `ltrim(x)` / `rtrim(x)` | Strip left/right spaces |
-| `tojson(x)` | Value → JSON string |
-| `fromjson(x)` | JSON string → value |
+| `tojson(x)` | Value -> JSON string |
+| `fromjson(x)` | JSON string -> value |
 | `reverse(x)` | Reverse array |
 | `sort(x)` | Sort array |
 | `unique(x)` | Unique array values |
 | `flatten(x)` | Flatten nested arrays |
-| `to_entries(x)` | Object → `[{key, value}]` |
-| `from_entries(x)` | `[{key, value}]` → object |
+| `to_entries(x)` | Object -> `[{key, value}]` |
+| `from_entries(x)` | `[{key, value}]` -> object |
 
 ## Arithmetic Expressions
 jonq supports basic arithmetic expressions:
 ```bash
 select name, age + 10 as age_plus_10
-select name, max(orders.price) - min(orders.price) as price_range
+select name, max(orders[].price) - min(orders[].price) as price_range
 ```
 
 ## Complex Query Examples
@@ -373,12 +385,12 @@ select profile.address.city, count(*) as user_count, avg(profile.age) as avg_age
 
 ### Aggregation with Filtering
 ```bash
-select sum(orders.price) as total_sales if orders.price > 100
+select sum(price) as total_sales from [].orders if price > 100
 ```
 
 ### Combining Multiple Features
 ```bash
-select name, profile.age, count(orders) as order_count if profile.age > 25 group by profile.address.city sort order_count desc 5
+select profile.address.city, count(*) as user_count, avg(profile.age) as avg_age if profile.age > 25 group by profile.address.city sort user_count desc 5
 ```
 
 ### Quoted String Values
@@ -400,3 +412,10 @@ jonq automatically handles null values in JSON input:
 ```bash
 select name, age if age is not null
 ```
+
+## Streaming Compatibility
+
+The `--stream` CLI flag supports row-wise queries over root-array JSON. It is
+compatible with field selection, expressions, and `if` filters. It rejects
+aggregations, `group by`, `sort`, `distinct`, and `limit` because those require
+global input state.

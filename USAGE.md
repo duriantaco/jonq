@@ -63,6 +63,7 @@ jonq users.json "select name as full_name, age as years"
 
 ```bash
 jonq users.json "select name, age if age > 30"
+jonq users.json "select name, age where age > 30"
 jonq users.json "select name if city = 'New York'"
 jonq users.json "select name if city in ('New York', 'Chicago')"
 jonq users.json "select name if not age > 30"
@@ -143,6 +144,7 @@ jonq users.json "select name, age" --format yaml   # YAML
 ```bash
 jonq data.json "select id, name"
 cat data.json | jonq - "select id, name"
+cat data.json | jonq "select id, name where active = true"
 curl -s https://api.example.com/users | jonq "select id, name"
 jonq 'logs/*.json' "select * if level = 'error'"
 jonq app.ndjson "select level, message if level = 'error'"

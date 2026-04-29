@@ -235,7 +235,7 @@ def validate_query_against_schema(json_file: str, query: str) -> str | None:
             return None
 
         m = re.search(
-            r"\bselect\s+(.*?)(?:\s+(?:from|if|group|order|sort|limit)\b|$)",
+            r"\bselect\s+(.*?)(?:\s+(?:from|if|where|group|order|sort|limit)\b|$)",
             query,
             flags=re.IGNORECASE | re.DOTALL,
         )

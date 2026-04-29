@@ -1,545 +1,184 @@
-# USAGE GUIDE
+# jonq Usage Guide
 
-## simple.json
+This file is a compact, copyable guide. The full documentation lives in
+`docs/source/` and at https://jonq.readthedocs.io.
 
-```json
+## Sample Data
+
+Most examples below use this file:
+
+```bash
+cat > users.json <<'JSON'
 [
   {"id": 1, "name": "Alice", "age": 30, "city": "New York"},
   {"id": 2, "name": "Bob", "age": 25, "city": "Los Angeles"},
   {"id": 3, "name": "Charlie", "age": 35, "city": "Chicago"}
 ]
+JSON
 ```
-1. Basic Selection
 
-### Select all fields:
+Nested examples use:
 
-Input: `jonq json_test_files/simple.json "select *"`
-
-```json
+```bash
+cat > nested.json <<'JSON'
 [
   {
     "id": 1,
     "name": "Alice",
-    "age": 30,
-    "city": "New York"
-  },
-  {
-    "id": 2,
-    "name": "Bob",
-    "age": 25,
-    "city": "Los Angeles"
-  },
-  {
-    "id": 3,
-    "name": "Charlie",
-    "age": 35,
-    "city": "Chicago"
-  }
-]
-```
-
-### Select specific fields:
-
-Input: `jonq json_test_files/simple.json "select name, age"`
-
-```json
-[
-    {
-    "name": "Alice",
-    "age": 30
-  },
-  {
-    "name": "Bob",
-    "age": 25
-  },
-  {
-    "name": "Charlie",
-    "age": 35
-  }
-]
-```
-2. Filtering with Conditions
-
-### Basic filtering:
-
-Input: `jonq json_test_files/simple.json "select name, age if age > 30"`
-
-```json
-[{
-    "name": "Charlie",
-    "age": 35
-  }
-]
-```
-
-3. Sorting and Limiting
-
-### Sort descending with limit:
-
-Input: `jonq json_test_files/simple.json "select name, age sort age desc 2"`
-
-```json
-[
-{
-    "name": "Charlie",
-    "age": 35
-  },
-  {
-    "name": "Alice",
-    "age": 30
-  }
-]
-```
-
-4. Aggregation Functions
-
-### Sum: 
-
-Input: `jonq json_test_files/simple.json "select sum(age) as total_age"`
-
-```json
-{
-  "total_age": 90
-}
-```
-
-### Average:
-
-Input: `jonq json_test_files/simple.json "select avg(age) as total_age"`
-
-```json
-{
-  "total_age": 30
-}
-```
-
-### Count:
-
-Input: `jonq json_test_files/simple.json "select count(age) as total_age"`
-
-```json
-{
-  "total_age": 3
-}
-```
-
-### Min/Max:
-
-Input: `jonq simple.json "select min(age) as youngest, max(age) as oldest"`
-
-```json
-{
-  "youngest": 25,
-  "oldest": 35
-}
-```
-
-5. Grouping and Having
-
-### Group by single field:
-
-Input: `jonq simple.json "select city, count(*) as count group by city"`
-
-```json
-[
-  {
-    "city": "Chicago",
-    "count": 1
-  },
-  {
-    "city": "Los Angeles",
-    "count": 1
-  },
-  {
-    "city": "New York",
-    "count": 1
-  }
-]
-```
-
-### Group by with aggregation:
-
-Input: `jonq simple.json "select city, avg(age) as avg_age group by city"`
-
-```json
-[
-  {
-    "city": "Chicago",
-    "avg_age": 35
-  },
-  {
-    "city": "Los Angeles",
-    "avg_age": 25
-  },
-  {
-    "city": "New York",
-    "avg_age": 30
-  }
-]
-```
-
-### Group by with HAVING clause:
-
-Input: `jonq simple.json "select city, count(*) as count group by city having count >= 1"`
-
-```json
-[
-  {
-    "city": "Chicago",
-    "count": 1
-  },
-  {
-    "city": "Los Angeles",
-    "count": 1
-  },
-  {
-    "city": "New York",
-    "count": 1
-  }
-]
-```
-
-=====================================================
-
-## nested.json
-
-```json
-[
-  {
-    "id": 1, "name": "Alice",
-    "profile": {
-      "age": 30,
-      "address": {"city": "New York", "zip": "10001"}
-    },
+    "profile": {"age": 30, "address": {"city": "New York"}},
     "orders": [
       {"order_id": 101, "item": "Laptop", "price": 1200},
       {"order_id": 102, "item": "Phone", "price": 800}
     ]
   },
   {
-    "id": 2, "name": "Bob",
-    "profile": {
-      "age": 25,
-      "address": {"city": "Los Angeles", "zip": "90001"}
-    },
+    "id": 2,
+    "name": "Bob",
+    "profile": {"age": 25, "address": {"city": "Los Angeles"}},
     "orders": [
       {"order_id": 103, "item": "Tablet", "price": 500}
     ]
   }
 ]
+JSON
 ```
 
-1. Basic Selection
+## Inspect JSON First
 
-### Access nested fields:
+Run jonq with no query to see paths, types, sample values, and a suggested query:
 
-Input: `jonq json_test_files/nested.json "select name, profile.age"` 
-
-```json
-[
-    {
-    "name": "Alice",
-    "age": 30
-  },
-  {
-    "name": "Bob",
-    "age": 25
-  }
-]
+```bash
+jonq users.json
 ```
 
-### Access deeply nested fields:
+## Select Fields
 
-Input: `jonq json_test_files/nested.json "select name, profile.address.city"` 
-
-```json
-[
-{
-    "name": "Alice",
-    "city": "New York"
-  },
-  {
-    "name": "Bob",
-    "city": "Los Angeles"
-  }
-]
+```bash
+jonq users.json "select *"
+jonq users.json "select name, age"
+jonq users.json "select name as full_name, age as years"
 ```
 
-2. Array Operations
+## Filter Rows
 
-### Count array items:
-
-Input: `jonq json_test_files/nested.json "select name, count(orders) as order_count"`
-
-```json
-[
-  {
-    "name": "Alice",
-    "order_count": 2
-  },
-  {
-    "name": "Bob",
-    "order_count": 1
-  }
-]
+```bash
+jonq users.json "select name, age if age > 30"
+jonq users.json "select name if city = 'New York'"
+jonq users.json "select name if city in ('New York', 'Chicago')"
+jonq users.json "select name if not age > 30"
+jonq users.json "select name if name like 'Al%'"
+jonq users.json "select name if age between 25 and 35"
 ```
 
-### Access array elements:
+## Sort, Limit, and Distinct
 
-Input: `jonq nested.json "select name, orders[0].item as first_item"`
-
-```json
-[
-  {
-    "name": "Alice",
-    "first_item": "Laptop"
-  },
-  {
-    "name": "Bob",
-    "first_item": "Tablet"
-  }
-]
+```bash
+jonq users.json "select name, age sort age desc"
+jonq users.json "select name, age sort age desc limit 2"
+jonq users.json "select * limit 2"
+jonq users.json "select distinct city"
 ```
 
-### Filter by array properties:
+## Aggregate and Group
 
-Input: `jonq nested.json "select name if orders[0].price > 1000"`
-
-```json
-[
-  {
-    "name": "Alice"
-  }
-]
+```bash
+jonq users.json "select count(*) as total"
+jonq users.json "select sum(age) as total_age"
+jonq users.json "select avg(age) as avg_age"
+jonq users.json "select count(distinct city) as unique_cities"
+jonq users.json "select city, count(*) as count group by city"
+jonq users.json "select city, avg(age) as avg_age group by city having avg_age > 30"
 ```
 
-3. Grouping and Having
+## Expressions and Functions
 
-### Group by with nested fields:
-
-Input: `jonq nested.json "select profile.address.city, avg(profile.age) as avg_age group by profile.address.city"`
-
-```json
-[
-  {
-    "city": "Los Angeles",
-    "avg_age": 25
-  },
-  {
-    "city": "New York",
-    "avg_age": 30
-  }
-]
+```bash
+jonq users.json "select upper(name) as name"
+jonq users.json "select name || ' from ' || city as label"
+jonq users.json "select age * 2 + 3 as score"
+jonq users.json "select str(age) as age"
+jonq users.json "select case when age > 30 then 'senior' else 'junior' end as segment"
+jonq users.json "select coalesce(nickname, name) as display"
 ```
 
-### Group by with HAVING on aggregated value:
+## Nested Objects and Arrays
 
-Input: `jonq nested.json "select profile.address.city, avg(profile.age) as avg_age group by profile.address.city having avg_age > 25"`
+Nested fields:
 
-```json
-[
-  {
-    "city": "New York",
-    "avg_age": 30
-  }
-]
+```bash
+jonq nested.json "select name, profile.age, profile.address.city"
 ```
 
-### Using FROM clause to query nested arrays:
+Array indexes:
 
-Input: `jonq nested.json "select order_id, item, price from [].orders"`
-
-```json
-[
-  {
-    "order_id": 101,
-    "item": "Laptop",
-    "price": 1200
-  },
-  {
-    "order_id": 102,
-    "item": "Phone",
-    "price": 800
-  },
-  {
-    "order_id": 103,
-    "item": "Tablet",
-    "price": 500
-  }
-]
+```bash
+jonq nested.json "select name, orders[0].item as first_order"
 ```
 
-### Filtering nested arrays with FROM:
+Query array elements with `from`:
 
-Input: `jonq nested.json "select order_id, item, price from [].orders if price > 800"`
-
-```json
-[
-  {
-    "order_id": 101,
-    "item": "Laptop",
-    "price": 1200
-  }
-]
+```bash
+jonq nested.json "select order_id, item, price from [].orders"
+jonq nested.json "select order_id, item, price from [].orders if price > 800"
 ```
 
-=====================================================
+Aggregations inside each row:
 
-## complex.json
-
-```json
-{
-    "company": {
-      "name": "TechCorp Global",
-      "founded": 2005,
-      "headquarters": {
-        "address": "123 Innovation Way",
-        "city": "San Francisco",
-        "country": "USA",
-        "coordinates": {
-          "latitude": 37.7749,
-          "longitude": -122.4194
-        }
-      },
-      "subsidiaries": [
-        {
-          "name": "TechCorp Asia",
-          "founded": 2010,
-          "headquarters": {
-            "city": "Singapore",
-            "country": "Singapore"
-          },
-          "employees": 250,
-          "financials": {
-            "revenue": 42000000,
-            "profit": 8500000
-          }
-        },
-        {
-          "name": "TechCorp Europe",
-          "founded": 2008,
-          "headquarters": {
-            "city": "Berlin",
-            "country": "Germany"
-          },
-          "employees": 300,
-          "financials": {
-            "revenue": 58000000,
-            "profit": 12000000
-          }
-        }
-      ]
-    },
-    "products": [
-      {
-        "id": "P001",
-        "name": "Enterprise Suite",
-        "type": "Software",
-        "launched": 2012,
-        "versions": [
-          {
-            "version": "1.0",
-            "released": "2012-05-15",
-            "pricing": {
-              "monthly": 199.99,
-              "yearly": 1999.99
-            }
-          },
-          {
-            "version": "2.0",
-            "released": "2015-06-30",
-            "pricing": {
-              "monthly": 299.99,
-              "yearly": 2999.99
-            }
-          }
-        ],
-        "customers": [
-          {"id": "C001", "name": "Acme Corp", "industry": "Manufacturing"},
-          {"id": "C002", "name": "Globex", "industry": "Finance"}
-        ]
-      },
-      {
-        "id": "P002",
-        "name": "Security Shield",
-        "type": "Software",
-        "launched": 2015,
-        "versions": [
-          {
-            "version": "1.0",
-            "pricing": {
-              "monthly": 149.99,
-              "yearly": 1499.99
-            }
-          }
-        ],
-        "customers": [
-          {"id": "C001", "name": "Acme Corp", "industry": "Manufacturing"},
-          {"id": "C003", "name": "Initech", "industry": "Technology"}
-        ]
-      }
-    ]
-  }
+```bash
+jonq nested.json "select name, count(orders) as order_count"
 ```
 
-1. Selection
+## Output Formats
 
-### Access multiple levels of nesting:
-
-Input: `jonq complex.json "select company.name, company.headquarters.city"`
-
-```json
-[
-  {
-    "name": "TechCorp Global",
-    "city": "San Francisco"
-  }
-]
+```bash
+jonq users.json "select name, age"                 # JSON
+jonq users.json "select name, age" -t              # table
+jonq users.json "select name, age" --format csv    # CSV
+jonq users.json "select name, age" --format jsonl  # JSONL
+jonq users.json "select name, age" --format yaml   # YAML
 ```
 
-Input: `jonq complex.json "select name, founded from company.subsidiaries[] if founded > 2008"`
+## Input Sources
 
-```json
-[
-  {
-    "name": "TechCorp Asia",
-    "founded": 2010
-  }
-]
+```bash
+jonq data.json "select id, name"
+cat data.json | jonq - "select id, name"
+curl -s https://api.example.com/users | jonq "select id, name"
+jonq 'logs/*.json' "select * if level = 'error'"
+jonq app.ndjson "select level, message if level = 'error'"
+tail -f app.ndjson | jonq --follow "select level, message if level = 'error'" -t
 ```
 
-### Combine aggregation of nested arrays:
+## Streaming
 
-Input: `jonq complex.json "select avg(products[].versions[].pricing.monthly) as avg_price`
+Streaming mode is for row-wise queries over root-array JSON:
 
-```json
-{
-  "avg_price": 216.65666666666667
-}
+```bash
+jonq large.json "select id, name if active = true" --stream
 ```
 
-Input: `jonq complex.json "select sum(company.subsidiaries[].financials.profit) as total_profit"`
+It rejects global operations such as aggregation, grouping, sorting, distinct, and limit because those require the full input.
 
-```json
-{
-  "total_profit": 20500000
-}
+## Debugging Queries
+
+```bash
+jonq users.json "select name if age > 30" --jq
+jonq users.json "select name if age > 30" --explain
+jonq users.json "select name if age > 30" --time
 ```
 
-### Complex queries: 
+## Python API
 
-Input: `jonq complex.json "select name, avg(versions[].pricing.monthly) as avg_monthly_price from products[]"`
+```python
+from jonq import query, execute, compile_query
 
-```json
-[
-  {
-    "name": "Enterprise Suite",
-    "avg_monthly_price": 249.99
-  },
-  {
-    "name": "Security Shield",
-    "avg_monthly_price": 149.99
-  }
-]
+data = [{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]
+
+rows = query(data, "select name if age > 25")
+
+result = execute(data, "select name", format="jsonl")
+print(result.text)
+
+compiled = compile_query("select name")
+print(query([{"name": "Bob"}], compiled))
 ```
-

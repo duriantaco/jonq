@@ -59,6 +59,10 @@ Use ``execute(...)`` when you want metadata such as the generated jq filter or r
 
    print(result.output_format)
    print(result.text)
+   print(result.compiled.jq_filter)
+
+The Python API supports ``format="json"``, ``format="jsonl"``, and
+``format="csv"``. Table and YAML rendering are CLI-only conveniences.
 
 Use ``format="jsonl"`` when you want newline-delimited JSON for downstream tools:
 
@@ -80,6 +84,36 @@ The high-level API accepts:
 - Python objects like ``dict`` and ``list``
 - Raw JSON strings
 - File paths (``str`` or ``pathlib.Path``)
+
+Validation and Limits
+---------------------
+
+File inputs are validated against the sampled JSON schema by default. Disable
+that check only when you know a query refers to fields that are absent from the
+sample:
+
+.. code-block:: python
+
+   rows = query("data.json", "select future_field", validate=False)
+
+Use ``limit=`` when you want to cap returned rows after query execution:
+
+.. code-block:: python
+
+   rows = query("data.json", "select name, age", limit=10)
+
+Streaming
+---------
+
+Set ``streaming=True`` for row-wise queries over a root-array JSON file:
+
+.. code-block:: python
+
+   rows = query("large.json", "select id, name if active = true", streaming=True)
+
+Streaming requires a filesystem path. It rejects aggregations, ``group by``,
+``sort``, ``distinct``, and ``limit`` because those operations need the full
+input.
 
 Async Usage
 -----------

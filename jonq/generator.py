@@ -654,10 +654,10 @@ def generate_jq_filter(
                 expr = parse_expression(expr_txt)
                 agg_sel.append(f'"{alias}": {generate_jq_expression(expr, "group")}')
 
-        if base_selector:
-            prefix = f"[ {base_selector} ] | "
-        else:
-            prefix = "[ .[] ] | "
+        source = base_selector or ".[]"
+        if condition:
+            source = f"{source} | select({condition})"
+        prefix = f"[ {source} ] | "
 
         jq_filter = f"{prefix}map(select(. != null)) | group_by({group_key}) | map({{ {', '.join(agg_sel)} }})"
         if having:

@@ -204,11 +204,21 @@ Consider ``nested.json``:
        {"order_id": 103, "item": "Tablet"}
      ]
 
-- **FROM clause:**
+- **FROM clause over nested arrays:**
 
   .. code-block:: bash
 
-     jonq nested.json "select type, name from products"
+     jonq nested.json "select order_id, item, price from [].orders"
+
+  **Output:**
+
+  .. code-block:: json
+
+     [
+       {"order_id": 101, "item": "Laptop", "price": 1200},
+       {"order_id": 102, "item": "Phone", "price": 800},
+       {"order_id": 103, "item": "Tablet", "price": 500}
+     ]
 
 Multiple Input Sources
 -----------------------

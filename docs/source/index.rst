@@ -9,12 +9,12 @@ Welcome to jonq's documentation!
    :target: https://github.com/duriantaco/skylos
    :alt: Skylos Grade
 
-jonq is a Python tool for exploring, extracting, and reshaping JSON with readable jq-powered queries. It keeps familiar ``select`` / ``if`` syntax for common cases while staying focused on JSON-native terminal workflows.
+jonq is a command-line JSON tool for exploring, extracting, and reshaping payloads with readable jq-powered queries. It keeps familiar ``select`` / ``if`` syntax for common cases while staying focused on JSON-native terminal workflows.
 
 .. important::
 
-   jonq is not a database.
-   Use it to understand and shape JSON quickly, then move to an analytical tool if the problem becomes relational.
+   jonq is not a database, ETL system, or full jq replacement.
+   Use it to understand and shape JSON quickly from the shell.
 
 Key Features
 -------------
@@ -35,6 +35,7 @@ Key Features
 - **Path explorer**: run ``jonq data.json`` with no query
 - **Interactive REPL**: ``jonq -i data.json`` with tab completion and history
 - **Follow mode**: ``--follow`` to stream NDJSON line-by-line
+- **Streaming mode**: ``--stream`` for row-wise root-array queries
 - **Watch mode**: ``--watch`` to re-run on file change
 - **Multiple inputs**: local files, URLs, globs, stdin (auto-detected), NDJSON
 - **Shell completions**: ``--completions bash|zsh|fish``

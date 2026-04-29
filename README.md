@@ -31,7 +31,7 @@ Alice   | 35
 Charlie | 42
 ```
 
-> **jonq is not a database.** It is a readable jq frontend for exploring, extracting, and reshaping JSON. If you need joins, window functions, or large-scale analytics, shape the JSON with jonq first and then hand it to DuckDB, Polars, or Pandas.
+> **jonq is not a database.** It is a readable jq frontend for exploring, extracting, and reshaping JSON in terminal workflows.
 
 ---
 
@@ -43,11 +43,13 @@ Charlie | 42
 - Stream and filter NDJSON log output in real time
 
 ### Use something else when you need
-- **Tabular analytics** — DuckDB, Polars, Pandas
-- **Joins across files** — a database or dataframe engine
+- **Exact jq control** — raw `jq`
+- **Python expressions over JSON** — [`jello`](https://github.com/kellyjonbrazil/jello)
+- **Flattened assignment-style JSON output** — [`gron`](https://github.com/tomnomnom/gron)
+- **Joins across files** — a database or analytics engine
 - **Large-scale ETL** — tools built for analytical pipelines
 
-**Rule of thumb:** if the problem is still "I need to understand this JSON", jonq is a good fit. If the problem has become relational analytics, move to a database.
+**Rule of thumb:** if the problem is still "I need to understand or reshape this JSON from the shell", jonq is a good fit. If the problem has become relational analytics or production data movement, use a tool built for that job.
 
 ## Features at a glance
 
@@ -127,9 +129,10 @@ Charlie | 42
 
 - Use **jonq** when the source of truth is still raw JSON and you need to inspect fields, paths, filters, or nested values quickly.
 - Use **raw jq** when you already know the exact jq filter you want and do not need the friendlier syntax.
-- Use **DuckDB / Polars / Pandas** after the JSON has become a tabular analytics problem.
+- Use **jello** when you want to process JSON with Python expressions from the CLI.
+- Use **gron** when you want to flatten JSON into grep-friendly assignment lines.
 
-**TL;DR:** jonq is the "understand and shape this JSON" step, not the database step.
+**TL;DR:** jonq is the "understand and shape this JSON from the terminal" step, not a database or ETL layer.
 
 ---
 
@@ -598,7 +601,7 @@ When outputting to a terminal, jonq auto-pretty-prints and colorizes JSON. Pipe 
 * Advanced jq Features: Some advanced jq features (recursive descent, custom filters) aren't exposed in the jonq syntax.
 * Custom Functions: User-defined functions aren't supported.
 * Joins: Cross-file joins are not supported — use a database for relational queries.
-* Window Functions: Not supported — use DuckDB or Polars for analytical queries.
+* Window Functions: Not supported — use an analytical query engine for analytical queries.
 
 ## Docs
 

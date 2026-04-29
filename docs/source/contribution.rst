@@ -21,8 +21,8 @@ Setting Up Development Environment
       python -m venv venv
       source venv/bin/activate  # On Windows: venv\Scripts\activate
       python -m pip install --upgrade pip
-      pip install -e .
-      pip install pytest pytest-asyncio
+      pip install -e ".[dev]"
+      pre-commit install --install-hooks
 
    To build the documentation locally, also install the docs requirements:
 
@@ -41,6 +41,16 @@ jonq uses pytest for testing. To run tests:
 
 Run the full test suite before opening a pull request. If you change only
 documentation, build the Sphinx docs as well.
+
+Pre-Commit Hooks
+-----------------
+
+The repository includes local pre-commit hooks for Ruff, package compilation,
+and a focused pre-push pytest smoke suite.
+
+.. code-block:: bash
+
+   pre-commit run --all-files
 
 Manual Testing
 ---------------
@@ -102,3 +112,11 @@ Reporting Issues
 -----------------
 
 If you find a bug or have a suggestion for improvement, please create an issue on the GitHub repository.
+
+Releases
+---------
+
+Maintainers publish from GitHub Releases. Before creating a release, update
+``pyproject.toml``, ``jonq/constants.py``, and ``CHANGELOG.md`` in a release
+prep pull request. Publishing uses PyPI trusted publishing from the ``pypi``
+GitHub environment.

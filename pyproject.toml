@@ -54,9 +54,27 @@ jonq = "jonq.main:entrypoint"
 packages = ["jonq"]
 
 [project.optional-dependencies]
+dev = [
+    "build",
+    "pre-commit",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "ruff",
+    "twine",
+]
 docs = [
     "sphinx",
     "sphinx-rtd-theme",
     "sphinx-autodoc-typehints",
     "myst-parser",
 ]
+
+[tool.ruff]
+target-version = "py39"
+extend-exclude = [
+    "docs/build",
+]
+
+[tool.ruff.lint]
+select = ["E9", "F"]

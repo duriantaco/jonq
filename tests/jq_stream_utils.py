@@ -11,7 +11,6 @@ from jonq.stream_utils import (
     process_json_streaming,
     process_json_streaming_async,
 )
-from jonq.executor import run_jq, run_jq_streaming, run_jq_async, run_jq_streaming_async
 
 class TestJsonOptimization:
     @pytest.fixture
@@ -60,7 +59,7 @@ class TestJsonOptimization:
             stdlib_json.loads(stdlib_serialized)
         stdlib_loads_time = time.time() - start
         
-        print(f"\nJSON Performance Results:")
+        print("\nJSON Performance Results:")
         print(f"  Serialization   - Custom: {custom_dumps_time:.4f}s, Stdlib: {stdlib_dumps_time:.4f}s")
         print(f"  Deserialization - Custom: {custom_loads_time:.4f}s, Stdlib: {stdlib_loads_time:.4f}s")
         

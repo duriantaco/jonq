@@ -89,14 +89,14 @@ def test_special_cases():
 def test_error_cases():
     query = "select name if name = 'John"
     try:
-        tokens = tokenize(query)
+        tokenize(query)
         print("❌ Unbalanced quotes: FAILED - Should have raised an exception")
     except Exception as e:
         print(f"✅ Unbalanced quotes: PASSED - Got expected exception: {str(e)}")
     
     query = "select name; drop table users;"
     try:
-        tokens = tokenize(query)
+        tokenize(query)
         print("❌ Invalid character: FAILED - Should have raised an exception")
     except Exception as e:
         print(f"✅ Invalid character: PASSED - Got expected exception: {str(e)}")

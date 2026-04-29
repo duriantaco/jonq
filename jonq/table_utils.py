@@ -121,17 +121,14 @@ def render_table(rows, *, color=False, max_width=None):
     colors = _Colors(color)
     lines = []
 
-    # header
     header_line = _build_row_line(headers, col_widths)
     lines.append(f"{colors.BOLD}{colors.CYAN}{header_line}{colors.NC}")
 
-    # separator
     sep_parts = []
     for width in col_widths:
         sep_parts.append("-" * (width + 2))
     lines.append("|".join(sep_parts))
 
-    # data rows
     for row in str_rows:
         lines.append(_build_row_line(row, col_widths))
 

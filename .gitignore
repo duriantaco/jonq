@@ -8,4 +8,10 @@ chunks
 venv
 target/
 dist
+
+# Local OS artifacts
 .DS_Store
+
+# Private planning notes
+OSS_WEDGE_PLAN.md
+MONETIZATION_ROADMAP.md

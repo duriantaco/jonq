@@ -2,7 +2,7 @@
 
 The general form of a jonq query is:
 ```bash
-select [distinct] <fields> [from <path>] [if <condition>] [group by <fields> [having <condition>]] [sort <field> [asc|desc]] [limit N]
+select [distinct] <fields> [from <path>] [if|where <condition>] [group by <fields> [having <condition>]] [sort <field> [asc|desc]] [limit N]
 ```
 
 jonq query syntax is for JSON extraction and reshaping. CLI behavior such as
@@ -65,12 +65,13 @@ select 'first name', "last-name", user."login-count"
 
 ## Filtering with IF
 
-Use `if` to filter results based on conditions:
+Use `if` to filter results based on conditions. `where` is accepted as an alias.
 
 ### Basic Comparisons
 
 ```bash
 select name, age if age > 30
+select name, age where age > 30
 select name, city if city = 'New York'
 ```
 

@@ -73,12 +73,12 @@ The ``jonq`` query syntax mirrors SQL but is tailored for JSON. Here's the full 
 
 .. code-block:: sql
 
-   select [distinct] <fields> [from <path>] [if <condition>] [group by <fields> [having <condition>]] [sort <field> [asc|desc]] [limit N]
+   select [distinct] <fields> [from <path>] [if|where <condition>] [group by <fields> [having <condition>]] [sort <field> [asc|desc]] [limit N]
 
 - **``<fields>``**: Fields to select (e.g., ``name``, ``age``), including aliases, expressions, or aggregations.
 - **``distinct``**: Optional keyword to return only unique rows.
 - **``from <path>``**: Optional path to query a specific part of the JSON (for example, ``from products`` or ``from [].orders``).
-- **``if <condition>``**: Optional filter (e.g., ``age > 30``).
+- **``if <condition>`` / ``where <condition>``**: Optional filter (e.g., ``age > 30``).
 - **``group by <fields>``**: Optional grouping (e.g., ``group by city``).
 - **``having <condition>``**: Optional filter on grouped results (e.g., ``having count > 2``).
 - **``sort <field>``**: Optional sorting field (e.g., ``sort age``).
@@ -283,7 +283,7 @@ The ``FROM`` clause lets you target a specific part of the JSON structure, such 
 Filtering with Conditions
 --------------------------
 
-The ``if`` clause filters data based on conditions using comparison and logical operators.
+The ``if`` clause filters data based on conditions using comparison and logical operators. ``where`` is accepted as an alias.
 
 Basic Filtering
 ~~~~~~~~~~~~~~~~
@@ -593,6 +593,7 @@ Multiple Input Sources
 .. code-block:: bash
 
    curl -s https://api.example.com/data | jonq "select id, name"
+   cat data.json | jonq "select name, age where age > 25"
    cat data.json | jonq - "select name, age"
 
 Follow Mode

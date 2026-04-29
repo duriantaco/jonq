@@ -1,3 +1,5 @@
+import io
+
 import pytest
 from unittest.mock import patch, AsyncMock
 from jonq.main import main
@@ -20,6 +22,32 @@ def test_main_with_from_clause(tmp_path, capsys):
         main()
     captured = capsys.readouterr()
     assert "Software" in captured.out
+
+
+def test_main_reads_piped_stdin_without_dash(capsys):
+    stdin = io.StringIO(
+        '[{"name":"Alice","age":30},{"name":"Bob","age":25},{"name":"Charlie","age":35}]'
+    )
+
+    with patch("sys.argv", ["jonq", "select name where age > 25"]):
+        with patch("sys.stdin", stdin):
+            main()
+
+    captured = capsys.readouterr()
+    assert "Alice" in captured.out
+    assert "Charlie" in captured.out
+    assert "Bob" not in captured.out
+
+
+def test_main_reads_piped_stdin_with_dash(capsys):
+    stdin = io.StringIO('[{"name":"Alice","age":30}]')
+
+    with patch("sys.argv", ["jonq", "-", "select name"]):
+        with patch("sys.stdin", stdin):
+            main()
+
+    captured = capsys.readouterr()
+    assert "Alice" in captured.out
 
 
 def test_main_file_not_found(capsys):

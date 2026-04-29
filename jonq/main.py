@@ -374,7 +374,7 @@ def _setup_repl_readline(json_file: str) -> None:
 def _build_repl_completions(json_file: str) -> list[str]:
     """Build completion list from JSON schema + keywords."""
     keywords = [
-        "select", "if", "from", "group", "by", "having", "sort", "asc", "desc",
+        "select", "if", "where", "from", "group", "by", "having", "sort", "asc", "desc",
         "limit", "distinct", "and", "or", "not", "in", "like", "between",
         "contains", "as", "case", "when", "then", "else", "end", "is", "null",
         "coalesce",
@@ -575,7 +575,7 @@ def _generate_completions(shell: str) -> str:
 _jonq_completions() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local opts="-i -f -t -s -n -o -p -w --format --table --stream --ndjson --limit --out --jq --explain --time --pretty --watch --follow --no-color --version --help --completions"
-    local keywords="select if from group by having sort asc desc limit distinct and or not in like between contains as case when then else end is null coalesce count sum avg min max upper lower length round abs ceil floor int float str type keys values trim todate fromdate date tojson fromjson"
+    local keywords="select if where from group by having sort asc desc limit distinct and or not in like between contains as case when then else end is null coalesce count sum avg min max upper lower length round abs ceil floor int float str type keys values trim todate fromdate date tojson fromjson"
 
     if [[ "${cur}" == -* ]]; then
         COMPREPLY=($(compgen -W "${opts}" -- "${cur}"))
@@ -607,7 +607,7 @@ _jonq() {
         '--no-color:No color'
         '--completions:Shell completions'
     )
-    keywords=(select if from group by having sort asc desc limit distinct and or not in like between contains as case when then else end is null coalesce count sum avg min max upper lower length round abs ceil floor int float str type keys values trim todate fromdate)
+    keywords=(select if where from group by having sort asc desc limit distinct and or not in like between contains as case when then else end is null coalesce count sum avg min max upper lower length round abs ceil floor int float str type keys values trim todate fromdate)
 
     if [[ "${words[2]}" == -* ]]; then
         _describe 'options' opts

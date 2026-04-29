@@ -130,7 +130,7 @@ jonq users.json "select name if age > 30" --explain
 ```text
 select [distinct] <fields>
   [from <path>]
-  [if <condition>]
+  [if|where <condition>]
   [group by <fields> [having <condition>]]
   [sort <field> [asc|desc]]
   [limit N]
@@ -142,6 +142,7 @@ Examples:
 jonq users.json "select *"
 jonq users.json "select name as full_name, age"
 jonq users.json "select name if city in ('New York', 'Chicago')"
+jonq users.json "select name where age > 30"
 jonq users.json "select name if not age > 30"
 jonq users.json "select name if name like 'Al%'"
 jonq users.json "select name if age between 25 and 35"
@@ -237,6 +238,7 @@ Piped stdin:
 
 ```bash
 curl -s https://api.example.com/users | jonq "select id, name" -t
+cat data.json | jonq "select id, name where active = true"
 cat data.json | jonq - "select id, name"
 ```
 

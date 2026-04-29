@@ -245,6 +245,9 @@ _SCALAR_FUNCTIONS = {
 _MULTI_ARG_FUNCTIONS = {"coalesce", "if_null"}
 _AGGREGATE_FUNCTIONS = {"count", "sum", "avg", "min", "max"}
 _ARITHMETIC_OPS = {"+", "-", "*", "/", "%", "^", "||"}
+_FILTER_CLAUSES = {"if", "where"}
+_SELECT_CLAUSES = _FILTER_CLAUSES | {"sort", "group", "having", "from", "limit"}
+_ALIAS_STOP_TOKENS = _SELECT_CLAUSES | {","}
 
 
 def parse_query(tokens: list[str]) -> tuple:
@@ -257,14 +260,7 @@ def parse_query(tokens: list[str]) -> tuple:
         i += 1
     fields = []
     expecting_field = True
-    while i < len(tokens) and tokens[i].lower() not in [
-        "if",
-        "sort",
-        "group",
-        "having",
-        "from",
-        "limit",
-    ]:
+    while i < len(tokens) and tokens[i].lower() not in _SELECT_CLAUSES:
         if tokens[i] == ",":
             if not expecting_field:
                 expecting_field = True
@@ -290,9 +286,7 @@ def parse_query(tokens: list[str]) -> tuple:
                 alias = None
                 if i < len(tokens) and tokens[i] == "as":
                     i += 1
-                    if i < len(tokens) and tokens[i].lower() not in [
-                        "if", "sort", "group", "having", ",", "from", "limit",
-                    ]:
+                    if i < len(tokens) and tokens[i].lower() not in _ALIAS_STOP_TOKENS:
                         alias = tokens[i]
                         i += 1
                     else:
@@ -332,7 +326,7 @@ def parse_query(tokens: list[str]) -> tuple:
                         if depth == 0 and (
                             token == ","
                             or token.lower()
-                            in ["if", "sort", "group", "having", "from", "limit", "as"]
+                            in (_SELECT_CLAUSES | {"as"})
                         ):
                             break
                         expr_tokens.append(token)
@@ -340,15 +334,7 @@ def parse_query(tokens: list[str]) -> tuple:
                     alias = None
                     if i < len(tokens) and tokens[i] == "as":
                         i += 1
-                        if i < len(tokens) and tokens[i].lower() not in [
-                            "if",
-                            "sort",
-                            "group",
-                            "having",
-                            ",",
-                            "from",
-                            "limit",
-                        ]:
+                        if i < len(tokens) and tokens[i].lower() not in _ALIAS_STOP_TOKENS:
                             alias = tokens[i]
                             i += 1
                         else:
@@ -361,15 +347,7 @@ def parse_query(tokens: list[str]) -> tuple:
                 alias = None
                 if i < len(tokens) and tokens[i] == "as":
                     i += 1
-                    if i < len(tokens) and tokens[i].lower() not in [
-                        "if",
-                        "sort",
-                        "group",
-                        "having",
-                        ",",
-                        "from",
-                        "limit",
-                    ]:
+                    if i < len(tokens) and tokens[i].lower() not in _ALIAS_STOP_TOKENS:
                         alias = tokens[i]
                         i += 1
                     else:
@@ -417,7 +395,7 @@ def parse_query(tokens: list[str]) -> tuple:
                     elif depth == 0 and (
                         token in [",", "as"]
                         or token.lower()
-                        in ["if", "sort", "group", "having", "from", "limit"]
+                        in _SELECT_CLAUSES
                     ):
                         break
                     field_tokens.append(token)
@@ -433,15 +411,7 @@ def parse_query(tokens: list[str]) -> tuple:
                 alias = None
                 if i < len(tokens) and tokens[i] == "as":
                     i += 1
-                    if i < len(tokens) and tokens[i].lower() not in [
-                        "if",
-                        "sort",
-                        "group",
-                        "having",
-                        ",",
-                        "from",
-                        "limit",
-                    ]:
+                    if i < len(tokens) and tokens[i].lower() not in _ALIAS_STOP_TOKENS:
                         alias = tokens[i]
                         i += 1
                     else:
@@ -469,19 +439,15 @@ def parse_query(tokens: list[str]) -> tuple:
     from_path = None
     if i < len(tokens) and tokens[i].lower() == "from":
         i += 1
-        if i < len(tokens) and tokens[i].lower() not in [
-            "if",
-            "sort",
-            "group",
-            "having",
-            "limit",
-        ]:
+        if i < len(tokens) and tokens[i].lower() not in (
+            _FILTER_CLAUSES | {"sort", "group", "having", "limit"}
+        ):
             from_path = tokens[i]
             i += 1
         else:
             raise ValueError("Expected path after 'from'")
     condition = None
-    if i < len(tokens) and tokens[i].lower() == "if":
+    if i < len(tokens) and tokens[i].lower() in _FILTER_CLAUSES:
         i += 1
         condition_tokens = []
         while i < len(tokens) and tokens[i].lower() not in [

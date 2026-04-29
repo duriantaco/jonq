@@ -30,6 +30,12 @@ def test_group_by_respects_filter_before_grouping():
     ]
 
 
+def test_where_alias_matches_if_filter():
+    data = [{"name": "Alice", "age": 30}, {"name": "Bob", "age": 20}]
+
+    assert query(data, "select name where age > 25") == [{"name": "Alice"}]
+
+
 def test_count_star_respects_from_path():
     data = {"products": [{"name": "A"}, {"name": "B"}]}
 

@@ -9,7 +9,7 @@ Welcome to jonq's documentation!
    :target: https://github.com/duriantaco/skylos
    :alt: Skylos Grade
 
-jonq is a command-line JSON tool for exploring, extracting, and reshaping payloads with readable jq-powered queries. It keeps familiar ``select`` / ``if`` syntax for common cases while staying focused on JSON-native terminal workflows.
+jonq is a command-line JSON tool for exploring, extracting, and reshaping payloads with readable jq-powered queries. It keeps familiar ``select`` / ``if`` syntax for common cases, accepts ``where`` as a filter alias, and stays focused on JSON-native terminal workflows.
 
 .. important::
 

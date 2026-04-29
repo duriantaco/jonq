@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [v0.3.1] - 2026-04-29
 
 ### Added
 - **Raw scalar output**: `-r`, `--raw`, and `--raw-output` print selected scalar values without JSON quotes for shell pipelines.

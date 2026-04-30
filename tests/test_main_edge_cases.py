@@ -10,6 +10,7 @@ from jonq.main import (
     _display_schema_type,
     _format_schema_types,
     _root_summary,
+    _sample_for_display,
     _suggest_queries,
     _json_to_raw,
     _json_to_yaml,
@@ -151,6 +152,18 @@ class TestSmartInspectHelpers:
             'jonq users.json "select id, name, city where active = true" -t'
             in suggestions
         )
+
+    def test_suggest_queries_filter_mixed_array_fields(self):
+        sample = [1, "two", {"key": "value"}]
+        paths = _collect_schema_paths(sample)
+
+        suggestions = _suggest_queries("mixed.json", paths, mixed_array=True)
+
+        assert 'jonq mixed.json "select key where key is not null" -t' in suggestions
+        assert 'jonq mixed.json "select key where key is not null" -r' in suggestions
+
+    def test_sample_for_display_prefers_object_from_mixed_array(self):
+        assert _sample_for_display([1, "two", {"key": "value"}]) == {"key": "value"}
 
 
 class TestValidateInputFile:

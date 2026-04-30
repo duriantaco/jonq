@@ -161,3 +161,15 @@ def test_main_smart_inspect_shows_fields_and_suggestions(tmp_path, capsys):
     assert "select id, name, user.address.city" in captured.out
     assert "select name" in captured.out
     assert "where active = true" in captured.out
+
+
+def test_main_smart_inspect_shows_deep_leaf_paths(tmp_path, capsys):
+    json_file = tmp_path / "deep.json"
+    json_file.write_text('{"a":{"b":{"c":{"d":{"e":"value"}}}}}')
+
+    with patch("sys.argv", ["jonq", str(json_file)]):
+        main()
+
+    captured = capsys.readouterr()
+    assert "a.b.c.d.e" in captured.out
+    assert 'sample: "value"' in captured.out

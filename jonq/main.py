@@ -358,7 +358,13 @@ def _format_suggested_command(source: str, query: str, *options: str) -> str:
     return " ".join(parts)
 
 
-def _suggest_queries(source: str, path_map) -> list[str]:
+def _query_for_mixed_array(query: str, selected: list[str], mixed_array: bool) -> str:
+    if not mixed_array or not selected:
+        return query
+    return f"{query} where {selected[0]} is not null"
+
+
+def _suggest_queries(source: str, path_map, *, mixed_array: bool = False) -> list[str]:
     flat_scalars = [
         path
         for path, info in path_map.items()
@@ -371,14 +377,26 @@ def _suggest_queries(source: str, path_map) -> list[str]:
     selected = _pick_select_fields(flat_scalars)
     if selected:
         suggestions.append(
-            _format_suggested_command(source, f"select {', '.join(selected)}", "-t")
+            _format_suggested_command(
+                source,
+                _query_for_mixed_array(
+                    f"select {', '.join(selected)}", selected, mixed_array
+                ),
+                "-t",
+            )
         )
 
     raw_candidates = []
     for leaf in ("name", "title", "email", "message", "id"):
         raw_candidates.extend(path for path in flat_scalars if _path_leaf(path) == leaf)
     raw_field = raw_candidates[0] if raw_candidates else flat_scalars[0]
-    suggestions.append(_format_suggested_command(source, f"select {raw_field}", "-r"))
+    suggestions.append(
+        _format_suggested_command(
+            source,
+            _query_for_mixed_array(f"select {raw_field}", [raw_field], mixed_array),
+            "-r",
+        )
+    )
 
     bool_fields = [
         path
@@ -428,6 +446,15 @@ def _suggest_queries(source: str, path_map) -> list[str]:
     return deduped[:3]
 
 
+def _sample_for_display(sample: list):
+    if not sample:
+        return []
+    for item in sample:
+        if isinstance(item, (dict, list)):
+            return item
+    return sample[0]
+
+
 def _print_schema(json_file: str, display_name: str | None = None) -> None:
     is_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
     c = _Colors(is_tty)
@@ -449,8 +476,10 @@ def _print_schema(json_file: str, display_name: str | None = None) -> None:
     print(f"{c.BOLD}{display_name}{c.NC}")
     print(f"{c.BOLD}Root:{c.NC} {c.DIM}{_root_summary(root_kind, sample)}{c.NC}")
 
+    mixed_array = False
     if root_kind == "array":
-        sample_for_display = sample[0] if sample else []
+        sample_for_display = _sample_for_display(sample)
+        mixed_array = any(not isinstance(item, dict) for item in sample)
     else:
         sample_for_display = sample
 
@@ -480,7 +509,7 @@ def _print_schema(json_file: str, display_name: str | None = None) -> None:
     if len(sample_json) > SCHEMA_SAMPLE_TRUNCATE:
         print("  ...")
 
-    suggestions = _suggest_queries(display_name, path_map)
+    suggestions = _suggest_queries(display_name, path_map, mixed_array=mixed_array)
     if suggestions:
         print(f"\n{c.BOLD}Suggested queries:{c.NC}")
         for suggestion in suggestions:

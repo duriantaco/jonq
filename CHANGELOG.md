@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Query repair suggestions**: unknown fields in selected fields, filters, sorting, grouping, and aggregations now include nearby field matches plus a copy-paste `Try:` command.
+
 ## [v0.3.2] - 2026-04-30
 
 ### Added

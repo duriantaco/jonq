@@ -170,6 +170,15 @@ jonq users.json "select name if age > 30" --explain
 jonq users.json "select name if age > 30" --time
 ```
 
+If a field is misspelled, jonq suggests nearby fields and a copy-paste repair:
+
+```text
+Error: Unknown field(s): cty
+Did you mean: cty -> city?
+Available fields: id, name, age, city
+Try: jonq users.json "select name where city = 'Chicago'"
+```
+
 ## Python API
 
 ```python

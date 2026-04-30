@@ -13,7 +13,7 @@ import shlex
 from collections import OrderedDict
 
 from jonq.api import compile_query, execute_async
-from jonq.error_handler import handle_error_with_context
+from jonq.error_handler import _format_query_field, handle_error_with_context
 from jonq.constants import (
     _Colors,
     VERSION,
@@ -361,7 +361,9 @@ def _format_suggested_command(source: str, query: str, *options: str) -> str:
 def _query_for_mixed_array(query: str, selected: list[str], mixed_array: bool) -> str:
     if not mixed_array or not selected:
         return query
-    return f"{query} where {selected[0]} is not null"
+    if _format_query_field(selected[0]) != selected[0]:
+        return query
+    return f"{query} where {_format_query_field(selected[0])} is not null"
 
 
 def _suggest_queries(source: str, path_map, *, mixed_array: bool = False) -> list[str]:
@@ -376,11 +378,12 @@ def _suggest_queries(source: str, path_map, *, mixed_array: bool = False) -> lis
     suggestions = []
     selected = _pick_select_fields(flat_scalars)
     if selected:
+        selected_query_fields = [_format_query_field(path) for path in selected]
         suggestions.append(
             _format_suggested_command(
                 source,
                 _query_for_mixed_array(
-                    f"select {', '.join(selected)}", selected, mixed_array
+                    f"select {', '.join(selected_query_fields)}", selected, mixed_array
                 ),
                 "-t",
             )
@@ -393,7 +396,9 @@ def _suggest_queries(source: str, path_map, *, mixed_array: bool = False) -> lis
     suggestions.append(
         _format_suggested_command(
             source,
-            _query_for_mixed_array(f"select {raw_field}", [raw_field], mixed_array),
+            _query_for_mixed_array(
+                f"select {_format_query_field(raw_field)}", [raw_field], mixed_array
+            ),
             "-r",
         )
     )
@@ -434,7 +439,7 @@ def _suggest_queries(source: str, path_map, *, mixed_array: bool = False) -> lis
             suggestions.append(
                 _format_suggested_command(
                     source,
-                    f"select {group_field}, count(*) as count group by {group_field}",
+                    f"select {_format_query_field(group_field)}, count(*) as count group by {_format_query_field(group_field)}",
                     "-t",
                 )
             )

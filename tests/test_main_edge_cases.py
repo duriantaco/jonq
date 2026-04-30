@@ -165,6 +165,24 @@ class TestSmartInspectHelpers:
     def test_sample_for_display_prefers_object_from_mixed_array(self):
         assert _sample_for_display([1, "two", {"key": "value"}]) == {"key": "value"}
 
+    def test_suggest_queries_quote_special_character_fields(self):
+        sample = {"first name": "Alice", "last-name": "Smith", "age_group": 3}
+        paths = _collect_schema_paths(sample)
+
+        suggestions = _suggest_queries("special.json", paths)
+
+        assert 'jonq special.json \'select "first name", "last-name", age_group\' -t' in suggestions
+        assert 'jonq special.json \'select "first name"\' -r' in suggestions
+
+    def test_mixed_array_suggestions_do_not_filter_quoted_fields(self):
+        sample = [1, {"first name": "Alice"}]
+        paths = _collect_schema_paths(sample)
+
+        suggestions = _suggest_queries("special.json", paths, mixed_array=True)
+
+        assert 'where "first name" is not null' not in "\n".join(suggestions)
+        assert 'jonq special.json \'select "first name"\' -t' in suggestions
+
 
 class TestValidateInputFile:
     def test_nonexistent_file(self):

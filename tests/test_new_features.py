@@ -4,7 +4,12 @@ import tempfile
 from jonq.query_parser import tokenize_query, parse_query
 from jonq.jq_filter import generate_jq_filter
 from jonq.api import compile_query
-from jonq.error_handler import _edit_distance, _fuzzy_suggest, validate_query_against_schema
+from jonq.error_handler import (
+    _edit_distance,
+    _format_query_field,
+    _fuzzy_suggest,
+    validate_query_against_schema,
+)
 from jonq.main import _looks_like_ndjson, _colorize_json, _type_label
 
 
@@ -208,6 +213,11 @@ class TestFuzzySuggestions:
         result = _fuzzy_suggest("a", ["ab", "ac", "ad", "ae", "af"])
         assert len(result) <= 3
 
+    def test_format_query_field_quotes_special_keys(self):
+        assert _format_query_field("name") == "name"
+        assert _format_query_field("first name") == '"first name"'
+        assert _format_query_field("profile.first name") == '"profile.first name"'
+
     def test_validate_schema_suggests_fields(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump([{"name": "Alice", "age": 30}], f)
@@ -264,6 +274,32 @@ class TestFuzzySuggestions:
         finally:
             os.unlink(tmp)
 
+    def test_validate_schema_repairs_having_alias_typo(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([{"city": "Chicago"}], f)
+            tmp = f.name
+        try:
+            result = validate_query_against_schema(
+                tmp, compile_query("select city, count(*) as count group by city having cnt > 1")
+            )
+            assert result is not None
+            assert "cnt -> count" in result
+            assert '"select city, count(*) as count group by city having count > 1"' in result
+        finally:
+            os.unlink(tmp)
+
+    def test_validate_schema_allows_having_alias(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([{"city": "Chicago"}], f)
+            tmp = f.name
+        try:
+            result = validate_query_against_schema(
+                tmp, compile_query("select city, count(*) as cnt group by city having cnt > 1")
+            )
+            assert result is None
+        finally:
+            os.unlink(tmp)
+
     def test_validate_schema_repairs_nested_field(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump([{"profile": {"email": "alice@example.com"}}], f)
@@ -275,6 +311,83 @@ class TestFuzzySuggestions:
             assert result is not None
             assert "profile.emali -> profile.email" in result
             assert '"select profile.email"' in result
+        finally:
+            os.unlink(tmp)
+
+    def test_validate_schema_ignores_dotted_string_literals(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([{"name": "Alice", "text": "Foo.Bar"}], f)
+            tmp = f.name
+        try:
+            result = validate_query_against_schema(
+                tmp, compile_query("select name where text contains 'Foo.Bar'")
+            )
+            assert result is None
+        finally:
+            os.unlink(tmp)
+
+    def test_validate_schema_uses_sparse_array_fields(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([{"id": 1, "name": "Alice"}, {"id": 2, "age": 25}], f)
+            tmp = f.name
+        try:
+            result = validate_query_against_schema(
+                tmp, compile_query("select id, name, age")
+            )
+            assert result is None
+        finally:
+            os.unlink(tmp)
+
+    def test_validate_schema_prefers_nested_leaf_match(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([{"profile": {"address": {"city": "New York"}}}], f)
+            tmp = f.name
+        try:
+            result = validate_query_against_schema(
+                tmp, compile_query("select * where cty = 'New York'")
+            )
+            assert result is not None
+            assert "cty -> profile.address.city" in result
+        finally:
+            os.unlink(tmp)
+
+    def test_validate_schema_quotes_special_key_repairs(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({"first name": "Alice", "age_group": 3}, f)
+            tmp = f.name
+        try:
+            result = validate_query_against_schema(tmp, compile_query("select first_nme"))
+            assert result is not None
+            assert "first_nme -> first name" in result
+            assert "'select \"first name\"'" in result
+        finally:
+            os.unlink(tmp)
+
+    def test_validate_schema_repairs_from_query_fields(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([{"orders": [{"order_id": 1, "price": 20}]}], f)
+            tmp = f.name
+        try:
+            result = validate_query_against_schema(
+                tmp, compile_query("select order_id, pric from [].orders")
+            )
+            assert result is not None
+            assert "pric -> price" in result
+            assert '"select order_id, price from [].orders"' in result
+        finally:
+            os.unlink(tmp)
+
+    def test_validate_schema_repairs_expression_fields(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([{"name": "Alice"}], f)
+            tmp = f.name
+        try:
+            result = validate_query_against_schema(
+                tmp, compile_query("select coalesce(nme, name) as display")
+            )
+            assert result is not None
+            assert "nme -> name" in result
+            assert '"select coalesce(name, name) as display"' in result
         finally:
             os.unlink(tmp)
 

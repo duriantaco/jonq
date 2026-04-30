@@ -1,0 +1,41 @@
+name: jq command I wish was easier
+description: Share a jq command or JSON task that feels too hard to remember.
+title: "Make this JSON query easier: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for real commands or tasks where jq works, but the syntax feels hard to write, remember, or explain.
+  - type: textarea
+    id: task
+    attributes:
+      label: What are you trying to do?
+      description: Describe the JSON workflow in plain language.
+      placeholder: "Example: From a GitHub API response, print repo name, stars, and pushed date as a table."
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Small sample input
+      description: Paste the smallest JSON sample that shows the shape. Redact secrets.
+      render: json
+  - type: textarea
+    id: current-command
+    attributes:
+      label: Current jq command, shell pipeline, or workaround
+      description: Paste the command you use today, if you have one.
+      render: bash
+  - type: textarea
+    id: ideal
+    attributes:
+      label: What would a readable jonq command look like?
+      description: Optional. Rough syntax is fine.
+      render: bash
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This is about exploring or reshaping JSON from the terminal.
+        - label: This does not require joins, window functions, or a long-running database.

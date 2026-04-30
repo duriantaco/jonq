@@ -1,0 +1,58 @@
+name: JSON file jonq struggled with
+description: Report a JSON shape, key name, input mode, or query that broke or behaved badly.
+title: "JSON edge case: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when jonq gives a confusing error, wrong suggestion, surprising output, or cannot inspect/query a JSON shape cleanly.
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: Paste the exact jonq command you ran.
+      render: bash
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Small sample input
+      description: Paste the smallest JSON or NDJSON sample that reproduces it. Redact secrets.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: What did you expect jonq to print or suggest?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Paste the output, traceback, or confusing suggestion.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output from `jonq --version`.
+      placeholder: "jonq 0.3.4"
+  - type: dropdown
+    id: input-mode
+    attributes:
+      label: Input mode
+      options:
+        - file
+        - stdin
+        - URL
+        - glob
+        - NDJSON
+        - follow mode
+        - streaming mode
+        - Python API

@@ -51,6 +51,7 @@ Key Features
    installation
    usage
    usage_in_python
+   cookbook
    comparison
    examples
    api

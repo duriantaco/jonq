@@ -254,11 +254,9 @@ def _validate_execution_args(
     if not validate or source_info["path"] is None:
         return
 
-    validation_error = validate_query_against_schema(source_info["path"], compiled.query)
+    validation_error = validate_query_against_schema(source_info["path"], compiled)
     if validation_error:
-        raise QuerySyntaxError(
-            validation_error, suggestion="Use 'select *' to see available fields"
-        )
+        raise QuerySyntaxError(validation_error)
 
 
 def _build_result(

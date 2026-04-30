@@ -4,6 +4,7 @@ import json
 import re
 import os
 import sys
+import shlex
 
 from jonq.constants import (
     _Colors,
@@ -40,6 +41,223 @@ def _fuzzy_suggest(
             candidates.append((d, field))
     candidates.sort()
     return [c[1] for c in candidates[:FUZZY_MAX_RESULTS]]
+
+
+def _collect_available_fields(data, prefix: str = "", depth: int = 0) -> list[str]:
+    if depth > 5:
+        return []
+
+    if isinstance(data, list):
+        fields = []
+        for item in data[:5]:
+            if isinstance(item, dict):
+                for field in _collect_available_fields(item, prefix, depth):
+                    if field not in fields:
+                        fields.append(field)
+        return fields
+
+    if not isinstance(data, dict):
+        return []
+
+    fields = []
+    for key, value in data.items():
+        field = f"{prefix}.{key}" if prefix else key
+        fields.append(field)
+
+        if isinstance(value, dict):
+            fields.extend(_collect_available_fields(value, field, depth + 1))
+        elif isinstance(value, list):
+            array_field = f"{field}[]"
+            fields.append(array_field)
+            fields.extend(_collect_available_fields(value, array_field, depth + 1))
+
+    deduped = []
+    for field in fields:
+        if field not in deduped:
+            deduped.append(field)
+    return deduped
+
+
+def _best_field_suggestion(name: str, available: list[str]) -> str | None:
+    direct = _fuzzy_suggest(name, available)
+    if direct:
+        return direct[0]
+
+    name_leaf = name.replace("[]", "").split(".")[-1]
+    leaf_matches = [
+        field
+        for field in available
+        if _fuzzy_suggest(name_leaf, [field.replace("[]", "").split(".")[-1]], max_dist=2)
+    ]
+    if leaf_matches:
+        return leaf_matches[0]
+
+    return None
+
+
+def _replace_field_reference(query: str, old: str, new: str) -> str:
+    pattern = re.compile(rf"(?<![\w.]){re.escape(old)}(?![\w.])")
+    return pattern.sub(new, query)
+
+
+def _is_simple_field_ref(value: str | None) -> bool:
+    if not value or value == "*":
+        return False
+    return bool(re.fullmatch(r"[A-Za-z_][\w]*(?:\[\])?(?:\.[A-Za-z_][\w]*(?:\[\])?)*", value))
+
+
+def _field_refs_from_compiled(compiled) -> tuple[list[str], set[str]]:
+    refs = []
+    aliases = set()
+
+    for field in getattr(compiled, "fields", ()) or ():
+        if not field:
+            continue
+        kind = field[0]
+        if kind == "field":
+            _, path, alias = field
+            refs.append(path)
+            if alias != path:
+                aliases.add(alias)
+        elif kind == "aggregation":
+            _, _, param, alias = field
+            if param != "*":
+                refs.append(param)
+            aliases.add(alias)
+        elif kind == "function":
+            _, _, param, alias = field
+            if _is_simple_field_ref(param):
+                refs.append(param)
+            aliases.add(alias)
+        elif kind == "count_distinct":
+            _, param, alias = field
+            refs.append(param)
+            aliases.add(alias)
+
+    refs.extend(getattr(compiled, "group_by", ()) or ())
+
+    order_by = getattr(compiled, "order_by", None)
+    if order_by:
+        refs.append(order_by)
+
+    for expr in (getattr(compiled, "condition", None), getattr(compiled, "having", None)):
+        refs.extend(_field_refs_from_expression(expr))
+
+    deduped = []
+    for ref in refs:
+        if ref and ref not in deduped:
+            deduped.append(ref)
+    return deduped, aliases
+
+
+def _field_refs_from_expression(expr: str | None) -> list[str]:
+    if not expr:
+        return []
+
+    refs = []
+    for match in re.finditer(r"\.([A-Za-z_][\w]*(?:\?\.[A-Za-z_][\w]*)*)\??", expr):
+        refs.append(match.group(1).replace("?.", ".").rstrip("?"))
+
+    if refs:
+        return refs
+
+    cleaned = re.sub(r"(['\"]).*?\1", " ", expr)
+    skip = {
+        "and",
+        "or",
+        "not",
+        "null",
+        "true",
+        "false",
+        "contains",
+        "in",
+        "like",
+        "between",
+        "is",
+    }
+    for token in re.findall(r"\b[A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)*\b", cleaned):
+        if token.lower() not in skip:
+            refs.append(token)
+    return refs
+
+
+def _field_refs_from_query(query: str) -> tuple[list[str], set[str]]:
+    refs = []
+    aliases = set()
+
+    m = re.search(
+        r"\bselect\s+(.*?)(?:\s+(?:from|if|where|group|order|sort|limit)\b|$)",
+        query,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if m:
+        for raw in m.group(1).split(","):
+            part = raw.strip()
+            if not part or part == "*":
+                continue
+            if part.lower().startswith("distinct "):
+                part = part.split(None, 1)[1].strip()
+            alias_match = re.search(r"\s+as\s+([A-Za-z_]\w*)$", part, flags=re.IGNORECASE)
+            if alias_match:
+                aliases.add(alias_match.group(1))
+                part = part[: alias_match.start()].strip()
+            if _is_simple_field_ref(part):
+                refs.append(part)
+
+    for pattern in (
+        r"\b(?:if|where)\s+(.*?)(?:\s+(?:group|order|sort|limit)\b|$)",
+        r"\bhaving\s+(.*?)(?:\s+(?:order|sort|limit)\b|$)",
+    ):
+        m = re.search(pattern, query, flags=re.IGNORECASE | re.DOTALL)
+        if m:
+            refs.extend(_field_refs_from_expression(m.group(1)))
+
+    m = re.search(r"\bgroup\s+by\s+(.*?)(?:\s+(?:having|order|sort|limit)\b|$)", query, flags=re.IGNORECASE | re.DOTALL)
+    if m:
+        refs.extend(part.strip() for part in m.group(1).split(",") if part.strip())
+
+    m = re.search(r"\b(?:order\s+by|sort)\s+([A-Za-z_][\w.]*)", query, flags=re.IGNORECASE)
+    if m:
+        refs.append(m.group(1))
+
+    deduped = []
+    for ref in refs:
+        if ref and ref not in deduped:
+            deduped.append(ref)
+    return deduped, aliases
+
+
+def _format_query_repair_message(
+    *,
+    query: str,
+    json_file: str,
+    bad_refs: list[str],
+    available: list[str],
+    replacements: dict[str, str],
+) -> str:
+    repaired = query
+    for old, new in replacements.items():
+        repaired = _replace_field_reference(repaired, old, new)
+
+    lines = [f"Unknown field(s): {', '.join(bad_refs)}"]
+    nearby = []
+    for old, new in replacements.items():
+        nearby.append(f"{old} -> {new}")
+    if nearby:
+        lines.append(f"Did you mean: {'; '.join(nearby)}?")
+
+    available_preview = ", ".join(available[:12])
+    if len(available) > 12:
+        available_preview += ", ..."
+    lines.append(f"Available fields: {available_preview}")
+
+    if repaired != query:
+        query_arg = f'"{repaired}"' if '"' not in repaired else shlex.quote(repaired)
+        lines.append(f"Try: jonq {shlex.quote(json_file)} {query_arg}")
+    else:
+        lines.append(f"Run `jonq {shlex.quote(json_file)}` to inspect fields and samples.")
+
+    return "\n".join(lines)
 
 
 class JonqError(Exception):
@@ -216,102 +434,65 @@ class ErrorAnalyzer:
             return "unknown"
 
 
-def validate_query_against_schema(json_file: str, query: str) -> str | None:
+def validate_query_against_schema(json_file: str, query) -> str | None:
     try:
+        query_text = getattr(query, "query", query)
         with open(json_file, "r", encoding="utf-8") as fp:
             data = json.load(fp)
 
         if isinstance(data, list) and data:
-            sample = data[0]
+            sample = next((item for item in data if isinstance(item, dict)), data[0])
         else:
             sample = data
 
         if not isinstance(sample, dict):
             return None
 
-        top_keys = set(sample.keys())
+        available = _collect_available_fields(sample)
+        available_set = set(available)
 
-        if re.search(r"\bfrom\b", query, flags=re.IGNORECASE):
+        if re.search(r"\bfrom\b", query_text, flags=re.IGNORECASE):
             return None
 
-        m = re.search(
-            r"\bselect\s+(.*?)(?:\s+(?:from|if|where|group|order|sort|limit)\b|$)",
-            query,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-        if not m:
-            return None
-        field_list = m.group(1)
-
-        raw_fields = []
-        split_fields = field_list.split(",")
-        _skip_words = {"distinct", "as"}
-
-        for f in split_fields:
-            cleaned_field = f.strip()
-            parts = cleaned_field.split(None, 1)
-            if parts and parts[0].lower() in _skip_words:
-                cleaned_field = parts[1] if len(parts) > 1 else ""
-
-            as_parts = cleaned_field.rsplit(" as ", 1)
-            cleaned_field = as_parts[0].strip()
-            if cleaned_field and cleaned_field != "*":
-                raw_fields.append(cleaned_field)
-
-        def head_of(path):
-            p = path.strip().strip('"').strip("'")
-            if p.startswith("."):
-                p = p[1:]
-            for sep in ("[", "."):
-                if sep in p:
-                    return p.split(sep, 1)[0]
-            return p
+        if hasattr(query, "fields"):
+            refs, aliases = _field_refs_from_compiled(query)
+        else:
+            refs, aliases = _field_refs_from_query(query_text)
 
         bad = []
-        special_chars = ["{", "}", "(", ")", "+", "-", "*", "/", "||"]
-        _skip_prefixes = {"case ", "coalesce", "if_null"}
-
-        for f in raw_fields:
-            has_special_chars = False
-            for ch in special_chars:
-                if ch in f:
-                    has_special_chars = True
-                    break
-
-            if has_special_chars:
+        replacements = {}
+        for ref in refs:
+            if not _is_simple_field_ref(ref):
                 continue
-
-            f_lower = f.lower().strip()
-            if any(f_lower.startswith(p) for p in _skip_prefixes):
+            if ref in aliases or ref in available_set:
                 continue
+            if ref.split(".", 1)[0] in available_set and ref not in available_set:
+                bad.append(ref)
+            elif ref not in available_set:
+                bad.append(ref)
 
-            h = head_of(f)
-
-            field_exists = bool(h)
-            is_new_field = h not in top_keys
-            is_not_wildcard = f != "*"
-
-            if field_exists and is_new_field and is_not_wildcard:
-                bad.append(f)
+            suggestion = _best_field_suggestion(ref, available)
+            if suggestion:
+                replacements[ref] = suggestion
 
         if os.environ.get("JONQ_DEBUG_SCHEMA"):
             print(
-                f"[schema] fields={raw_fields} heads={[head_of(f) for f in raw_fields]} top={sorted(top_keys)}",
+                f"[schema] refs={refs} aliases={sorted(aliases)} available={available}",
                 file=sys.stderr,
             )
 
         if bad:
-            avail = ", ".join(sorted(top_keys))
-            suggestions = []
-            for b in bad:
-                h = head_of(b)
-                similar = _fuzzy_suggest(h, list(top_keys))
-                if similar:
-                    suggestions.append(f"'{h}' -> {', '.join(similar)}")
-            msg = f"Field(s) {', '.join(bad)!r} not found. Available fields: {avail}"
-            if suggestions:
-                msg += f". Did you mean: {'; '.join(suggestions)}?"
-            return msg
+            deduped_bad = []
+            for ref in bad:
+                if ref not in deduped_bad:
+                    deduped_bad.append(ref)
+            return _format_query_repair_message(
+                query=query_text,
+                json_file=json_file,
+                bad_refs=deduped_bad,
+                available=available,
+                replacements=replacements,
+            )
         return None
     except (OSError, json.JSONDecodeError, ValueError, KeyError):
         return None

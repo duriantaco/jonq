@@ -645,16 +645,20 @@ jonq auto-detects NDJSON (newline-delimited JSON) files. No flag needed:
 
 You can still force it with ``--ndjson`` if needed. ``--ndjson`` cannot be combined with ``--stream``.
 
-Fuzzy Field Suggestions
-------------------------
+Query Repair Suggestions
+-------------------------
 
-When you mistype a field name, jonq suggests similar fields:
+When you mistype a field name, jonq suggests similar fields and a copy-paste
+repair command. This works across selected fields, filters, sorting, grouping,
+and aggregations for normal file inputs:
 
 .. code-block:: text
 
-   $ jonq data.json "select nme, agge"
-   Field(s) 'nme, agge' not found. Available fields: age, city, id, name.
-   Did you mean: 'nme' -> name; 'agge' -> age?
+   $ jonq users.json "select name where cty = 'Chicago'"
+   Error: Unknown field(s): cty
+   Did you mean: cty -> city?
+   Available fields: id, name, age, city
+   Try: jonq users.json "select name where city = 'Chicago'"
 
 Colorized Output
 -----------------

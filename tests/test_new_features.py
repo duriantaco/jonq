@@ -3,6 +3,7 @@ import os
 import tempfile
 from jonq.query_parser import tokenize_query, parse_query
 from jonq.jq_filter import generate_jq_filter
+from jonq.api import compile_query
 from jonq.error_handler import _edit_distance, _fuzzy_suggest, validate_query_against_schema
 from jonq.main import _looks_like_ndjson, _colorize_json, _type_label
 
@@ -216,6 +217,64 @@ class TestFuzzySuggestions:
             assert result is not None
             assert "Did you mean" in result
             assert "name" in result
+            assert 'Try: jonq' in result
+            assert '"select name"' in result
+        finally:
+            os.unlink(tmp)
+
+    def test_validate_schema_repairs_where_field(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([{"name": "Alice", "city": "Chicago"}], f)
+            tmp = f.name
+        try:
+            result = validate_query_against_schema(
+                tmp, compile_query("select name where cty = 'Chicago'")
+            )
+            assert result is not None
+            assert "cty -> city" in result
+            assert "\"select name where city = 'Chicago'\"" in result
+        finally:
+            os.unlink(tmp)
+
+    def test_validate_schema_repairs_sort_field(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([{"name": "Alice", "age": 30}], f)
+            tmp = f.name
+        try:
+            result = validate_query_against_schema(
+                tmp, compile_query("select name sort ag desc")
+            )
+            assert result is not None
+            assert "ag -> age" in result
+            assert '"select name sort age desc"' in result
+        finally:
+            os.unlink(tmp)
+
+    def test_validate_schema_repairs_aggregation_field(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([{"age": 30}], f)
+            tmp = f.name
+        try:
+            result = validate_query_against_schema(
+                tmp, compile_query("select avg(ag) as avg_age")
+            )
+            assert result is not None
+            assert "ag -> age" in result
+            assert '"select avg(age) as avg_age"' in result
+        finally:
+            os.unlink(tmp)
+
+    def test_validate_schema_repairs_nested_field(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([{"profile": {"email": "alice@example.com"}}], f)
+            tmp = f.name
+        try:
+            result = validate_query_against_schema(
+                tmp, compile_query("select profile.emali")
+            )
+            assert result is not None
+            assert "profile.emali -> profile.email" in result
+            assert '"select profile.email"' in result
         finally:
             os.unlink(tmp)
 

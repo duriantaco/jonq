@@ -412,7 +412,7 @@ jonq --completions fish > ~/.config/fish/completions/jonq.fish
 
 - **No query was provided**: Run `jonq data.json` to inspect the file, or pass a query such as `jonq data.json "select *"`.
 
-- **A field is missing or misspelled**: jonq validates top-level fields for normal file inputs and suggests close matches.
+- **A field is missing or misspelled**: jonq validates fields in selections, filters, sorting, grouping, and aggregations, then suggests close matches and a copy-paste `Try:` command.
 
 - **Streaming mode rejected a query**: Use non-streaming mode for global operations like aggregation, grouping, sorting, distinct, or limit.
 

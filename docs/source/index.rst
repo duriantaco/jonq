@@ -33,7 +33,7 @@ Key Features
 - **Table output**: ``-t`` for aligned terminal tables
 - **JSONL / YAML output**: ``--format jsonl`` and ``--format yaml``
 - **Raw scalar output**: ``-r`` for unquoted values in shell pipelines
-- **Path explorer**: run ``jonq data.json`` with no query
+- **Smart Inspect**: run ``jonq data.json`` to see fields, samples, and suggested queries
 - **Interactive REPL**: ``jonq -i data.json`` with tab completion and history
 - **Follow mode**: ``--follow`` to stream NDJSON line-by-line
 - **Streaming mode**: ``--stream`` for row-wise root-array queries

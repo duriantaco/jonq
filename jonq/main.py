@@ -9,6 +9,7 @@ import logging
 import asyncio
 import time
 import subprocess
+import shlex
 from collections import OrderedDict
 
 from jonq.api import compile_query, execute_async
@@ -267,31 +268,190 @@ def _collect_schema_paths(sample):
     return paths
 
 
-def _print_schema(json_file: str) -> None:
+def _display_schema_type(type_label: str) -> str:
+    if type_label.startswith("array[") and type_label.endswith("]"):
+        inner = type_label[len("array[") : -1]
+        if inner == "empty":
+            return "array[empty]"
+        parts = [part.strip() for part in inner.split("|")]
+        return "array[" + " | ".join(_display_schema_type(part) for part in parts) + "]"
+    if type_label.startswith("object"):
+        return "object"
+    return {
+        "str": "string",
+        "int": "number",
+        "float": "number",
+        "bool": "boolean",
+    }.get(type_label, type_label)
+
+
+def _format_schema_types(types: list[str]) -> str:
+    labels = []
+    for type_label in types:
+        display = _display_schema_type(type_label)
+        if display not in labels:
+            labels.append(display)
+    return " | ".join(labels)
+
+
+def _root_summary(root_kind: str, sample) -> str:
+    if root_kind == "empty":
+        return "empty"
+    if root_kind == "scalar":
+        return f"scalar {_display_schema_type(_type_label(sample))}"
+    if root_kind == "object":
+        return "object"
+    if root_kind == "array":
+        sample_count = len(sample)
+        if not sample:
+            item_summary = "empty"
+        else:
+            item_types = []
+            for item in sample:
+                item_type = _display_schema_type(_type_label(item))
+                if item_type not in item_types:
+                    item_types.append(item_type)
+            item_summary = " | ".join(item_types)
+            if item_summary == "object":
+                item_summary = "objects"
+        suffix = f"sampled {sample_count} item{'s' if sample_count != 1 else ''}"
+        return f"array of {item_summary} ({suffix})"
+    return root_kind
+
+
+def _is_scalar_schema_info(info) -> bool:
+    return all(
+        not type_label.startswith("object") and not type_label.startswith("array[")
+        for type_label in info["types"]
+    )
+
+
+def _path_leaf(path: str) -> str:
+    return path.replace("[]", "").split(".")[-1].lower()
+
+
+def _pick_select_fields(paths: list[str], limit: int = 3) -> list[str]:
+    preferred_names = (
+        "id",
+        "name",
+        "title",
+        "email",
+        "status",
+        "type",
+        "level",
+        "message",
+        "city",
+    )
+    preferred = [path for path in paths if _path_leaf(path) in preferred_names]
+    selected = []
+    for path in preferred + paths:
+        if path not in selected:
+            selected.append(path)
+        if len(selected) >= limit:
+            break
+    return selected
+
+
+def _format_suggested_command(source: str, query: str, *options: str) -> str:
+    query_arg = f'"{query}"' if '"' not in query else shlex.quote(query)
+    parts = ["jonq", shlex.quote(source), query_arg, *options]
+    return " ".join(parts)
+
+
+def _suggest_queries(source: str, path_map) -> list[str]:
+    flat_scalars = [
+        path
+        for path, info in path_map.items()
+        if "[]" not in path and _is_scalar_schema_info(info)
+    ]
+    if not flat_scalars:
+        return []
+
+    suggestions = []
+    selected = _pick_select_fields(flat_scalars)
+    if selected:
+        suggestions.append(
+            _format_suggested_command(source, f"select {', '.join(selected)}", "-t")
+        )
+
+    raw_candidates = []
+    for leaf in ("name", "title", "email", "message", "id"):
+        raw_candidates.extend(path for path in flat_scalars if _path_leaf(path) == leaf)
+    raw_field = raw_candidates[0] if raw_candidates else flat_scalars[0]
+    suggestions.append(_format_suggested_command(source, f"select {raw_field}", "-r"))
+
+    bool_fields = [
+        path
+        for path in flat_scalars
+        if any(type_label == "bool" for type_label in path_map[path]["types"])
+    ]
+    if bool_fields and selected:
+        suggestions.append(
+            _format_suggested_command(
+                source,
+                f"select {', '.join(selected)} where {bool_fields[0]} = true",
+                "-t",
+            )
+        )
+    else:
+        groupable_names = (
+            "status",
+            "type",
+            "level",
+            "city",
+            "country",
+            "category",
+            "kind",
+            "state",
+            "plan",
+        )
+        group_fields = [
+            path
+            for path in flat_scalars
+            if _path_leaf(path) in groupable_names
+            and any(type_label == "str" for type_label in path_map[path]["types"])
+        ]
+        if group_fields:
+            group_field = group_fields[0]
+            suggestions.append(
+                _format_suggested_command(
+                    source,
+                    f"select {group_field}, count(*) as count group by {group_field}",
+                    "-t",
+                )
+            )
+
+    deduped = []
+    for suggestion in suggestions:
+        if suggestion not in deduped:
+            deduped.append(suggestion)
+    return deduped[:3]
+
+
+def _print_schema(json_file: str, display_name: str | None = None) -> None:
     is_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
     c = _Colors(is_tty)
+    display_name = display_name or json_file
 
     root_kind, sample = _sample_json_for_schema(json_file)
 
     if root_kind == "empty":
-        print(f"{c.BOLD}{json_file}{c.NC}  {c.DIM}(empty){c.NC}")
+        print(f"{c.BOLD}{display_name}{c.NC}")
+        print(f"{c.BOLD}Root:{c.NC} {c.DIM}{_root_summary(root_kind, sample)}{c.NC}")
         return
 
     if root_kind == "scalar":
-        print(
-            f"{c.BOLD}{json_file}{c.NC}  {c.DIM}(scalar: {_type_label(sample)}){c.NC}"
-        )
+        print(f"{c.BOLD}{display_name}{c.NC}")
+        print(f"{c.BOLD}Root:{c.NC} {c.DIM}{_root_summary(root_kind, sample)}{c.NC}")
         print(f"  {sample}")
         return
 
+    print(f"{c.BOLD}{display_name}{c.NC}")
+    print(f"{c.BOLD}Root:{c.NC} {c.DIM}{_root_summary(root_kind, sample)}{c.NC}")
+
     if root_kind == "array":
-        sample_count = len(sample)
-        print(
-            f"{c.BOLD}{json_file}{c.NC}  {c.DIM}(array, sampled {sample_count} item{'s' if sample_count != 1 else ''}){c.NC}"
-        )
         sample_for_display = sample[0] if sample else []
     else:
-        print(f"{c.BOLD}{json_file}{c.NC}  {c.DIM}(object){c.NC}")
         sample_for_display = sample
 
     path_map = _collect_schema_paths(sample)
@@ -299,23 +459,32 @@ def _print_schema(json_file: str) -> None:
         print("  No object-like paths found in sample.")
         return
 
-    print(f"\n{c.BOLD}Paths:{c.NC}")
+    print(f"\n{c.BOLD}Fields:{c.NC}")
     max_key = max((len(k) for k in path_map), default=0)
+    max_type = max(
+        (len(_format_schema_types(info["types"])) for info in path_map.values()),
+        default=0,
+    )
     for key, info in path_map.items():
-        type_label = " | ".join(info["types"])
-        preview = f"  {c.DIM}{info['preview']}{c.NC}" if info["preview"] else ""
+        type_label = _format_schema_types(info["types"])
+        preview = f"  {c.DIM}sample: {info['preview']}{c.NC}" if info["preview"] else ""
         print(
-            f"  {c.GREEN}{key:<{max_key}}{c.NC}  {c.YELLOW}{type_label}{c.NC}{preview}"
+            f"  {c.GREEN}{key:<{max_key}}{c.NC}  {c.YELLOW}{type_label:<{max_type}}{c.NC}{preview}"
         )
 
     print(f"\n{c.BOLD}Sample:{c.NC}")
     sample_json = json.dumps(sample_for_display, indent=2, ensure_ascii=False)
-    print(f"  {sample_json[:SCHEMA_SAMPLE_TRUNCATE]}")
+    sample_text = sample_json[:SCHEMA_SAMPLE_TRUNCATE]
+    for line in sample_text.splitlines():
+        print(f"  {line}")
+    if len(sample_json) > SCHEMA_SAMPLE_TRUNCATE:
+        print("  ...")
 
-    first_paths = list(path_map)[:2]
-    if first_paths:
-        example = ", ".join(first_paths)
-        print(f'\n{c.DIM}Tip: jonq {json_file} "select {example}"{c.NC}')
+    suggestions = _suggest_queries(display_name, path_map)
+    if suggestions:
+        print(f"\n{c.BOLD}Suggested queries:{c.NC}")
+        for suggestion in suggestions:
+            print(f"  {c.DIM}{suggestion}{c.NC}")
 
 
 def _colorize_json(s: str) -> str:
@@ -1090,7 +1259,7 @@ def _show_schema_for_target(target: str) -> None:
     if target.startswith("http://") or target.startswith("https://"):
         tmp = _fetch_url(target)
         try:
-            _print_schema(tmp)
+            _print_schema(tmp, display_name=target)
         finally:
             os.remove(tmp)
         return

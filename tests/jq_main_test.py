@@ -143,18 +143,21 @@ def test_main_version(capsys):
     assert VERSION in captured.out
 
 
-def test_main_schema_preview_shows_nested_paths(tmp_path, capsys):
+def test_main_smart_inspect_shows_fields_and_suggestions(tmp_path, capsys):
     json_file = tmp_path / "nested.json"
     json_file.write_text(
-        '{"user":{"name":"Alice","address":{"city":"New York"}},"orders":[{"id":1,"price":1200}]}'
+        '[{"id":1,"name":"Alice","active":true,"user":{"address":{"city":"New York"}}}]'
     )
 
     with patch("sys.argv", ["jonq", str(json_file)]):
         main()
 
     captured = capsys.readouterr()
-    assert "Paths:" in captured.out
-    assert "user.name" in captured.out
+    assert "Root: array of objects" in captured.out
+    assert "Fields:" in captured.out
     assert "user.address.city" in captured.out
-    assert "orders[]" in captured.out
-    assert "orders[].price" in captured.out
+    assert "sample: \"Alice\"" in captured.out
+    assert "Suggested queries:" in captured.out
+    assert "select id, name, user.address.city" in captured.out
+    assert "select name" in captured.out
+    assert "where active = true" in captured.out

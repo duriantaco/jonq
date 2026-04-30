@@ -280,7 +280,7 @@ tail -f app.ndjson | jonq --follow "select level, message if level = 'error'" -t
 
 ## Inspect Before Querying
 
-Run jonq with no query to inspect paths, inferred types, sample values, and a suggested query:
+Run jonq with no query to inspect shape, fields, sample values, and suggested queries:
 
 ```bash
 jonq data.json
@@ -289,13 +289,14 @@ jonq data.json
 Example output:
 
 ```text
-data.json  (array, sampled 3 items)
+data.json
+Root: array of objects (sampled 3 items)
 
-Paths:
-  id    int  1
-  name  str  "Alice"
-  age   int  30
-  city  str  "New York"
+Fields:
+  id    number  sample: 1
+  name  string  sample: "Alice"
+  age   number  sample: 30
+  city  string  sample: "New York"
 
 Sample:
   {
@@ -305,7 +306,10 @@ Sample:
     "city": "New York"
   }
 
-Tip: jonq data.json "select id, name"
+Suggested queries:
+  jonq data.json "select id, name, city" -t
+  jonq data.json "select name" -r
+  jonq data.json "select city, count(*) as count group by city" -t
 ```
 
 ## Streaming and Watch Modes

@@ -542,16 +542,16 @@ Choose how results are displayed:
   Prints one selected value per line, without JSON string quotes. Multi-field
   rows remain compact JSON objects, one per line.
 
-Path Explorer
+Smart Inspect
 --------------
 
-Run ``jonq`` with just a file (no query) to inspect nested JSON paths before writing a query:
+Run ``jonq`` with just a file (no query) to inspect the root shape, fields, sample values, and suggested queries before writing a query:
 
 .. code-block:: bash
 
    jonq data.json
 
-This shows file info, nested paths with inferred types, and a truncated sample object.
+This shows root type information, nested fields with inferred types, a truncated sample object, and copy-paste query suggestions based on the fields found in the data.
 
 Interactive REPL
 -----------------
@@ -681,7 +681,7 @@ Debugging Queries
 ~~~~~~~~~~~~~~~~~~
 
 - **Test Small:** Start with a simple ``select *`` to verify the JSON structure.
-- **Use the Path Explorer:** Run ``jonq data.json`` (no query) to inspect nested paths and types.
+- **Use Smart Inspect:** Run ``jonq data.json`` (no query) to inspect nested fields, types, samples, and suggested queries.
 - **See the jq filter:** Use ``--jq`` to see the generated jq filter, or ``--explain`` for a full breakdown.
 - **Quote Strings:** Always quote string literals in conditions (e.g., ``'New York'``).
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **Query repair suggestions** now handle dotted string literals, sparse arrays, nested leaf matches, quoted special-character keys, `from` queries, expression fields, and selected aliases in `having` clauses.
+
 ## [v0.3.3] - 2026-04-30
 
 ### Added

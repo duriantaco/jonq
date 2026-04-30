@@ -43,6 +43,18 @@ def _fuzzy_suggest(
     return [c[1] for c in candidates[:FUZZY_MAX_RESULTS]]
 
 
+def _strip_quoted_strings(value: str) -> str:
+    return re.sub(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'', " ", value)
+
+
+def _format_query_field(path: str) -> str:
+    simple_segment = r"[A-Za-z_][\w]*(?:\[\])?"
+    if all(re.fullmatch(simple_segment, segment) for segment in path.split(".")):
+        return path
+    escaped = path.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
 def _collect_available_fields(data, prefix: str = "", depth: int = 0) -> list[str]:
     if depth > 5:
         return []
@@ -78,19 +90,31 @@ def _collect_available_fields(data, prefix: str = "", depth: int = 0) -> list[st
     return deduped
 
 
-def _best_field_suggestion(name: str, available: list[str]) -> str | None:
+def _best_field_suggestion(
+    name: str, available: list[str], aliases: list[str] | None = None
+) -> str | None:
+    aliases = aliases or []
+    alias_matches = _fuzzy_suggest(name, aliases)
+    if alias_matches:
+        return alias_matches[0]
+
+    name_leaf = name.replace("[]", "").split(".")[-1]
+    leaf_matches = []
+    for field in available:
+        field_leaf = field.replace("[]", "").split(".")[-1]
+        if name_leaf == field_leaf:
+            leaf_matches.append((0, _edit_distance(name, field), field))
+            continue
+        leaf_distance = _edit_distance(name_leaf.lower(), field_leaf.lower())
+        if leaf_distance <= 2:
+            leaf_matches.append((leaf_distance, _edit_distance(name, field), field))
+    leaf_matches.sort()
+    if leaf_matches:
+        return leaf_matches[0][2]
+
     direct = _fuzzy_suggest(name, available)
     if direct:
         return direct[0]
-
-    name_leaf = name.replace("[]", "").split(".")[-1]
-    leaf_matches = [
-        field
-        for field in available
-        if _fuzzy_suggest(name_leaf, [field.replace("[]", "").split(".")[-1]], max_dist=2)
-    ]
-    if leaf_matches:
-        return leaf_matches[0]
 
     return None
 
@@ -104,6 +128,44 @@ def _is_simple_field_ref(value: str | None) -> bool:
     if not value or value == "*":
         return False
     return bool(re.fullmatch(r"[A-Za-z_][\w]*(?:\[\])?(?:\.[A-Za-z_][\w]*(?:\[\])?)*", value))
+
+
+def _extract_from_data(data, from_path: str | None):
+    if not from_path:
+        return data
+
+    current = data
+    path = from_path.strip()
+    if path.startswith("[]"):
+        if not isinstance(current, list):
+            return None
+        current = current
+        path = path[2:].lstrip(".")
+    else:
+        current = [current]
+
+    if not path:
+        return current
+
+    for raw_segment in path.split("."):
+        if not raw_segment:
+            continue
+        expand = raw_segment.endswith("[]")
+        segment = raw_segment[:-2] if expand else raw_segment
+        next_items = []
+        for item in current:
+            if isinstance(item, dict) and segment in item:
+                value = item[segment]
+                if expand:
+                    if isinstance(value, list):
+                        next_items.extend(value)
+                else:
+                    if isinstance(value, list):
+                        next_items.extend(value)
+                    else:
+                        next_items.append(value)
+        current = next_items
+    return current
 
 
 def _field_refs_from_compiled(compiled) -> tuple[list[str], set[str]]:
@@ -133,6 +195,10 @@ def _field_refs_from_compiled(compiled) -> tuple[list[str], set[str]]:
             _, param, alias = field
             refs.append(param)
             aliases.add(alias)
+        elif kind == "expression":
+            _, expr, alias = field
+            refs.extend(_field_refs_from_expression(expr))
+            aliases.add(alias)
 
     refs.extend(getattr(compiled, "group_by", ()) or ())
 
@@ -154,6 +220,7 @@ def _field_refs_from_expression(expr: str | None) -> list[str]:
     if not expr:
         return []
 
+    expr = _strip_quoted_strings(expr)
     refs = []
     for match in re.finditer(r"\.([A-Za-z_][\w]*(?:\?\.[A-Za-z_][\w]*)*)\??", expr):
         refs.append(match.group(1).replace("?.", ".").rstrip("?"))
@@ -161,19 +228,47 @@ def _field_refs_from_expression(expr: str | None) -> list[str]:
     if refs:
         return refs
 
-    cleaned = re.sub(r"(['\"]).*?\1", " ", expr)
+    cleaned = expr
     skip = {
+        "abs",
         "and",
-        "or",
+        "avg",
+        "between",
+        "case",
+        "ceil",
+        "coalesce",
+        "contains",
+        "count",
+        "else",
+        "end",
+        "false",
+        "float",
+        "floor",
+        "fromdate",
+        "if_null",
+        "in",
+        "int",
+        "is",
+        "keys",
+        "length",
+        "like",
+        "lower",
+        "max",
+        "min",
         "not",
         "null",
+        "or",
+        "round",
+        "str",
+        "sum",
+        "then",
+        "todate",
+        "trim",
         "true",
-        "false",
-        "contains",
-        "in",
-        "like",
-        "between",
-        "is",
+        "type",
+        "upper",
+        "values",
+        "when",
     }
     for token in re.findall(r"\b[A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)*\b", cleaned):
         if token.lower() not in skip:
@@ -237,7 +332,7 @@ def _format_query_repair_message(
 ) -> str:
     repaired = query
     for old, new in replacements.items():
-        repaired = _replace_field_reference(repaired, old, new)
+        repaired = _replace_field_reference(repaired, old, _format_query_field(new))
 
     lines = [f"Unknown field(s): {', '.join(bad_refs)}"]
     nearby = []
@@ -440,19 +535,13 @@ def validate_query_against_schema(json_file: str, query) -> str | None:
         with open(json_file, "r", encoding="utf-8") as fp:
             data = json.load(fp)
 
-        if isinstance(data, list) and data:
-            sample = next((item for item in data if isinstance(item, dict)), data[0])
-        else:
-            sample = data
-
-        if not isinstance(sample, dict):
+        from_path = getattr(query, "from_path", None)
+        validation_data = _extract_from_data(data, from_path)
+        available = _collect_available_fields(validation_data)
+        if not available:
             return None
 
-        available = _collect_available_fields(sample)
         available_set = set(available)
-
-        if re.search(r"\bfrom\b", query_text, flags=re.IGNORECASE):
-            return None
 
         if hasattr(query, "fields"):
             refs, aliases = _field_refs_from_compiled(query)
@@ -471,7 +560,7 @@ def validate_query_against_schema(json_file: str, query) -> str | None:
             elif ref not in available_set:
                 bad.append(ref)
 
-            suggestion = _best_field_suggestion(ref, available)
+            suggestion = _best_field_suggestion(ref, available, sorted(aliases))
             if suggestion:
                 replacements[ref] = suggestion
 

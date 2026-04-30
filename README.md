@@ -3,7 +3,7 @@
 
 # jonq - readable JSON queries for the terminal
 
-### A jq-powered CLI for inspecting, filtering, and reshaping JSON without writing raw jq
+### A jq-powered CLI for inspecting, filtering, and reshaping JSON without memorizing jq syntax
 
 [![PyPI version](https://img.shields.io/pypi/v/jonq.svg)](https://pypi.org/project/jonq/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/jonq.svg)](https://pypi.org/project/jonq/)
@@ -15,21 +15,53 @@
 
 ---
 
+## Install
+
+jonq requires Python 3.9+ and the `jq` command-line tool.
+
+```bash
+pipx install jonq
+# or
+pip install jonq
+```
+
+Check that `jq` is available:
+
+```bash
+jq --version
+```
+
 ## What jonq is
 
-`jonq` is a command-line JSON query tool. It lets you write readable, SQL-like queries such as:
+`jonq` is a command-line JSON query tool for the messy first minutes with an API response, config file, generated JSON, or log payload.
+
+It lets you inspect an unfamiliar payload before writing a query:
+
+```bash
+jonq data.json
+```
+
+Then extract what you need with readable, SQL-like syntax:
 
 ```bash
 jonq users.json "select name, age if age > 30" -t
 ```
 
-Instead of raw jq:
+Instead of writing the equivalent raw jq:
 
 ```bash
 jq '.[] | select(.age > 30) | {name, age}' users.json
 ```
 
-jonq compiles your query to jq and executes it with a reusable jq worker. It is useful when you need to understand an unfamiliar JSON payload, extract fields, filter rows, flatten nested arrays, or turn JSON into table, CSV, JSONL, YAML, or raw scalar output.
+jonq compiles your query to jq and executes it with a reusable jq worker. It is useful when you need to understand JSON shape, extract fields, filter rows, flatten nested arrays, or turn JSON into table, CSV, JSONL, YAML, or raw scalar output.
+
+It also helps when you mistype fields:
+
+```text
+Unknown field(s): firts_name
+Did you mean: firts_name -> first_name?
+Try: jonq users.json "select first_name"
+```
 
 > jonq is not a database, ETL framework, or analytics engine. It is a JSON exploration and shaping tool for terminal workflows.
 
@@ -53,26 +85,12 @@ Use another tool when you need:
 - joins, window functions, or relational analytics: use a database or analytics engine
 - production ETL, scheduling, or connectors: use an ETL system
 
-## Install
-
-jonq requires Python 3.9+ and the `jq` command-line tool.
-
-```bash
-pip install jonq
-```
-
-From source:
+## From Source
 
 ```bash
 git clone https://github.com/duriantaco/jonq.git
 cd jonq
 pip install -e .
-```
-
-Check that `jq` is available:
-
-```bash
-jq --version
 ```
 
 ## Quick Start

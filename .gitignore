@@ -9,6 +9,8 @@ chunks
 venv
 target/
 dist
+docs/build/
+docs/_build/
 
 # Local OS artifacts
 .DS_Store

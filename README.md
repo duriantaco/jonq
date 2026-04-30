@@ -447,6 +447,7 @@ jonq --completions fish > ~/.config/fish/completions/jonq.fish
 ## Documentation
 
 - Full docs: https://jonq.readthedocs.io/en/latest/
+- Cookbook: https://jonq.readthedocs.io/en/latest/cookbook.html
 - Syntax reference: [SYNTAX.md](SYNTAX.md)
 - Usage examples: [USAGE.md](USAGE.md)
 - Contributing: [CONTRIBUTIONS.md](CONTRIBUTIONS.md)

@@ -1,0 +1,40 @@
+name: Workflow request
+description: Suggest a real terminal JSON workflow that jonq should make smoother.
+title: "Workflow: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for workflows, not isolated syntax wishes. The best requests include a source of JSON, the desired output, and what you do after that output.
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow
+      description: What are you doing from start to finish?
+      placeholder: "Example: curl an API, inspect unknown fields, extract a few nested values, and save CSV for a spreadsheet."
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Example input or source
+      description: Link to an API/docs page or paste a small sample. Redact secrets.
+      render: json
+  - type: textarea
+    id: output
+    attributes:
+      label: Desired output
+      description: Show the table, CSV, JSONL, raw values, or JSON shape you want.
+      render: text
+  - type: textarea
+    id: current-tools
+    attributes:
+      label: What tools do you use today?
+      description: jq, gron, jello, Python, DuckDB, shell scripts, spreadsheet import, etc.
+  - type: checkboxes
+    id: direction
+    attributes:
+      label: Direction check
+      options:
+        - label: This would help with common JSON exploration or extraction.
+        - label: This should stay readable and not turn jonq into a full database or ETL system.

@@ -6,6 +6,11 @@ from jonq.main import (
     _concat_glob,
     _type_label,
     _preview_value,
+    _collect_schema_paths,
+    _display_schema_type,
+    _format_schema_types,
+    _root_summary,
+    _suggest_queries,
     _json_to_raw,
     _json_to_yaml,
     _json_to_yaml_simple,
@@ -115,6 +120,37 @@ class TestPreviewValue:
     def test_simple_list(self):
         result = _preview_value([1, 2, 3])
         assert "1" in result
+
+
+class TestSmartInspectHelpers:
+    def test_display_schema_type_uses_readable_names(self):
+        assert _display_schema_type("str") == "string"
+        assert _display_schema_type("bool") == "boolean"
+        assert _display_schema_type("array[object{2}]") == "array[object]"
+
+    def test_format_schema_types_deduplicates_number_labels(self):
+        assert _format_schema_types(["int", "float", "str"]) == "number | string"
+
+    def test_root_summary_for_sampled_array(self):
+        summary = _root_summary("array", [{"id": 1}, {"id": 2}])
+
+        assert summary == "array of objects (sampled 2 items)"
+
+    def test_suggest_queries_from_schema_paths(self):
+        sample = [
+            {"id": 1, "name": "Alice", "active": True, "city": "Singapore"},
+            {"id": 2, "name": "Bob", "active": False, "city": "Tokyo"},
+        ]
+        paths = _collect_schema_paths(sample)
+
+        suggestions = _suggest_queries("users.json", paths)
+
+        assert 'jonq users.json "select id, name, city" -t' in suggestions
+        assert 'jonq users.json "select name" -r' in suggestions
+        assert (
+            'jonq users.json "select id, name, city where active = true" -t'
+            in suggestions
+        )
 
 
 class TestValidateInputFile:

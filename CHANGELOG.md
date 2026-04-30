@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Smart Inspect mode**: running `jonq data.json` now shows root shape, readable field types, sample values, and suggested queries without adding new CLI flags.
+
 ## [v0.3.1] - 2026-04-29
 
 ### Added

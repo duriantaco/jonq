@@ -45,7 +45,7 @@ JSON
 
 ## Inspect JSON First
 
-Run jonq with no query to see paths, types, sample values, and a suggested query:
+Run jonq with no query to see the root shape, fields, sample values, and suggested queries:
 
 ```bash
 jonq users.json

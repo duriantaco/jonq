@@ -73,6 +73,9 @@ Use jonq when you need to:
 - select and rename fields without remembering jq object syntax
 - filter JSON with readable conditions
 - query nested objects and arrays
+- profile field presence, nulls, and type conflicts
+- diff JSON shape changes across files or runs
+- run repeatable local checks from `jonq.yaml`
 - produce table, CSV, JSONL, YAML, raw scalar, or compact JSON output
 - run the same query in shell scripts, CI, or Python code
 - follow NDJSON logs line-by-line
@@ -330,6 +333,72 @@ Suggested queries:
   jonq data.json "select city, count(*) as count group by city" -t
 ```
 
+## Profile, Diff, And Check
+
+Use `profile` when you need more than the quick no-query inspect view:
+
+```bash
+jonq profile response.json
+```
+
+It reports each discovered path, inferred types, present count, null count, missing count, and a sample value. Use JSON output when another tool needs the profile:
+
+```bash
+jonq profile response.json --format json
+```
+
+Compare two payload shapes with `diff`:
+
+```bash
+jonq diff old-response.json new-response.json
+jonq diff old-response.json new-response.json --fail-on-change
+```
+
+Run one-off checks from flags:
+
+```bash
+jonq check response.json \
+  --require id,email,status \
+  --type id:number \
+  --type email:string \
+  --no-null id,email \
+  --min-count 1
+```
+
+Or save queries and checks in `jonq.yaml`:
+
+```yaml
+queries:
+  active_users:
+    source: users.json
+    query: select id, email, status if status = 'active'
+    format: table
+
+checks:
+  user_contract:
+    source: users.json
+    require:
+      - id
+      - email
+      - status
+    types:
+      id: number
+      email: string
+      status: string
+    no_null:
+      - id
+      - email
+    min_count: 1
+```
+
+Then run the saved workflow:
+
+```bash
+jonq run active_users
+jonq check user_contract
+jonq check --all
+```
+
 ## Streaming and Watch Modes
 
 Streaming mode processes root-array JSON in chunks:
@@ -390,6 +459,17 @@ print(query([{"name": "Alice", "age": 30}], compiled))
 Async helpers are also available: `query_async(...)` and `execute_async(...)`.
 
 ## CLI Options
+
+Workbench commands:
+
+| Command | Description |
+|---------|-------------|
+| `jonq profile FILE` | Show field paths, types, present/null/missing counts, and samples |
+| `jonq diff OLD NEW` | Compare two JSON profiles and show shape drift |
+| `jonq check [NAME\|FILE]` | Run named checks from `jonq.yaml` or inline flag-based checks |
+| `jonq run NAME` | Run a named query from `jonq.yaml` |
+
+Query options:
 
 | Option | Description |
 |--------|-------------|

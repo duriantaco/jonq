@@ -14,6 +14,17 @@ from collections import OrderedDict
 
 from jonq.api import compile_query, execute_async
 from jonq.error_handler import _format_query_field, handle_error_with_context
+from jonq.workbench import (
+    build_profile,
+    build_profile_from_data,
+    compare_profiles,
+    format_check_result,
+    format_diff,
+    format_profile,
+    load_config,
+    normalize_list,
+    run_profile_check,
+)
 from jonq.constants import (
     _Colors,
     VERSION,
@@ -30,6 +41,8 @@ from jonq.constants import (
 )
 
 logger = logging.getLogger(__name__)
+
+_WORKBENCH_COMMANDS = {"profile", "diff", "check", "run"}
 
 
 def _looks_like_ndjson(path: str) -> bool:
@@ -804,12 +817,13 @@ def _generate_completions(shell: str) -> str:
 _jonq_completions() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local opts="-i -f -t -r -s -n -o -p -w --format --table --raw --raw-output --stream --ndjson --limit --out --jq --explain --time --pretty --watch --follow --no-color --version --help --completions"
+    local commands="profile diff check run"
     local keywords="select if where from group by having sort asc desc limit distinct and or not in like between contains as case when then else end is null coalesce count sum avg min max upper lower length round abs ceil floor int float str type keys values trim todate fromdate date tojson fromjson"
 
     if [[ "${cur}" == -* ]]; then
         COMPREPLY=($(compgen -W "${opts}" -- "${cur}"))
     elif [[ "${COMP_CWORD}" == 1 ]]; then
-        COMPREPLY=($(compgen -f -X '!*.json' -- "${cur}") $(compgen -f -X '!*.jsonl' -- "${cur}"))
+        COMPREPLY=($(compgen -W "${commands}" -- "${cur}") $(compgen -f -X '!*.json' -- "${cur}") $(compgen -f -X '!*.jsonl' -- "${cur}"))
     else
         COMPREPLY=($(compgen -W "${keywords}" -- "${cur}"))
     fi
@@ -819,7 +833,7 @@ complete -F _jonq_completions jonq'''
         return '''# jonq zsh completion
 # Add to ~/.zshrc: eval "$(jonq --completions zsh)"
 _jonq() {
-    local -a opts keywords
+    local -a opts commands keywords
     opts=(
         '-i:Interactive mode'
         '-f:Output format'
@@ -839,11 +853,13 @@ _jonq() {
         '--no-color:No color'
         '--completions:Shell completions'
     )
+    commands=(profile diff check run)
     keywords=(select if where from group by having sort asc desc limit distinct and or not in like between contains as case when then else end is null coalesce count sum avg min max upper lower length round abs ceil floor int float str type keys values trim todate fromdate)
 
     if [[ "${words[2]}" == -* ]]; then
         _describe 'options' opts
     elif [[ ${CURRENT} -eq 2 ]]; then
+        compadd "${commands[@]}"
         _files -g '*.json(|l)'
     else
         compadd "${keywords[@]}"
@@ -869,6 +885,10 @@ complete -c jonq -l explain -d 'Explain query'
 complete -c jonq -l time -d 'Show timing'
 complete -c jonq -l no-color -d 'No color'
 complete -c jonq -l completions -d 'Shell completions' -x -a 'bash zsh fish'
+complete -c jonq -n '__fish_use_subcommand' -a 'profile' -d 'Profile JSON fields'
+complete -c jonq -n '__fish_use_subcommand' -a 'diff' -d 'Diff JSON profiles'
+complete -c jonq -n '__fish_use_subcommand' -a 'check' -d 'Run JSON checks'
+complete -c jonq -n '__fish_use_subcommand' -a 'run' -d 'Run named query'
 complete -c jonq -l version -d 'Show version\''''
     return ""
 
@@ -1019,8 +1039,13 @@ async def _amain(argv: list[str] | None = None):
         format="%(levelname)s:%(name)s:%(message)s", level=logging.WARNING
     )
 
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    if raw_argv and raw_argv[0] in _WORKBENCH_COMMANDS:
+        await _run_workbench_command(raw_argv)
+        return
+
     parser = _build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(raw_argv)
 
     if getattr(args, "completions", None):
         print(_generate_completions(args.completions))
@@ -1155,6 +1180,10 @@ def _build_parser() -> argparse.ArgumentParser:
             '  jonq data.json "select name, age if age > 30"\n'
             '  jonq data.json "select name, age" -t\n'
             "  jonq data.json\n"
+            "  jonq profile data.json\n"
+            "  jonq diff old.json new.json\n"
+            "  jonq check user_contract\n"
+            "  jonq run active_users\n"
             "  jonq -i data.json\n"
             '  curl api.example.com/data | jonq "select id, name"\n'
             "  tail -f app.log | jonq --follow \"select level, msg if level = 'error'\"\n"
@@ -1287,6 +1316,300 @@ def _options_from_args(args: argparse.Namespace) -> dict:
         "no_color": args.no_color,
         "follow": getattr(args, "follow", False),
     }
+
+
+async def _run_workbench_command(argv: list[str]) -> None:
+    command = argv[0]
+    try:
+        if command == "profile":
+            _run_profile_command(argv[1:])
+        elif command == "diff":
+            _run_diff_command(argv[1:])
+        elif command == "check":
+            await _run_check_command(argv[1:])
+        elif command == "run":
+            await _run_named_query_command(argv[1:])
+        else:
+            raise ValueError(f"Unknown command: {command}")
+    except SystemExit:
+        raise
+    except Exception as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _run_profile_command(argv: list[str]) -> None:
+    parser = argparse.ArgumentParser(
+        prog="jonq profile",
+        description="Profile JSON fields, types, nulls, and missing values.",
+    )
+    parser.add_argument("source", help="Local JSON or NDJSON file")
+    parser.add_argument(
+        "-f",
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help="Output format",
+    )
+    parser.add_argument(
+        "--max-records",
+        type=int,
+        help="Profile only the first N records",
+    )
+    args = parser.parse_args(argv)
+
+    validate_input_file(args.source)
+    profile = build_profile(args.source, max_records=args.max_records)
+    if args.format == "json":
+        print(json.dumps(profile.to_dict(), ensure_ascii=False, indent=2))
+    else:
+        print(format_profile(profile))
+
+
+def _run_diff_command(argv: list[str]) -> None:
+    parser = argparse.ArgumentParser(
+        prog="jonq diff",
+        description="Compare JSON profiles and show shape drift.",
+    )
+    parser.add_argument("old", help="Old/baseline JSON or NDJSON file")
+    parser.add_argument("new", help="New/current JSON or NDJSON file")
+    parser.add_argument(
+        "-f",
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help="Output format",
+    )
+    parser.add_argument(
+        "--fail-on-change",
+        action="store_true",
+        help="Exit with status 1 when profile changes are found",
+    )
+    args = parser.parse_args(argv)
+
+    validate_input_file(args.old)
+    validate_input_file(args.new)
+    diff = compare_profiles(build_profile(args.old), build_profile(args.new))
+    if args.format == "json":
+        print(json.dumps(diff.to_dict(), ensure_ascii=False, indent=2))
+    else:
+        print(format_diff(diff))
+    if args.fail_on_change and diff.has_changes():
+        sys.exit(1)
+
+
+async def _run_check_command(argv: list[str]) -> None:
+    parser = argparse.ArgumentParser(
+        prog="jonq check",
+        description="Run JSON contract checks from flags or jonq.yaml.",
+    )
+    parser.add_argument("target", nargs="?", help="Check name or source file")
+    parser.add_argument(
+        "-c",
+        "--config",
+        default="jonq.yaml",
+        help="Path to jonq.yaml",
+    )
+    parser.add_argument("--all", action="store_true", help="Run all configured checks")
+    parser.add_argument("--source", help="Source file for an inline check")
+    parser.add_argument(
+        "--require",
+        action="append",
+        help="Required field path; repeat or pass comma-separated values",
+    )
+    parser.add_argument(
+        "--no-null",
+        action="append",
+        help="Field path that must not contain null; repeat or comma-separate",
+    )
+    parser.add_argument(
+        "--type",
+        dest="types",
+        action="append",
+        help="Type expectation such as field:string or field=number|string",
+    )
+    parser.add_argument("--min-count", type=int, help="Minimum record count")
+    parser.add_argument("--max-count", type=int, help="Maximum record count")
+    parser.add_argument(
+        "-f",
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help="Output format",
+    )
+    args = parser.parse_args(argv)
+
+    inline_requested = any(
+        (
+            args.source,
+            args.require,
+            args.no_null,
+            args.types,
+            args.min_count is not None,
+            args.max_count is not None,
+        )
+    )
+
+    specs: list[tuple[str, dict]] = []
+    if args.all or (not args.target and not inline_requested):
+        config = load_config(args.config)
+        checks = config.get("checks") or {}
+        if not isinstance(checks, dict) or not checks:
+            raise ValueError(f"No checks found in {args.config}.")
+        specs.extend((name, spec) for name, spec in checks.items())
+    elif inline_requested:
+        specs.append(("inline", _inline_check_spec(args)))
+    else:
+        config = load_config(args.config)
+        checks = config.get("checks") or {}
+        if not isinstance(checks, dict) or args.target not in checks:
+            raise ValueError(f"Check '{args.target}' was not found in {args.config}.")
+        specs.append((args.target, checks[args.target]))
+
+    results = []
+    for name, spec in specs:
+        if not isinstance(spec, dict):
+            raise ValueError(f"Check '{name}' must be a mapping.")
+        profile = await _profile_for_check_spec(name, spec)
+        results.append(run_profile_check(profile, spec, name))
+
+    if args.format == "json":
+        payload = [result.to_dict() for result in results]
+        if len(payload) == 1:
+            print(json.dumps(payload[0], ensure_ascii=False, indent=2))
+        else:
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print("\n\n".join(format_check_result(result) for result in results))
+
+    if any(not result.ok for result in results):
+        sys.exit(1)
+
+
+def _inline_check_spec(args: argparse.Namespace) -> dict:
+    source = args.source or args.target
+    if not source:
+        raise ValueError("Inline checks need a source file.")
+    spec: dict[str, object] = {"source": source}
+    if args.require:
+        spec["require"] = normalize_list(args.require)
+    if args.no_null:
+        spec["no_null"] = normalize_list(args.no_null)
+    if args.types:
+        spec["types"] = _parse_type_expectations(args.types)
+    if args.min_count is not None:
+        spec["min_count"] = args.min_count
+    if args.max_count is not None:
+        spec["max_count"] = args.max_count
+    if len(spec) == 1:
+        raise ValueError("Inline checks need at least one assertion.")
+    return spec
+
+
+def _parse_type_expectations(values: list[str]) -> dict[str, str]:
+    expectations = {}
+    for raw in values:
+        for item in normalize_list(raw):
+            if ":" in item:
+                path, expected = item.split(":", 1)
+            elif "=" in item:
+                path, expected = item.split("=", 1)
+            else:
+                raise ValueError(
+                    "--type expects field:type or field=type, for example id:number"
+                )
+            expectations[path.strip()] = expected.strip()
+    return expectations
+
+
+async def _profile_for_check_spec(name: str, spec: dict) -> object:
+    source = spec.get("source")
+    if not source:
+        raise ValueError(f"Check '{name}' needs a source.")
+    validate_input_file(source)
+
+    query = spec.get("query")
+    if query:
+        result = await execute_async(source, query, format="json", validate=True)
+        return build_profile_from_data(
+            result.data,
+            source=f"{source} | {query}",
+            root="query",
+        )
+
+    return build_profile(source)
+
+
+async def _run_named_query_command(argv: list[str]) -> None:
+    parser = argparse.ArgumentParser(
+        prog="jonq run",
+        description="Run a named query from jonq.yaml.",
+    )
+    parser.add_argument("name", help="Named query from jonq.yaml")
+    parser.add_argument(
+        "-c",
+        "--config",
+        default="jonq.yaml",
+        help="Path to jonq.yaml",
+    )
+    parser.add_argument(
+        "-f",
+        "--format",
+        choices=("json", "jsonl", "csv", "table", "yaml"),
+        help="Override configured output format",
+    )
+    parser.add_argument("-r", "--raw", "--raw-output", dest="raw_output", action="store_true")
+    parser.add_argument("-p", "--pretty", action="store_true", help="Pretty-print JSON")
+    parser.add_argument("-o", "--out", help="Write output to file")
+    parser.add_argument("--jq", dest="show_jq", action="store_true", help="Print jq")
+    parser.add_argument("--explain", action="store_true", help="Explain query")
+    parser.add_argument("--no-color", action="store_true", help="Disable color")
+    args = parser.parse_args(argv)
+
+    config = load_config(args.config)
+    queries = config.get("queries") or {}
+    if not isinstance(queries, dict) or args.name not in queries:
+        raise ValueError(f"Query '{args.name}' was not found in {args.config}.")
+
+    spec = queries[args.name]
+    if not isinstance(spec, dict):
+        raise ValueError(f"Query '{args.name}' must be a mapping.")
+    source = spec.get("source")
+    query = spec.get("query")
+    if not source or not query:
+        raise ValueError(f"Query '{args.name}' needs source and query.")
+
+    fmt = args.format or spec.get("format") or "json"
+    options = {
+        "format": fmt,
+        "streaming": False,
+        "ndjson": False,
+        "limit": spec.get("limit"),
+        "out": args.out or spec.get("out"),
+        "show_jq": args.show_jq,
+        "explain": args.explain,
+        "show_time": False,
+        "pretty": args.pretty,
+        "raw_output": args.raw_output,
+        "watch": False,
+        "no_color": args.no_color,
+        "follow": False,
+    }
+    if options.get("raw_output") and options["format"] != "json":
+        raise ValueError("--raw/--raw-output can only be used with JSON output.")
+
+    validate_input_file(source)
+    result = await _run_query(source, query, options)
+    if result:
+        out_path = options.get("out")
+        if out_path:
+            import re
+
+            clean = re.sub(r"\033\[[0-9;]*m", "", result)
+            with open(out_path, "w", encoding="utf-8") as fp:
+                fp.write(clean + ("\n" if not clean.endswith("\n") else ""))
+        else:
+            print(result)
 
 
 def _show_schema_for_target(target: str) -> None:

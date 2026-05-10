@@ -14,6 +14,10 @@ Run ``jonq`` with the following syntax:
 .. code-block:: bash
 
    jonq <path/to/json_file> "<query>" [options]
+   jonq profile <path/to/json_file>
+   jonq diff <old.json> <new.json>
+   jonq check [check_name|path/to/json_file]
+   jonq run <query_name>
 
 **Available Options:**
 
@@ -552,6 +556,76 @@ Run ``jonq`` with just a file (no query) to inspect the root shape, fields, samp
    jonq data.json
 
 This shows root type information, nested fields with inferred types, a truncated sample object, and copy-paste query suggestions based on the fields found in the data.
+
+Profile, Diff, And Check
+-------------------------
+
+Use ``profile`` when you need a fuller contract-oriented view of a payload:
+
+.. code-block:: bash
+
+   jonq profile response.json
+
+The profile shows each discovered path, inferred types, how many records contain
+that path, how many records contain ``null``, how many records are missing it,
+and a sample value. Use JSON output when another tool or CI job needs to consume
+the profile:
+
+.. code-block:: bash
+
+   jonq profile response.json --format json
+
+Compare two payload shapes with ``diff``:
+
+.. code-block:: bash
+
+   jonq diff old-response.json new-response.json
+   jonq diff old-response.json new-response.json --fail-on-change
+
+Run quick inline checks from flags:
+
+.. code-block:: bash
+
+   jonq check response.json \
+     --require id,email,status \
+     --type id:number \
+     --type email:string \
+     --no-null id,email \
+     --min-count 1
+
+For repeatable workflows, save named queries and checks in ``jonq.yaml``:
+
+.. code-block:: yaml
+
+   queries:
+     active_users:
+       source: users.json
+       query: select id, email, status if status = 'active'
+       format: table
+
+   checks:
+     user_contract:
+       source: users.json
+       require:
+         - id
+         - email
+         - status
+       types:
+         id: number
+         email: string
+         status: string
+       no_null:
+         - id
+         - email
+       min_count: 1
+
+Then run the saved workflow:
+
+.. code-block:: bash
+
+   jonq run active_users
+   jonq check user_contract
+   jonq check --all
 
 Interactive REPL
 -----------------

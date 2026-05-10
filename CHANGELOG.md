@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **JSON workbench commands**: `jonq profile`, `jonq diff`, `jonq check`, and `jonq run`.
+- **`jonq.yaml` workflows** for named queries and repeatable field/type/null/count checks.
+- **Profile output** with field presence, null count, missing count, type conflicts, and sample values.
+- **Shape diffing** for added, removed, changed, newly optional, and newly nullable fields.
+
 ## [v0.3.4] - 2026-04-30
 
 ### Fixed

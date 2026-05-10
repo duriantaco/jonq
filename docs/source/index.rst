@@ -34,6 +34,10 @@ Key Features
 - **JSONL / YAML output**: ``--format jsonl`` and ``--format yaml``
 - **Raw scalar output**: ``-r`` for unquoted values in shell pipelines
 - **Smart Inspect**: run ``jonq data.json`` to see fields, samples, and suggested queries
+- **Profile**: ``jonq profile data.json`` for field presence, nulls, missing counts, and type conflicts
+- **Diff**: ``jonq diff old.json new.json`` to catch shape drift
+- **Checks**: ``jonq check`` with inline assertions or named checks from ``jonq.yaml``
+- **Named queries**: ``jonq run NAME`` from ``jonq.yaml``
 - **Interactive REPL**: ``jonq -i data.json`` with tab completion and history
 - **Follow mode**: ``--follow`` to stream NDJSON line-by-line
 - **Streaming mode**: ``--stream`` for row-wise root-array queries

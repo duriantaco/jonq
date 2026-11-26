@@ -6,7 +6,8 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-JSON_PATH="/Users/oha/jonq/tests/json_test_files"
+cd -- "$(dirname -- "$0")" || exit 1
+JSON_PATH="json_test_files"
 
 # Initialize counters
 total_tests=0
@@ -118,6 +119,7 @@ done
 
 # Print final test summary
 print_summary
+exit "$((failed_tests > 0))"
 
 echo "-----------------------------------------"
 echo "Test script completed"

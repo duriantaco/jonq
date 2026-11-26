@@ -88,9 +88,9 @@ The high-level API accepts:
 Validation and Limits
 ---------------------
 
-File inputs are validated against the sampled JSON schema by default. Disable
-that check only when you know a query refers to fields that are absent from the
-sample:
+File inputs are checked for referenced fields by default. A field can be absent
+from some rows. Set ``validate=False`` when the entire input may omit a field
+intentionally.
 
 .. code-block:: python
 
@@ -111,9 +111,10 @@ Set ``streaming=True`` for row-wise queries over a root-array JSON file:
 
    rows = query("large.json", "select id, name if active = true", streaming=True)
 
-Streaming requires a filesystem path. It rejects aggregations, ``group by``,
-``sort``, ``distinct``, and ``limit`` because those operations need the full
-input.
+Streaming reads a local file incrementally for field validation and query
+execution. The API assembles the result in memory before returning it.
+It rejects aggregations, ``group by``, ``sort``, ``distinct``, and ``limit``
+because those operations need the full input.
 
 Async Usage
 -----------

@@ -1,6 +1,6 @@
 from enum import Enum
 from dataclasses import dataclass
-from typing import List, Any
+from typing import List, Any, Union
 
 
 class PathType(Enum):
@@ -18,6 +18,7 @@ class PathElement:
 @dataclass
 class Path:
     elements: List[PathElement]
+    from_parent: bool = False
 
 
 class ExprType(Enum):
@@ -44,29 +45,32 @@ class Condition:
 
 @dataclass
 class AndCondition:
-    left: "Condition"
-    right: "Condition"
+    left: "Predicate"
+    right: "Predicate"
 
 
 @dataclass
 class OrCondition:
-    left: "Condition"
-    right: "Condition"
+    left: "Predicate"
+    right: "Predicate"
 
 
 @dataclass
 class BetweenCondition:
-    field: str
+    field: Union[str, Path]
     low: Any
     high: Any
 
 
 @dataclass
 class InCondition:
-    field: str
+    field: Union[str, Path]
     values: List[Any]
 
 
 @dataclass
 class NotCondition:
-    condition: Any
+    condition: "Predicate"
+
+
+Predicate = Union[Condition, AndCondition, OrCondition, BetweenCondition, InCondition, NotCondition]

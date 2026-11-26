@@ -37,7 +37,21 @@ Typical Workflow
 jonq vs raw jq
 ---------------
 
-jonq's advantage is readability. The same query in raw jq requires more syntax:
+The examples query the same array and produce equivalent results. Jonq
+checks that values compared with numeric thresholds are JSON numbers.
+Its ``coalesce`` uses the first non-null value and preserves ``false``.
+The corresponding jq filters include those checks explicitly.
+
+.. code-block:: bash
+
+   cat > data.json <<'JSON'
+   [
+     {"name":"Alice","first":"Alice","last":"Ng","age":35,"city":"NY",
+      "nickname":false,"email":"alice@example.com","price":"12.5","ts":1700000000},
+     {"name":"Bob","first":"Bob","last":"Lee","age":"35","city":"LA",
+      "nickname":null,"email":null,"price":null,"ts":null}
+   ]
+   JSON
 
 .. list-table::
    :header-rows: 1
@@ -47,53 +61,53 @@ jonq's advantage is readability. The same query in raw jq requires more syntax:
      - Raw **jq** filter
      - **jonq** one-liner
    * - Select fields
-     - ``jq '.[]{name:.name,age:.age}'``
+     - ``jq 'map({name, age})' data.json``
      - ``jonq data.json "select name, age"``
    * - Filter rows
-     - ``jq '.[]|select(.age > 30)|{name,age}'``
-     - ``... "select name, age if age > 30"``
+     - ``jq 'map(select((.age | type) == "number" and .age > 30) | {name, age})' data.json``
+     - ``jonq data.json "select name, age where age > 30"``
    * - Sort + limit
-     - ``jq 'sort_by(.age) | reverse | .[0:2]'``
-     - ``... "select name, age sort age desc 2"``
+     - ``jq 'sort_by(.age) | reverse | .[:2] | map({name, age})' data.json``
+     - ``jonq data.json "select name, age sort age desc limit 2"``
    * - Standalone limit
-     - ``jq '.[0:5]'``
-     - ``... "select * limit 5"``
+     - ``jq '.[0:5]' data.json``
+     - ``jonq data.json "select * limit 5"``
    * - Distinct values
-     - ``jq '[.[].city] | unique'``
-     - ``... "select distinct city"``
+     - ``jq 'map({city}) | unique' data.json``
+     - ``jonq data.json "select distinct city"``
    * - IN filter
-     - ``jq '.[] | select(.city=="NY" or .city=="LA")'``
-     - ``... "select * if city in ('NY', 'LA')"``
+     - ``jq 'map(select(.city == "NY" or .city == "LA"))' data.json``
+     - ``jonq data.json "select * if city in ('NY', 'LA')"``
    * - NOT filter
-     - ``jq '.[] | select((.age > 30) | not)'``
-     - ``... "select * if not age > 30"``
+     - ``jq 'map(select(((.age | type) == "number" and .age > 30) | not))' data.json``
+     - ``jonq data.json "select * if not age > 30"``
    * - LIKE filter
-     - ``jq '.[] | select(.name | startswith("Al"))'``
-     - ``... "select * if name like 'Al%'"``
+     - ``jq 'map(select(.name | tostring | startswith("Al")))' data.json``
+     - ``jonq data.json "select * if name like 'Al%'"``
    * - Uppercase
-     - ``jq '.[] | {name: (.name | ascii_upcase)}'``
-     - ``... "select upper(name) as name"``
+     - ``jq 'map({name: (.name | ascii_upcase)})' data.json``
+     - ``jonq data.json "select upper(name) as name"``
    * - Group & count
-     - ``jq 'group_by(.city) | map({city:.[0].city,count:length})'``
-     - ``... "select city, count(*) as count group by city"``
+     - ``jq 'group_by(.city) | map({city: .[0].city, count: length})' data.json``
+     - ``jonq data.json "select city, count(*) as count group by city"``
    * - CASE/WHEN
-     - ``jq '.[] | if .age>30 then "senior" else "junior" end'``
-     - ``... "select case when age > 30 then 'senior' else 'junior' end as level"``
+     - ``jq 'map({level: (if (.age | type) == "number" and .age > 30 then "senior" else "junior" end)})' data.json``
+     - ``jonq data.json "select case when age > 30 then 'senior' else 'junior' end as level"``
    * - COALESCE
-     - ``jq '.[] | {d: (.nick // .name)}'``
-     - ``... "select coalesce(nickname, name) as display"``
+     - ``jq 'map({display: first(((.nickname, .name) | select(. != null)), null)})' data.json``
+     - ``jonq data.json "select coalesce(nickname, name) as display"``
    * - IS NULL
-     - ``jq '.[] | select(.email != null)'``
-     - ``... "select * if email is not null"``
+     - ``jq 'map(select(.email != null))' data.json``
+     - ``jonq data.json "select * if email is not null"``
    * - String concat
-     - ``jq '.[] | {f: (.first + " " + .last)}'``
-     - ``... "select first || ' ' || last as full"``
+     - ``jq 'map({full: (.first + " " + .last)})' data.json``
+     - ``jonq data.json "select first || ' ' || last as full"``
    * - Type cast
-     - ``jq '.[] | {p: (.price | tonumber)}'``
-     - ``... "select float(price) as p"``
+     - ``jq 'map({p: (.price | if . == null then null else tonumber end)})' data.json``
+     - ``jonq data.json "select float(price) as p"``
    * - Date convert
-     - ``jq '.[] | {d: (.ts | todate)}'``
-     - ``... "select todate(ts) as d"``
-   * - Table output
-     - (pipe through ``column -t``)
+     - ``jq 'map({d: (.ts | if . == null then null else todate end)})' data.json``
+     - ``jonq data.json "select todate(ts) as d"``
+   * - Tabular output
+     - ``jq -r '(["name", "age"], (.[] | [.name, .age])) | @tsv' data.json`` (TSV)
      - ``jonq data.json "select name, age" -t``

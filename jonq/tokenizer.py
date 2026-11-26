@@ -23,7 +23,7 @@ class Token:
         return f"Token({self.type}, '{self.value}')"
 
 
-def tokenize_with_lexer(query):
+def tokenize_with_lexer(query, *, with_positions=False):
     token_specs = [
         ("WHITESPACE", r"\s+"),
         (
@@ -66,17 +66,17 @@ def tokenize_with_lexer(query):
         if token_type == "FUNCTION_CALL":
             func_name = re.match(r"^(\w+)\s*\(", value).group(1)
             tokens.append(Token(TokenType.FUNCTION, func_name, position))
-            tokens.append(Token(TokenType.PUNCTUATION, "(", position + len(func_name)))
-            tokens.append(Token(TokenType.WILDCARD, "*", position + len(func_name) + 1))
+            tokens.append(Token(TokenType.PUNCTUATION, "(", position + value.index("(")))
+            tokens.append(Token(TokenType.WILDCARD, "*", position + value.index("*")))
             tokens.append(Token(TokenType.PUNCTUATION, ")", position + len(value) - 1))
 
         elif token_type == "FUNCTION_PARAM":
             func_name = re.match(r"^(\w+)\s*\(", value).group(1)
-            param = re.search(r"\(\s*([\w\.\[\]]+)\s*\)", value).group(1)
+            param = re.search(r"\(\s*([\w\.\[\]]+)\s*\)", value)
             tokens.append(Token(TokenType.FUNCTION, func_name, position))
-            tokens.append(Token(TokenType.PUNCTUATION, "(", position + len(func_name)))
+            tokens.append(Token(TokenType.PUNCTUATION, "(", position + value.index("(")))
             tokens.append(
-                Token(TokenType.IDENTIFIER, param, position + len(func_name) + 1)
+                Token(TokenType.IDENTIFIER, param.group(1), position + param.start(1))
             )
             tokens.append(Token(TokenType.PUNCTUATION, ")", position + len(value) - 1))
 
@@ -106,8 +106,7 @@ def tokenize_with_lexer(query):
     if pos < len(query) and not query[pos:].isspace():
         raise ValueError(f"Unexpected character '{query[pos]}' at position {pos}")
 
-    simple_tokens = [token.value for token in tokens]
-    return simple_tokens
+    return tokens if with_positions else [token.value for token in tokens]
 
 
 def tokenize(query):

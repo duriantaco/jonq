@@ -25,6 +25,7 @@ cat > nested.json <<'JSON'
   {
     "id": 1,
     "name": "Alice",
+    "nickname": "Al",
     "profile": {"age": 30, "address": {"city": "New York"}},
     "orders": [
       {"order_id": 101, "item": "Laptop", "price": 1200},
@@ -34,6 +35,7 @@ cat > nested.json <<'JSON'
   {
     "id": 2,
     "name": "Bob",
+    "nickname": null,
     "profile": {"age": 25, "address": {"city": "Los Angeles"}},
     "orders": [
       {"order_id": 103, "item": "Tablet", "price": 500}
@@ -45,10 +47,11 @@ JSON
 
 ## Inspect JSON First
 
-Run jonq with no query to see the root shape, fields, sample values, and suggested queries:
+Run jonq with no query to see the root shape, fields, sample values, and suggested queries. This also works with piped input.
 
 ```bash
 jonq users.json
+cat users.json | jonq
 ```
 
 ## Select Fields
@@ -70,6 +73,8 @@ jonq users.json "select name if not age > 30"
 jonq users.json "select name if name like 'Al%'"
 jonq users.json "select name if age between 25 and 35"
 ```
+
+In an ordered comparison such as `where age > 30`, a numeric literal requires the other operand to be a JSON number. The example skips missing ages, `null`, and strings such as `"35"`.
 
 ## Sort, Limit, and Distinct
 
@@ -99,8 +104,10 @@ jonq users.json "select name || ' from ' || city as label"
 jonq users.json "select age * 2 + 3 as score"
 jonq users.json "select str(age) as age"
 jonq users.json "select case when age > 30 then 'senior' else 'junior' end as segment"
-jonq users.json "select coalesce(nickname, name) as display"
+jonq nested.json "select coalesce(nickname, name) as display"
 ```
+
+`coalesce` returns the first non-null value, preserving `false`.
 
 ## Nested Objects and Arrays
 
@@ -143,12 +150,25 @@ jonq users.json "select name" -r                   # raw values
 ## Input Sources
 
 ```bash
-jonq data.json "select id, name"
-cat data.json | jonq - "select id, name"
-cat data.json | jonq "select id, name where active = true"
+jonq users.json "select id, name"
+cat users.json | jonq - "select id, name"
+cat users.json | jonq "select id, name where age > 30"
 curl -s https://api.example.com/users | jonq "select id, name"
 jonq 'logs/*.json' "select * if level = 'error'"
+```
+
+Inspect or query a newline-delimited JSON file directly. Use `--ndjson` to select that format explicitly on stdin.
+
+```bash
+printf '%s\n' '{"level":"info","message":"Started"}' '{"level":"error","message":"Could not load settings"}' > app.ndjson
+jonq app.ndjson
 jonq app.ndjson "select level, message if level = 'error'"
+cat app.ndjson | jonq --ndjson "select level, message if level = 'error'"
+```
+
+Use `--follow` to query an ongoing stream one record at a time.
+
+```bash
 tail -f app.ndjson | jonq --follow "select level, message if level = 'error'" -t
 ```
 
@@ -178,6 +198,8 @@ Did you mean: cty -> city?
 Available fields: id, name, age, city
 Try: jonq users.json "select name where city = 'Chicago'"
 ```
+
+If the input came from a pipe, pass the same data to the suggested command and keep any input flags such as `--ndjson`.
 
 ## Python API
 

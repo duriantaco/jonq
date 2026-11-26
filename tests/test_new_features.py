@@ -326,17 +326,28 @@ class TestFuzzySuggestions:
         finally:
             os.unlink(tmp)
 
-    def test_validate_schema_uses_sparse_array_fields(self):
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump([{"id": 1, "name": "Alice"}, {"id": 2, "age": 25}], f)
-            tmp = f.name
-        try:
-            result = validate_query_against_schema(
-                tmp, compile_query("select id, name, age")
-            )
-            assert result is None
-        finally:
-            os.unlink(tmp)
+    def test_validate_schema_uses_sparse_array_fields(self, tmp_path):
+        source = tmp_path / "sparse.json"
+        records = [{"id": record_id, "name": "Alice"} for record_id in range(1, 6)]
+        records.append({"id": 6, "age": None})
+        source.write_text(json.dumps(records), encoding="utf-8")
+
+        result = validate_query_against_schema(source, compile_query("select id, name, age"))
+
+        assert result is None
+
+    def test_validate_schema_uses_sparse_nested_array_fields(self, tmp_path):
+        source = tmp_path / "orders.json"
+        orders = [{"id": order_id} for order_id in range(1, 6)]
+        orders.append({"id": 6, "tracking": "abc"})
+        source.write_text(json.dumps({"orders": orders}), encoding="utf-8")
+
+        assert validate_query_against_schema(
+            source, compile_query("select orders[].tracking")
+        ) is None
+        assert validate_query_against_schema(
+            source, compile_query("select tracking from orders")
+        ) is None
 
     def test_validate_schema_prefers_nested_leaf_match(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:

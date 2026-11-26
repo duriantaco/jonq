@@ -34,7 +34,7 @@ Run ``jonq`` with the following syntax:
    * - ``-r, --raw, --raw-output``
      - Print scalar values without JSON quoting
    * - ``--stream, -s``
-     - Process row-wise root-array queries in memory-friendly chunks
+     - Process row-wise root-array queries in chunks
    * - ``--ndjson``
      - Force NDJSON mode (auto-detected by default)
    * - ``--follow``
@@ -238,7 +238,7 @@ Must include at least one ``WHEN ... THEN ...``, optional ``ELSE``, and close wi
 COALESCE
 ~~~~~~~~~
 
-Return the first non-null value:
+Return the first non-null value. A missing field counts as null, and ``false`` is preserved.
 
 .. code-block:: bash
 
@@ -286,6 +286,11 @@ The ``FROM`` clause lets you target a specific part of the JSON structure, such 
 
   Filters ``orders`` where ``price`` exceeds 800.
 
+For a root array, use ``from []`` when returning a parent field alongside
+values from one child array, as in ``select name, orders[].item from []``.
+Filters in that projection refer to the parent. Choose ``from [].orders`` to
+filter by order fields. Query independent child arrays separately.
+
 Filtering with Conditions
 --------------------------
 
@@ -299,6 +304,10 @@ Basic Filtering
   .. code-block:: bash
 
      jonq data.json "select name, age if age >= 30"
+
+  In an ordered comparison (``>``, ``<``, ``>=``, ``<=``), a numeric
+  literal requires the other operand to be a JSON number. The example skips
+  strings such as ``"35"``, nulls, and missing ages.
 
 - **String Equality:**
 
@@ -673,10 +682,13 @@ Multiple Input Sources
 
    jonq 'logs/*.json' "select * if level = 'error'"
 
-**Stdin (auto-detected):**
+**Stdin**
+
+Omit the query to inspect piped JSON. Supply a query to filter or reshape the data.
 
 .. code-block:: bash
 
+   cat data.json | jonq
    curl -s https://api.example.com/data | jonq "select id, name"
    cat data.json | jonq "select name, age where age > 25"
    cat data.json | jonq - "select name, age"
@@ -708,23 +720,28 @@ Generate completion scripts for your shell:
    # Fish
    jonq --completions fish > ~/.config/fish/completions/jonq.fish
 
-Auto-detect NDJSON
--------------------
+NDJSON Input
+------------
 
-jonq auto-detects NDJSON (newline-delimited JSON) files. No flag needed:
+Inspect or query files ending in ``.ndjson`` or ``.jsonl`` directly. Use
+``--ndjson`` to select the format explicitly on stdin or for a file with a
+different extension.
 
 .. code-block:: bash
 
+   jonq data.ndjson
    jonq data.ndjson "select name, age if age > 25"
+   cat data.ndjson | jonq --ndjson "select name, age if age > 25"
 
-You can still force it with ``--ndjson`` if needed. ``--ndjson`` cannot be combined with ``--stream``.
+Use ``--follow`` for a row-wise NDJSON stream. The ``--stream`` flag requires
+a root-array JSON file.
 
 Query Repair Suggestions
 -------------------------
 
 When you mistype a field name, jonq suggests similar fields and a copy-paste
 repair command. This works across selected fields, filters, sorting, grouping,
-and aggregations for normal file inputs:
+and aggregations. Repairs preserve quoted values and change field references.
 
 .. code-block:: text
 
@@ -733,6 +750,9 @@ and aggregations for normal file inputs:
    Did you mean: cty -> city?
    Available fields: id, name, age, city
    Try: jonq users.json "select name where city = 'Chicago'"
+
+If the input came from a pipe, pass the same data to the suggested command and
+keep any input flags such as ``--ndjson``.
 
 Colorized Output
 -----------------
@@ -748,8 +768,9 @@ For big JSON files, use streaming mode:
 
    jonq large_data.json "select name, age" --stream
 
-- **Requirement:** The JSON must be an array at the root level.
-- **Benefit:** Processes data in chunks in memory, avoiding temp chunk files in the main execution path.
+- **Requirement:** Use a local JSON file with an array at the root.
+- **Input:** Reads the array incrementally, including during field validation. An individual large record can still use substantial memory.
+- **Output:** JSON, JSONL, and raw CLI results are staged on disk until processing succeeds. CSV, table, and YAML output are assembled in memory.
 - **Scope:** Streaming supports row-wise queries only. It rejects aggregations, ``group by``, ``sort``, ``distinct``, and ``limit`` because those need the full input.
 
 Tips and Tricks

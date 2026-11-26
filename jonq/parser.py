@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import json
 import re
 from jonq.ast import (
     AndCondition,
@@ -13,15 +16,47 @@ from jonq.ast import (
 from jonq.utils import _split_top_level
 
 
-def parse_path(path_str: str) -> Path:
+_QUOTED_KEY = re.compile(r'"(?:[^"\\]|\\.)*"' r"|'(?:[^'\\]|\\.)*'")
+_PATH_PARTS = re.compile(_QUOTED_KEY.pattern + r"|\.")
+
+
+def decode_quoted_key(value: str) -> str:
+    if value.startswith('"'):
+        return json.loads(value)
+    return re.sub(r"\\(['\\])", r"\1", value[1:-1])
+
+
+def parse_path(path_str: str | Path) -> Path:
+    if isinstance(path_str, Path):
+        return path_str
     if not path_str or path_str == "*":
         return Path([])
 
     elements = []
     cleaned_path = path_str.lstrip(".")
-    parts = re.split(r"\.(?![^\[]*\])", cleaned_path)
+    parts = []
+    start = 0
+    for match in _PATH_PARTS.finditer(cleaned_path):
+        if match.group() == ".":
+            parts.append(cleaned_path[start:match.start()])
+            start = match.end()
+    parts.append(cleaned_path[start:])
 
     for part in parts:
+        quoted_part = part.strip()
+        quoted = _QUOTED_KEY.match(quoted_part)
+        if quoted:
+            name = decode_quoted_key(quoted.group())
+            suffix = quoted_part[quoted.end():].strip()
+            if suffix.startswith("[]"):
+                elements.append(PathElement(PathType.ARRAY, name))
+                suffix = suffix[2:]
+            else:
+                elements.append(PathElement(PathType.FIELD, name))
+            if suffix:
+                elements.extend(parse_path(suffix).elements)
+            continue
+
         if "[]" in part:
             base, *rest = part.split("[]", 1)
             elements.append(PathElement(PathType.ARRAY, base))
@@ -59,6 +94,20 @@ def parse_path(path_str: str) -> Path:
         else:
             elements.append(PathElement(PathType.FIELD, part))
 
+    return Path(elements)
+
+
+def resolve_from_path(from_path: str) -> Path:
+    """Resolve FROM to the ordered field lookups and array expansions it performs."""
+    elements = parse_path(from_path).elements
+    root_array = bool(elements and elements[0] == PathElement(PathType.ARRAY, ""))
+    if not any(element.type == PathType.ARRAY for element in elements) or (
+        root_array and elements[-1].type != PathType.ARRAY
+    ):
+        if elements and elements[-1].type == PathType.FIELD and elements[-1].value:
+            elements[-1] = PathElement(PathType.ARRAY, elements[-1].value)
+        else:
+            elements.append(PathElement(PathType.ARRAY, ""))
     return Path(elements)
 
 
@@ -222,7 +271,7 @@ def parse_expression(expr_str: str) -> Expression:
 
     agg_match = re.match(r"(\w+)\s*\(", expr_str)
     if agg_match:
-        func = agg_match.group(1)
+        func = agg_match.group(1).lower()
         start = agg_match.end() - 1
         depth = 0
         end = start
@@ -236,9 +285,13 @@ def parse_expression(expr_str: str) -> Expression:
                     break
         arg = expr_str[start + 1:end].strip()
 
-        if func == "coalesce":
+        if func in {"coalesce", "if_null"}:
             args = _split_args(arg)
-            return Expression(ExprType.FUNCTION, "coalesce", [
+            if not args or any(not item for item in args):
+                raise ValueError(f"{func} requires nonempty arguments")
+            if func == "if_null" and len(args) != 2:
+                raise ValueError("if_null requires two arguments")
+            return Expression(ExprType.FUNCTION, func, [
                 parse_expression(a) for a in args
             ])
         if func in ["sum", "avg", "min", "max", "count"]:
@@ -264,15 +317,27 @@ def parse_expression(expr_str: str) -> Expression:
         re.VERBOSE,
     )
 
-    if _NUM_RE.match(expr_str) or (expr_str.startswith('"') and expr_str.endswith('"')):
+    if expr_str.lower() in {"true", "false", "null"}:
+        return Expression(ExprType.LITERAL, expr_str.lower())
+    if _NUM_RE.match(expr_str) or _QUOTED_KEY.fullmatch(expr_str):
+        if expr_str.startswith("'"):
+            expr_str = json.dumps(decode_quoted_key(expr_str))
         return Expression(ExprType.LITERAL, expr_str)
 
-    # Single-quoted strings → convert to double-quoted literal
-    if expr_str.startswith("'") and expr_str.endswith("'") and len(expr_str) >= 2:
-        inner = expr_str[1:-1]
-        return Expression(ExprType.LITERAL, f'"{inner}"')
-
     return Expression(ExprType.FIELD, expr_str)
+
+
+def contains_aggregate(expr: Expression) -> bool:
+    if expr.type == ExprType.AGGREGATION:
+        return True
+    if expr.type == ExprType.CASE:
+        values = [value for _, value in expr.args or ()]
+        if expr.value is not None:
+            values.append(expr.value)
+        return any(contains_aggregate(parse_expression(value)) for value in values)
+    return any(
+        contains_aggregate(arg) for arg in expr.args or () if isinstance(arg, Expression)
+    )
 
 
 def parse_condition(cond_str):

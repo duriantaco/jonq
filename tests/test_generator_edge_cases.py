@@ -80,13 +80,14 @@ class TestGenerateJqExpression:
         ]
         expr = Expression(ExprType.FUNCTION, "coalesce", args)
         result = generate_jq_expression(expr)
-        assert "//" in result
+        assert "first(" in result
+        assert "select(. != null)" in result
 
     def test_coalesce_four_args(self):
         args = [Expression(ExprType.FIELD, x) for x in ["a", "b", "c", "d"]]
         expr = Expression(ExprType.FUNCTION, "coalesce", args)
         result = generate_jq_expression(expr)
-        assert result.count("//") == 3
+        assert ".a?, .b?, .c?, .d?" in result
 
     def test_null_sensitive_todate(self):
         expr = parse_expression("todate(ts)")
@@ -163,8 +164,7 @@ class TestEndToEndExecution:
         data = json.dumps([{"a": False, "b": True}])
         result = execute(data, "select coalesce(a, b) as val")
         parsed = json.loads(result.text)
-        # jq treats false as falsy, so it falls through to b
-        assert parsed[0]["val"] in (False, True)
+        assert parsed[0]["val"] is False
 
     def test_case_with_string_equality(self):
         data = json.dumps([{"status": "active"}, {"status": "inactive"}])

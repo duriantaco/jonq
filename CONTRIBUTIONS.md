@@ -34,6 +34,38 @@ Thanks for your interest in helping with jonq! Here's how you can contribute:
 ## Testing
 Run `pytest` before submitting your changes.
 
+### Benchmark connection reports
+
+From the repository root, point the benchmark at a local NDJSON export and scope it to the host you want to evaluate. For labeled captures, preserve the `label` and `det_label` fields when converting to NDJSON.
+
+```bash
+python tests/benchmark_connections.py CAPTURE.ndjson \
+  --src-cidr HOST --window 60 --min-destinations 10 --runs 5
+```
+
+The benchmark runs `jonq connections` on all in-scope records. It reads labels after analysis to score the original lines in each reported peak. By default all records labeled `Malicious` are targets. To evaluate one category, add `--target-detail PartOfAHorizontalPortScan` or `--target-detail 'C&C'`. The flag matches `det_label` exactly and can be repeated to include multiple categories. [IoT-23 label definitions](https://www.stratosphereips.org/datasets-iot23)
+
+The regular report contributes at most one peak window per source. Add `--scan-leads` to score peaks by source and TCP destination port using only rejected or unanswered attempts. The same input labels and time window apply in both modes. The JSON result includes label counts and an assessment for each selected window.
+
+- `target_in_window` when the window contains at least one target record, including windows with mixed labels.
+- `benign_only` when every record in the window is labeled benign.
+- `unconfirmed` when the window has no target records and includes other or unlabeled records.
+- `target_sources_without_peak` lists sources that had a target record but never met the threshold.
+- `target_sources_with_peak_missing_target` lists sources that had a target record elsewhere in the capture but none in the selected peak.
+
+Add `--baseline REFERENCE.ndjson` to report separate counts for review windows and windows within reference.
+
+The benchmark runs once to warm up, then times a fresh CLI process for each measured run. Wall time includes startup, input parsing, analysis, and JSON output. The report gives median, minimum, and maximum times. On macOS and Linux it also gives peak child RSS including the warm-up. Label scoring happens outside the timed runs.
+
+Use the included synthetic fixture to check the harness.
+
+```bash
+python tests/benchmark_connections.py tests/json_test_files/zeek_conn.ndjson \
+  --src-cidr 192.0.2.10 --window 60 --min-destinations 3 --runs 5
+```
+
+The fixture has one qualifying peak. Its records have no labels, so the benchmark reports the window as `unconfirmed`.
+
 ## Documentation
 Keep `README.md`, `USAGE.md`, `SYNTAX.md`, and the Sphinx docs in `docs/source/`
 in sync when changing CLI behavior, query syntax, output formats, or the Python

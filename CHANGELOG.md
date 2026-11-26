@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- **Network log triage** with `jonq triage` for recorded alert signatures and repeated firewall denials in NDJSON.
+- **Connection activity reports** with `jonq connections` for bidirectional IP pair counts and rolling distinct destination peaks in Zeek and Suricata EVE exports.
+- **Connection baselines** with `jonq connections --baseline` for comparing peak counts and spotting destinations absent from a reference export.
+- **Connection outcome evidence** groups peak-window records by protocol and destination port and identifies original input lines to review.
+- **Horizontal scan leads** group recorded TCP rejections and unanswered attempts by source, port, and time window with `jonq connections --scan-leads`.
+- **Color terminal reports** put connection evidence and recorded alert counts up front. Use `--no-color` for plain text in a terminal.
 - **JSON workbench commands**: `jonq profile`, `jonq diff`, `jonq check`, and `jonq run`.
 - **`jonq.yaml` workflows** for named queries and repeatable field/type/null/count checks.
 - **Profile output** with field presence, null count, missing count, type conflicts, and sample values.

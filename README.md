@@ -2,13 +2,27 @@
 
 <img src="docs/source/_static/jonq.png" alt="" width="96" align="right" />
 
-Inspect and reshape JSON with a jq-powered CLI. Explore unfamiliar payloads, write SQL-like queries, and export a table, CSV, or JSONL. You can also check JSON shape in CI.
+Inspect and reshape JSON with a jq-powered CLI. Explore unfamiliar payloads, write SQL-like queries, and export a table, CSV, or JSONL. You can also check JSON shape in CI and review saved network logs with evidence tied to the original input.
 
 [Try from source](#from-source) · [JSON quick start](#quick-start) · [Documentation](https://jonq.readthedocs.io) · [PyPI releases](https://pypi.org/project/jonq/) · [CI](https://github.com/duriantaco/jonq/actions)
 
+## Recorded Network Traffic
+
+### Review a connection lead
+
+![Terminal scan lead report with a UTC interval, recorded TCP outcomes, and an input line to review.](docs/source/_static/jonq-scan.png)
+
+The report comes from recorded CTU lab traffic during a controlled Muhstik capture. It shows 68 destination IPs on TCP/22 and points to line 11,912 of the NDJSON export for a recorded attempt. Of the 117 records in the lead, the dataset labels associate 116 with a horizontal port scan and one with benign traffic. [CTU IoT-23 capture 3-1](https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset-v2/CTU-IoT-Malware-Capture-3-1/), [published Zeek log](https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-IoT-Malware-Capture-3-1/bro/), [IoT-23 label methodology](https://www.stratosphereips.org/datasets-iot23)
+
+### Summarize recorded alerts
+
+![Terminal report listing Suricata alert signatures with their counts.](docs/source/_static/jonq-triage.png)
+
+`jonq triage` summarizes alert signatures already present in the Suricata EVE log from a controlled Mirai capture. [CTU IoT-23 capture 34-1](https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset-v2/CTU-IoT-Malware-Capture-34-1/), [published Suricata logs](https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-IoT-Malware-Capture-34-1/suricata/)
+
 ## From Source
 
-Use this checkout for the examples below. jonq requires Python 3.9+. SQL-like queries use the `jq` command-line tool.
+Use this checkout for the examples below and the network log commands. jonq requires Python 3.9+. SQL-like queries use the `jq` command-line tool.
 
 ```bash
 git clone https://github.com/duriantaco/jonq.git
@@ -16,9 +30,16 @@ cd jonq
 pip install -e .
 ```
 
+Try both network reports on the included synthetic logs.
+
+```bash
+jonq connections tests/json_test_files/zeek_conn.ndjson --scan-leads --min-destinations 2
+jonq triage tests/json_test_files/suricata_eve.ndjson
+```
+
 ## Install
 
-Install a published release from PyPI. For the current inspection workflow shown here, [install from source](#from-source).
+Install a published release from PyPI. For the current inspection workflow and network log commands shown here, [install from source](#from-source).
 
 ```bash
 pipx install jonq
@@ -394,6 +415,33 @@ jonq check user_contract
 jonq check --all
 ```
 
+## Network Log Triage
+
+`jonq triage` uses Python to summarize alert signatures and flag repeated firewall denials by source IP in an NDJSON export. It accepts Suricata EVE alert records and firewall records with `event_type: firewall`, `src_ip`, and `action`. [Install from source](#from-source) to try it.
+
+```bash
+jonq triage eve.json
+jonq triage - --min-denials 10 --format json < firewall.ndjson
+```
+
+Use `-` to read stdin. The denial threshold defaults to five and counts across the entire input, so use a bounded export for each review period. The counts help you decide which events to inspect. Malformed records produce line diagnostics and exit status `1` while valid records still contribute to the report. [Try the cookbook examples](docs/source/cookbook.rst#triage-network-logs).
+
+Both network reports use color in a terminal. Pass `--no-color` or set `NO_COLOR=1` for plain text.
+
+`jonq connections` reads Zeek `conn.log` in JSON mode or Suricata EVE flow records. It groups records by IP pair, shows a count for each direction, and reports each qualifying source's peak distinct destination count in a rolling window. The default window is 60 seconds and the default threshold is 10 destinations.
+
+```bash
+jonq connections conn.log --src-cidr 192.0.2.0/24 --min-destinations 3
+jonq connections conn.log --baseline previous.log --min-destinations 3
+jonq connections conn.log --scan-leads --src-cidr 192.0.2.0/24
+```
+
+The terminal report puts findings and their UTC windows first. It groups recorded outcomes by protocol and destination port and points to an original input line to inspect. A baseline compares peak destination counts and shows which destinations in the current peak are absent from the reference. Use `--format json` for the full set of evidence records and service groups.
+
+`--scan-leads` groups recorded TCP rejections and unanswered attempts by source IP and destination port. It highlights horizontal patterns for review when a source attempts connections to enough distinct destinations on the same port within the window. Each run accepts at most one of `--scan-leads` and `--baseline`. [Try the scan lead example](docs/source/cookbook.rst#review-horizontal-scan-leads).
+
+Pass a bounded export or use `-` for stdin. [Try the connections cookbook example](docs/source/cookbook.rst#review-connection-activity).
+
 ## Streaming and Watch Modes
 
 Streaming mode reads a local root-array JSON file incrementally and runs the query in chunks.
@@ -465,6 +513,8 @@ Workbench commands:
 | `jonq diff OLD NEW` | Compare two JSON profiles and show shape drift |
 | `jonq check [NAME\|FILE]` | Run named checks from `jonq.yaml` or inline flag-based checks |
 | `jonq run NAME` | Run a named query from `jonq.yaml` |
+| `jonq triage [FILE\|-]` | Summarize alert signatures and repeated firewall denials in NDJSON |
+| `jonq connections [FILE\|-]` | Summarize IP pairs and peak distinct destination counts in Zeek or EVE logs |
 
 Query options:
 

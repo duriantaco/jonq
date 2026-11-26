@@ -1,4 +1,6 @@
+import csv
 import io
+from pathlib import Path
 
 import pytest
 from unittest.mock import patch, AsyncMock
@@ -22,6 +24,21 @@ def test_main_with_from_clause(tmp_path, capsys):
         main()
     captured = capsys.readouterr()
     assert "Software" in captured.out
+
+
+def test_main_summarizes_alerts_in_mixed_ndjson(capsys):
+    source = Path(__file__).parent / "json_test_files" / "suricata_eve.ndjson"
+    query = (
+        "select alert.signature_id as signature_id, count(*) as total_alerts "
+        "where event_type = 'alert' group by alert.signature_id sort total_alerts desc"
+    )
+
+    main([str(source), query, "--ndjson", "--format", "csv"])
+
+    assert list(csv.DictReader(io.StringIO(capsys.readouterr().out))) == [
+        {"signature_id": "900001", "total_alerts": "2"},
+        {"signature_id": "900002", "total_alerts": "1"},
+    ]
 
 
 def test_main_reads_piped_stdin_without_dash(capsys):

@@ -1,0 +1,2 @@
+{"ts":1699913620.75,"uid":"baseline-1","id.orig_h":"192.0.2.10","id.orig_p":52001,"id.resp_h":"198.51.100.10","id.resp_p":443,"proto":"tcp","conn_state":"SF"}
+{"ts":1699913650.75,"uid":"baseline-2","id.orig_h":"192.0.2.10","id.orig_p":52002,"id.resp_h":"198.51.100.11","id.resp_p":443,"proto":"tcp","conn_state":"SF"}

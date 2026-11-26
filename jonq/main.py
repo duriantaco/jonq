@@ -46,7 +46,7 @@ from jonq.constants import (
     SCHEMA_PATH_PREVIEW_ITEMS,
 )
 
-_WORKBENCH_COMMANDS = {"profile", "diff", "check", "run", "triage", "connections"}
+_WORKBENCH_COMMANDS = {"profile", "diff", "check", "run", "triage", "connections", "mcp"}
 _QUERY_STRUCTURAL_WORDS = {
     "as", "distinct", "from", "group", "having", "if", "limit", "order", "select",
     "sort", "where", "case", "true", "false", "null",
@@ -856,7 +856,7 @@ def _generate_completions(shell: str) -> str:
 _jonq_completions() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local opts="-i -f -t -r -s -n -o -p -w --format --table --raw --raw-output --stream --ndjson --limit --out --jq --explain --time --pretty --watch --follow --no-color --version --help --completions"
-    local commands="profile diff check run triage connections"
+    local commands="profile diff check run triage connections mcp"
     local keywords="select if where from group by having sort asc desc limit distinct and or not in like between contains as case when then else end is null coalesce count sum avg min max upper lower length round abs ceil floor int float str type keys values trim todate fromdate date tojson fromjson"
 
     if [[ "${cur}" == -* ]]; then
@@ -892,7 +892,7 @@ _jonq() {
         '--no-color:No color'
         '--completions:Shell completions'
     )
-    commands=(profile diff check run triage connections)
+    commands=(profile diff check run triage connections mcp)
     keywords=(select if where from group by having sort asc desc limit distinct and or not in like between contains as case when then else end is null coalesce count sum avg min max upper lower length round abs ceil floor int float str type keys values trim todate fromdate)
 
     if [[ "${words[2]}" == -* ]]; then
@@ -930,6 +930,7 @@ complete -c jonq -n '__fish_use_subcommand' -a 'check' -d 'Run JSON checks'
 complete -c jonq -n '__fish_use_subcommand' -a 'run' -d 'Run named query'
 complete -c jonq -n '__fish_use_subcommand' -a 'triage' -d 'Review network event logs'
 complete -c jonq -n '__fish_use_subcommand' -a 'connections' -d 'Summarize network connections'
+complete -c jonq -n '__fish_use_subcommand' -a 'mcp' -d 'Serve local network log tools'
 complete -c jonq -l version -d 'Show version\''''
     return ""
 
@@ -1258,6 +1259,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "  jonq triage eve.ndjson\n"
             "  jonq connections conn.ndjson --scan-leads\n"
             "  jonq -i data.json\n"
+            "  jonq mcp --log-root ./logs\n"
             '  curl api.example.com/data | jonq "select id, name"\n'
             "  tail -f app.log | jonq --follow \"select level, msg if level = 'error'\"\n"
             '  jonq data.json "select *" --watch\n'
@@ -1406,6 +1408,10 @@ async def _run_workbench_command(argv: list[str]) -> None:
             _run_triage_command(argv[1:])
         elif command == "connections":
             _run_connections_command(argv[1:])
+        elif command == "mcp":
+            from jonq.mcp import run_mcp
+
+            run_mcp(argv[1:])
         else:
             raise ValueError(f"Unknown command: {command}")
     except SystemExit:

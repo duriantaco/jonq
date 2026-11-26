@@ -1,0 +1,17 @@
+{"ts":1767225600,"uid":"mock-0","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.20","id.resp_p":443,"proto":"tcp","conn_state":"SF","label":"Benign","det_label":"-"}
+{"ts":1767225900,"uid":"mock-300","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.1","id.resp_p":443,"proto":"tcp","conn_state":"REJ","label":"Benign","det_label":"-"}
+{"ts":1767225902,"uid":"mock-302","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.2","id.resp_p":443,"proto":"tcp","conn_state":"S0","label":"Benign","det_label":"-"}
+{"ts":1767225904,"uid":"mock-304","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.3","id.resp_p":443,"proto":"tcp","conn_state":"S0","label":"Benign","det_label":"-"}
+{"ts":1767225906,"uid":"mock-306","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.4","id.resp_p":443,"proto":"tcp","conn_state":"REJ","label":"Benign","det_label":"-"}
+{"ts":1767225908,"uid":"mock-308","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.5","id.resp_p":443,"proto":"tcp","conn_state":"S0","label":"Benign","det_label":"-"}
+{"ts":1767225910,"uid":"mock-310","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.6","id.resp_p":443,"proto":"tcp","conn_state":"S0","label":"Benign","det_label":"-"}
+{"ts":1767225912,"uid":"mock-312","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.7","id.resp_p":443,"proto":"tcp","conn_state":"REJ","label":"Benign","det_label":"-"}
+{"ts":1767225914,"uid":"mock-314","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.8","id.resp_p":443,"proto":"tcp","conn_state":"S0","label":"Benign","det_label":"-"}
+{"ts":1767225916,"uid":"mock-316","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.9","id.resp_p":443,"proto":"tcp","conn_state":"S0","label":"Benign","det_label":"-"}
+{"ts":1767225918,"uid":"mock-318","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.10","id.resp_p":443,"proto":"tcp","conn_state":"REJ","label":"Benign","det_label":"-"}
+{"ts":1767225920,"uid":"mock-320","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.11","id.resp_p":443,"proto":"tcp","conn_state":"S0","label":"Benign","det_label":"-"}
+{"ts":1767225922,"uid":"mock-322","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.12","id.resp_p":443,"proto":"tcp","conn_state":"S0","label":"Benign","det_label":"-"}
+{"ts":1767225901,"uid":"mock-301","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.1","id.resp_p":443,"proto":"tcp","conn_state":"S0","label":"Benign","det_label":"-"}
+{"ts":1767225905,"uid":"mock-305","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.13","id.resp_p":443,"proto":"udp","conn_state":"S0","label":"Benign","det_label":"-"}
+{"ts":1767225907,"uid":"mock-307","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.14","id.resp_p":3128,"proto":"tcp","conn_state":"REJ","label":"Benign","det_label":"-"}
+{"ts":1767229200,"uid":"mock-3600","id.orig_h":"192.0.2.40","id.resp_h":"198.51.100.20","id.resp_p":443,"proto":"tcp","conn_state":"SF","label":"Benign","det_label":"-"}

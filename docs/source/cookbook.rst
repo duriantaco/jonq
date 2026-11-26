@@ -126,6 +126,8 @@ For newline-delimited JSON logs, combine ``tail -f`` with ``--follow``:
 
 This is for line-by-line log inspection. Use non-follow mode when you need global operations such as grouping, sorting, distinct, or aggregation.
 
+.. _triage-network-logs:
+
 Triage Network Logs
 -------------------
 
@@ -145,8 +147,35 @@ summarizes them. See the `Suricata EVE format guide <https://docs.suricata.io/en
    jonq triage "$eve"
    jonq triage "$eve" --format json > alert-summary.json
 
-The summary counts two events for signature ``900001`` and one for
-``900002``.
+The summary starts with three recorded alert events across two alert types.
+It counts two events for signature ``900001`` and one for ``900002``.
+The terminal shows the first matching input line and its timestamp when
+available for each signature. With a named file on macOS or Linux, it also
+shows a shell command to open the first cited line. The JSON report keeps
+up to two examples per signature in input order. Missing or invalid
+timestamps appear as ``null``. Each ``line`` value is a one-based line
+number in the original input, including blank lines in the count.
+
+Open line 6 to verify the first example for signature ``900001``. Export
+one example per signature to share the counts and source references.
+
+.. code-block:: bash
+
+   sed -n '6p' < "$eve"
+   jonq alert-summary.json \
+     "select signature_id, signature, count, examples[0].line as example_line, examples[0].timestamp as example_timestamp from alerts" \
+     --format csv > alert-evidence.csv
+
+To reproduce the recorded IoT-23 example, download the published
+Suricata EVE log and inspect the first cited IRC alert.
+
+.. code-block:: bash
+
+   curl -fsSLo eve.ndjson 'https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-IoT-Malware-Capture-34-1/suricata/eve.json'
+   jonq triage eve.ndjson
+   sed -n '8p' eve.ndjson | jonq 'select timestamp, alert.signature_id, alert.signature' -t
+
+Line 8 reports signature ``2002028``, ``ET CHAT IRC PONG response``.
 
 ``jonq triage`` and ``jonq connections`` color their text reports when
 stdout is a terminal. Use ``--no-color`` or set ``NO_COLOR=1`` for plain
@@ -201,7 +230,8 @@ points to an original input line to inspect. The report then groups
 records by IP pair and shows a count for each direction.
 
 For Zeek TCP records, jonq uses ``S0`` for no reply observed, ``REJ`` for
-rejected, and ``S1`` or ``SF`` for established. For EVE TCP, it uses explicit
+rejected, and ``S1``, ``S2``, ``S3``, ``SF``, or ``RSTO`` for established.
+For EVE TCP, it uses explicit
 flow state and the packet count toward the client. When the recorded fields
 leave the outcome unclear, jonq shows ``outcome unavailable``. See the
 `Zeek connection state reference <https://docs.zeek.org/en/lts/scripts/base/protocols/conn/main.zeek.html#type-Conn::Info>`_
@@ -224,6 +254,8 @@ window.
 Malformed records produce line diagnostics on stderr and exit status ``1``
 while valid records still contribute to the report.
 
+.. _review-horizontal-scan-leads:
+
 Review Horizontal Scan Leads
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -243,12 +275,37 @@ The same ``--window``, ``--min-destinations``, ``--src-cidr``, and
    jonq connections tests/json_test_files/zeek_conn.ndjson \
      --min-destinations 2 --scan-leads --src-cidr 192.0.2.0/24
 
-The fixture shows two destinations on TCP/443 within 60 seconds.
-Zeek recorded no reply from ``198.51.100.11`` or ``198.51.100.12``. Open
-lines 1 and 3 of the current log to review the evidence. Use
-``--format json`` to see the full set of records and original line numbers
-for each lead. Run the regular ``connections`` report to review overall
-breadth and established traffic in the same capture.
+The fixture shows an attempt to each of two addresses on TCP port 443
+within 60 seconds. Zeek recorded no reply from ``198.51.100.11`` or
+``198.51.100.12``. The report cites line 1 and shows a shell command to open
+it on macOS and Linux. The two matching records are on lines 1 and 3.
+Use ``--format json`` for all cited records. Run the regular ``connections``
+report to review overall breadth and established traffic in the same capture.
+
+Check whether the source host was scheduled to contact the listed
+addresses and TCP port during the window. This synthetic health-check
+fixture meets the threshold because the source retries across 12 addresses.
+
+.. code-block:: bash
+
+   jonq connections tests/json_test_files/benign_health_check_retries.ndjson \
+     --scan-leads --src-cidr 192.0.2.40
+
+The window contains 13 eligible records on TCP port 443 and 12 different
+destination IPs. Repeated records for an IP count once toward the
+threshold. When no lead appears, distinguish an empty IP scope, a scope
+with no eligible TCP records, and eligible records whose windows all
+fall below the threshold. See :doc:`contribution` for the accuracy replay.
+
+Export the same lead's evidence rows to CSV. The ``line`` column points
+to the input NDJSON.
+
+.. code-block:: bash
+
+   jonq connections tests/json_test_files/zeek_conn.ndjson \
+     --min-destinations 2 --scan-leads --format json > scan-leads.json
+   jonq scan-leads.json "select line, dest_ip, details.state from scan_leads[].records[]" \
+     --format csv > scan-evidence.csv
 
 Compare With a Baseline
 ~~~~~~~~~~~~~~~~~~~~~~~

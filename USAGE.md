@@ -172,6 +172,48 @@ Use `--follow` to query an ongoing stream one record at a time.
 tail -f app.ndjson | jonq --follow "select level, message if level = 'error'" -t
 ```
 
+## Network Log Reports
+
+From the repository root, install the checkout and run the bundled fixtures.
+
+```bash
+python -m pip install -e .
+jonq triage tests/json_test_files/suricata_eve.ndjson
+jonq connections tests/json_test_files/zeek_conn.ndjson --scan-leads --min-destinations 2
+```
+
+`triage` summarizes recorded Suricata EVE alerts and firewall denials.
+The report starts with the alert event and alert type counts, then shows
+the first matching input line and timestamp for each signature. Use
+`--format json` to keep up to two examples per signature.
+
+`connections` accepts Zeek `conn.log` in JSON mode and Suricata EVE flow
+records. Use `--scan-leads` to group rejected and unanswered TCP attempts by
+source and destination port. The default threshold is 10 different
+destination IPs in 60 seconds. Several records for one IP count as one
+destination. The smaller threshold shows the fixture's two-destination
+lead. Each run accepts at most one of `--scan-leads` and `--baseline`.
+
+The reports give a command to open the first cited line when reading a
+named file on macOS or Linux. Here are the first alert and both scan-lead
+records for the examples above.
+
+```bash
+sed -n '6p' < tests/json_test_files/suricata_eve.ndjson
+sed -n -e '1p' -e '3p' < tests/json_test_files/zeek_conn.ndjson
+```
+
+Check whether the source host was scheduled to contact the reported IPs
+and port during that window. Expected health-check retries can qualify.
+If there are no leads, the report distinguishes no in-scope records,
+no eligible TCP observations, and no window meeting the threshold.
+
+Both report commands use Python's standard library and support `-` for stdin,
+`--format json`, and `--no-color`. Malformed records produce line diagnostics
+and exit status 1 while valid records still contribute to the report.
+[Network log cookbook](docs/source/cookbook.rst#triage-network-logs) ·
+[Scan-lead replay](CONTRIBUTIONS.md#replay-the-scan-lead-accuracy-cases)
+
 ## Streaming
 
 Streaming mode is for row-wise queries over root-array JSON:

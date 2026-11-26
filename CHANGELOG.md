@@ -4,10 +4,13 @@
 
 ### Added
 - **Network log triage** with `jonq triage` for recorded alert signatures and repeated firewall denials in NDJSON.
+- **Alert evidence** shows the first matching input line in the terminal and keeps up to two source lines and timestamps per signature in JSON.
 - **Connection activity reports** with `jonq connections` for bidirectional IP pair counts and rolling distinct destination peaks in Zeek and Suricata EVE exports.
 - **Connection baselines** with `jonq connections --baseline` for comparing peak counts and spotting destinations absent from a reference export.
 - **Connection outcome evidence** groups peak-window records by protocol and destination port and identifies original input lines to review.
 - **Horizontal scan leads** group recorded TCP rejections and unanswered attempts by source, port, and time window with `jonq connections --scan-leads`.
+- **Scan-lead replay** evaluates hash-verified captures and a synthetic benign retry case with labels held back until scoring.
+- **MCP server** serves network log tools with `jonq mcp --log-root PATH`.
 - **Color terminal reports** put connection evidence and recorded alert counts up front. Use `--no-color` for plain text in a terminal.
 - **JSON workbench commands**: `jonq profile`, `jonq diff`, `jonq check`, and `jonq run`.
 - **`jonq.yaml` workflows** for named queries and repeatable field/type/null/count checks.
@@ -16,6 +19,7 @@
 - **Inspect suggestions** find nested row arrays and show runnable `from` queries. Inspect accepts piped JSON and NDJSON files.
 
 ### Changed
+- Scan and alert text reports lead with the observed activity and show commands for opening cited lines in named files. Scan reports distinguish empty scope, no eligible records, and windows below the threshold.
 - Selecting parent fields alongside unaggregated child values requires an explicit row source. Query independent child arrays separately.
 - Streaming reads local root-array JSON incrementally and still checks referenced fields. The CLI stages JSON, JSONL, and raw results on disk until processing succeeds.
 

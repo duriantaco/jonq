@@ -8,6 +8,8 @@ select [distinct] <fields> [from <path>] [if|where <condition>] [group by <field
 jonq query syntax is for JSON extraction and reshaping. CLI behavior such as
 output formats, streaming, watch mode, and shell completions is configured with
 command-line flags rather than inside the query string.
+See the [Usage Guide](USAGE.md#network-log-reports) for the `triage` and
+`connections` subcommands.
 
 ## SELECT Statement
 Every jonq query must begin with select, followed by one or more fields to retrieve.

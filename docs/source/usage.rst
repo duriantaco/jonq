@@ -18,6 +18,9 @@ Run ``jonq`` with the following syntax:
    jonq diff <old.json> <new.json>
    jonq check [check_name|path/to/json_file]
    jonq run <query_name>
+   jonq triage [FILE|-]
+   jonq connections [FILE|-]
+   jonq mcp --log-root PATH
 
 **Available Options:**
 
@@ -71,6 +74,31 @@ Run ``jonq`` with the following syntax:
    jonq users.json "select name, age if age > 30"
 
 This command selects the ``name`` and ``age`` fields from ``users.json`` where the ``age`` is greater than 30.
+
+.. _network-log-reports:
+
+Network Log Reports
+-------------------
+
+From the repository root, install the checkout and try the bundled fixtures.
+
+.. code-block:: bash
+
+   python -m pip install -e .
+   jonq triage tests/json_test_files/suricata_eve.ndjson
+   jonq connections tests/json_test_files/zeek_conn.ndjson --scan-leads --min-destinations 2
+
+``triage`` counts recorded Suricata EVE alert signatures and firewall denials.
+The terminal shows the first matching line and its timestamp for each
+signature when available. JSON includes up to two examples per signature.
+``connections`` reads Zeek connection logs in JSON mode and Suricata EVE
+flow records. Scan-lead mode reports peak windows of rejected or
+unanswered TCP attempts on the same destination port.
+
+Both commands accept ``-`` for stdin, ``--format json`` for a structured
+report, and ``--no-color`` for plain text. See :ref:`triage-network-logs`
+and :ref:`review-horizontal-scan-leads` for evidence checks and CSV exports.
+See :doc:`mcp` to use the network tools through an MCP client.
 
 Query Syntax Breakdown
 -----------------------

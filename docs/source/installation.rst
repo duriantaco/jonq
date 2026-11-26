@@ -7,12 +7,15 @@ Prerequisites
 Before installing jonq, ensure you have the following:
 
 * Python 3.9 or higher
-* jq command line tool installed
+* jq command-line tool for SQL-like queries
+
+The native ``triage`` and ``connections`` reports use Python's standard library.
 
 Installing jq
 --------------
 
-jonq requires the jq command-line tool to be installed on your system.
+Install the jq command-line tool to run SQL-like queries and the cookbook's
+evidence export queries.
 
 For Linux (Debian/Ubuntu):
 

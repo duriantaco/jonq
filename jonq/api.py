@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from contextlib import closing
 from dataclasses import dataclass
 from os import PathLike
 from typing import Any
@@ -7,8 +9,19 @@ import os
 import re
 
 from jonq.csv_utils import json_to_csv
-from jonq.error_handler import ErrorAnalyzer, QuerySyntaxError, validate_query_against_schema
-from jonq.executor import run_jq, run_jq_async, run_jq_streaming, run_jq_streaming_async
+from jonq.ast import Predicate
+from jonq.error_handler import (
+    ErrorAnalyzer, QuerySyntaxError, validate_query_against_batches, validate_query_against_schema,
+)
+from jonq.executor import (
+    iter_jq_streaming_async,
+    run_jq_file,
+    run_jq_file_async,
+    run_jq_streaming,
+    run_jq_streaming_async,
+    run_jq_text,
+    run_jq_text_async,
+)
 from jonq.generator import (
     build_jq_path as ast_build_jq_path,
     escape_string as ast_escape_string,
@@ -16,10 +29,10 @@ from jonq.generator import (
     generate_jq_path,
 )
 from jonq.json_utils import dumps, loads
-from jonq.parser import parse_condition_tokens, parse_path
-from jonq.query_parser import parse_query as parse_query_tokens
-from jonq.query_parser import tokenize_query
+from jonq.parser import contains_aggregate, parse_condition_tokens, parse_expression, parse_path
+from jonq.query_parser import parse_query_structure, tokenize_query
 from jonq.jq_filter import generate_jq_filter
+from jonq.stream_utils import iter_json_array_chunks
 
 __all__ = [
     "CompiledQuery",
@@ -50,6 +63,7 @@ class CompiledQuery:
     from_path: str | None
     distinct: bool
     jq_filter: str
+    predicate: Predicate | None = None
 
 
 @dataclass(frozen=True)
@@ -64,7 +78,7 @@ def compile_query(query: str) -> CompiledQuery:
     tokens = tokenize_query(query)
     (
         fields,
-        condition,
+        predicate,
         group_by,
         having,
         order_by,
@@ -72,10 +86,10 @@ def compile_query(query: str) -> CompiledQuery:
         limit,
         from_path,
         distinct,
-    ) = parse_query_tokens(tokens)
+    ) = parse_query_structure(tokens)
     jq_filter = generate_jq_filter(
         fields,
-        condition,
+        predicate,
         group_by,
         having,
         order_by,
@@ -87,7 +101,10 @@ def compile_query(query: str) -> CompiledQuery:
     return CompiledQuery(
         query=query,
         fields=tuple(fields),
-        condition=condition,
+        condition=(
+            generate_jq_condition(predicate, "array" if from_path else "root")
+            if predicate is not None else None
+        ),
         group_by=tuple(group_by or ()),
         having=having,
         order_by=order_by,
@@ -96,6 +113,7 @@ def compile_query(query: str) -> CompiledQuery:
         from_path=from_path,
         distinct=distinct,
         jq_filter=jq_filter,
+        predicate=predicate,
     )
 
 
@@ -117,9 +135,9 @@ def execute(
         if streaming:
             stdout, stderr = run_jq_streaming(source_info["path"], compiled.jq_filter)
         else:
-            stdout, stderr = run_jq(source_info["path"], compiled.jq_filter)
+            stdout, stderr = run_jq_file(source_info["path"], compiled.jq_filter)
     else:
-        stdout, stderr = run_jq(compiled.jq_filter, source_info["json_text"])
+        stdout, stderr = run_jq_text(compiled.jq_filter, source_info["json_text"])
 
     return _build_result(
         stdout,
@@ -139,11 +157,14 @@ async def execute_async(
     streaming: bool = False,
     limit: int | None = None,
     validate: bool = True,
+    source_label: str | None = None,
 ) -> QueryResult:
     _validate_result_format(format, allowed={"json", "csv", "jsonl"})
     compiled = _coerce_compiled_query(query)
     source_info = _normalize_source(source)
-    _validate_execution_args(source_info, compiled, streaming=streaming, validate=validate)
+    await _validate_execution_args_async(
+        source_info, compiled, streaming=streaming, validate=validate, source_label=source_label
+    )
 
     if source_info["path"] is not None:
         if streaming:
@@ -151,9 +172,9 @@ async def execute_async(
                 source_info["path"], compiled.jq_filter
             )
         else:
-            stdout, stderr = await run_jq_async(source_info["path"], compiled.jq_filter)
+            stdout, stderr = await run_jq_file_async(source_info["path"], compiled.jq_filter)
     else:
-        stdout, stderr = await run_jq_async(compiled.jq_filter, source_info["json_text"])
+        stdout, stderr = await run_jq_text_async(compiled.jq_filter, source_info["json_text"])
 
     return _build_result(
         stdout,
@@ -163,6 +184,19 @@ async def execute_async(
         output_format=format,
         limit=limit,
     )
+
+
+async def _iter_stream_results(json_file: str, compiled: CompiledQuery, *, source_label: str | None):
+    source = {"path": json_file, "json_text": None}
+    await _validate_execution_args_async(
+        source, compiled, streaming=True, validate=True, source_label=source_label,
+    )
+    chunks = iter_jq_streaming_async(json_file, compiled.jq_filter)
+    try:
+        async for chunk in chunks:
+            yield loads(chunk)
+    finally:
+        await chunks.aclose()
 
 
 def query(
@@ -235,6 +269,7 @@ def _validate_execution_args(
     *,
     streaming: bool,
     validate: bool,
+    source_label: str | None = None,
 ) -> None:
     if streaming and source_info["path"] is None:
         raise ValueError("Streaming mode requires a filesystem path.")
@@ -254,9 +289,30 @@ def _validate_execution_args(
     if not validate or source_info["path"] is None:
         return
 
-    validation_error = validate_query_against_schema(source_info["path"], compiled)
+    path = source_info["path"]
+    if streaming:
+        with closing(iter_json_array_chunks(path)) as chunks:
+            validation_error = validate_query_against_batches(
+                (loads(chunk) for chunk in chunks), compiled, source_label=source_label or path,
+                command_options=("--stream",),
+            )
+    else:
+        validation_options = {"source_label": source_label} if source_label is not None else {}
+        validation_error = validate_query_against_schema(path, compiled, **validation_options)
     if validation_error:
         raise QuerySyntaxError(validation_error)
+
+
+async def _validate_execution_args_async(source_info, compiled, *, streaming, validate, source_label):
+    if streaming:
+        await asyncio.to_thread(
+            _validate_execution_args, source_info, compiled, streaming=True, validate=validate,
+            source_label=source_label,
+        )
+    else:
+        _validate_execution_args(
+            source_info, compiled, streaming=False, validate=validate, source_label=source_label,
+        )
 
 
 def _build_result(
@@ -269,9 +325,9 @@ def _build_result(
     limit: int | None,
 ) -> QueryResult:
     if stderr:
-        if source_path is not None:
+        if source_path is not None and not stderr.startswith("Invalid JSON:"):
             analyzer = ErrorAnalyzer(source_path, compiled.query, compiled.jq_filter)
-            raise analyzer.analyze_jq_error(stderr)
+            raise analyzer.analyze_jq_error(stderr.removeprefix("Error in jq filter: "))
         raise ValueError(stderr.strip())
 
     text = stdout or ""
@@ -280,9 +336,7 @@ def _build_result(
         text = _apply_limit_to_json_string(text, limit)
 
     if output_format == "csv" and text:
-        text = json_to_csv(text)
-        if limit is not None:
-            text = _apply_limit_to_csv_string(text, limit)
+        text = json_to_csv(text, limit=limit)
     elif output_format == "jsonl" and text:
         text = _json_to_jsonl(text)
 
@@ -307,13 +361,6 @@ def _apply_limit_to_json_string(s: str, n: int) -> str:
     if isinstance(data, list):
         return dumps(data[:n])
     return s
-
-
-def _apply_limit_to_csv_string(s: str, n: int) -> str:
-    lines = s.splitlines()
-    if not lines:
-        return s
-    return "\n".join(lines[:1] + lines[1 : 1 + max(0, n)])
 
 
 def _json_to_jsonl(s: str) -> str:
@@ -376,6 +423,8 @@ def _supports_chunk_streaming(compiled: CompiledQuery) -> bool:
         return False
     for field in compiled.fields:
         if field[0] in {"aggregation", "count_distinct"}:
+            return False
+        if field[0] == "expression" and contains_aggregate(parse_expression(field[1])):
             return False
     return True
 

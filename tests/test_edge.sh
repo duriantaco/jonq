@@ -4,6 +4,8 @@ echo "=== JONQ EDGE CASES TEST ==="
 echo "Testing boundary conditions and error handling"
 echo
 
+failures=0
+
 run_test() {
   local description=$1
   local command=$2
@@ -25,18 +27,19 @@ run_test() {
     echo "RESULT: $result (Expected)"
   else
     echo "RESULT: $result (Unexpected - Expected $expected_result)"
+    failures=$((failures + 1))
   fi
   echo "----------------------------------------"
 }
 
 echo "=== MISSING DATA HANDLING ==="
 run_test "Accessing non-existent array index" 'jonq json_test_files/nested.json "select name, orders[5].item"'
-run_test "Accessing non-existent nested field" 'jonq json_test_files/nested.json "select name, profile.nonexistent.field"'
+run_test "Accessing non-existent nested field" 'jonq json_test_files/nested.json "select name, profile.nonexistent.field"' "FAIL"
 run_test "Filtering on non-existent field" 'jonq json_test_files/nested.json "select name if nonexistent > 10"' "FAIL"
-run_test "Aggregation on empty array" 'jonq json_test_files/nested.json "select name, count(nonexistent) as count"'
+run_test "Aggregation on empty array" 'jonq json_test_files/all.json "select id, count(items) as count where id = 3"'
 
 echo "=== BOUNDARY VALUES ==="
-run_test "Equal to boundary" 'jonq json_test_files/nested.json "select name, profile.age if profile.age == 25"' "FAIL" # Expected to fail with exact numeric comparison
+run_test "Equal to boundary" 'jonq json_test_files/nested.json "select name, profile.age if profile.age == 25"'
 run_test "Zero value comparison" 'jonq json_test_files/nested.json "select name, profile.age if profile.age > 0"'
 run_test "Selecting many fields" 'jonq json_test_files/nested.json "select id, name, profile.age, profile.address.city, profile.address.zip, orders[0].item, orders[0].price"' 
 run_test "Very large numbers" 'jonq json_test_files/complex.json "select name, financials.revenue from company.subsidiaries[] if financials.revenue > 10000000"'
@@ -49,7 +52,7 @@ run_test "Complex field path with multiple arrays" 'jonq json_test_files/complex
 
 echo "=== ALIASING AND RENAMING ==="
 run_test "Simple aliasing" 'jonq json_test_files/nested.json "select name as customer_name, profile.age as customer_age"'
-run_test "Aliasing with spaces" 'jonq json_test_files/nested.json "select name as \"Customer Name\""' "FAIL" # Expected to fail with quoted alias
+run_test "Aliasing with spaces" 'jonq json_test_files/nested.json "select name as \"Customer Name\""'
 run_test "Aliasing without as keyword" 'jonq json_test_files/nested.json "select name customer_name"' "FAIL" # Expected to fail without 'as'
 
 echo "=== COMBINATION QUERIES ==="
@@ -69,3 +72,4 @@ run_test "Empty result filtering" 'jonq json_test_files/nested.json "select name
 run_test "Group by with having clause" 'jonq json_test_files/nested.json "select profile.address.city, avg(profile.age) as avg_age group by profile.address.city having avg_age > 20"'
 
 echo "=== TEST COMPLETE ==="
+exit "$((failures > 0))"

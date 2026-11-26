@@ -1,5 +1,6 @@
 import csv
 import io
+from itertools import islice
 
 try:
     import orjson as _json_impl
@@ -45,7 +46,7 @@ def flatten_json(data, parent_key="", sep="."):
     return dict(items)
 
 
-def json_to_csv(json_data):
+def json_to_csv(json_data, *, limit=None):
     if isinstance(json_data, str):
         try:
             data = _loads(json_data)
@@ -83,7 +84,8 @@ def json_to_csv(json_data):
     writer = csv.DictWriter(output, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL)
     writer.writeheader()
 
-    for item in flattened_data:
+    rows = flattened_data if limit is None else islice(flattened_data, min(max(0, limit), len(flattened_data)))
+    for item in rows:
         row = {}
         for key, value in item.items():
             if key == "_empty" and len(fieldnames) > 0 and "_empty" not in fieldnames:

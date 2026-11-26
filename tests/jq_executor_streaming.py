@@ -3,7 +3,7 @@ import json
 import tempfile
 from jonq.executor import run_jq, run_jq_streaming
 from jonq.executor import run_jq_async, run_jq_streaming_async
-from jonq.jq_worker_cli import get_worker_async, _cleanup_async
+from jonq.jq_worker_cli import get_worker_async
 import pytest
 import asyncio
 
@@ -83,10 +83,11 @@ class TestExecutorStreamingAsync:
     def teardown_method(self):
         os.unlink(self.large_json.name)
     
-    @pytest.mark.asyncio
-    async def test_run_jq_streaming_async(self):
+    def test_run_jq_streaming_async(self):
         jq_filter = '.[] | select(.active == true)'
-        stdout, stderr = await run_jq_streaming_async(self.large_json.name, jq_filter, chunk_size=100)
+        stdout, stderr = asyncio.run(
+            run_jq_streaming_async(self.large_json.name, jq_filter, chunk_size=100)
+        )
         
         assert stderr == ""
         
@@ -97,12 +98,13 @@ class TestExecutorStreamingAsync:
         assert output[0]["id"] == 2
         assert output[-1]["id"] == 500
     
-    @pytest.mark.asyncio
-    async def test_compare_streaming_vs_regular_async(self):
+    def test_compare_streaming_vs_regular_async(self):
         jq_filter = '[.[] | select(.id > 250)]'
         
-        regular_stdout, _ = await run_jq_async(self.large_json.name, jq_filter)
-        streaming_stdout, _ = await run_jq_streaming_async(self.large_json.name, jq_filter)
+        regular_stdout, _ = asyncio.run(run_jq_async(self.large_json.name, jq_filter))
+        streaming_stdout, _ = asyncio.run(
+            run_jq_streaming_async(self.large_json.name, jq_filter)
+        )
         
         regular_data = json.loads(regular_stdout)
         streaming_data = json.loads(streaming_stdout)
@@ -113,66 +115,48 @@ class TestExecutorStreamingAsync:
         streaming_ids = sorted([item["id"] for item in streaming_data])
         assert regular_ids == streaming_ids
     
-    @pytest.mark.asyncio
-    async def test_run_jq_streaming_error_async(self):
+    def test_run_jq_streaming_error_async(self):
         jq_filter = '.[] | invalid_function'
-        stdout, stderr = await run_jq_streaming_async(self.large_json.name, jq_filter)
+        stdout, stderr = asyncio.run(run_jq_streaming_async(self.large_json.name, jq_filter))
         
         assert stdout == ""
         assert "Error" in stderr
 
-    @pytest.mark.asyncio
-    async def test_concurrent_processing(self):
-        tasks = [
-            run_jq_async(self.large_json.name, '[.[] | select(.id > 400)]'),
-            run_jq_async(self.large_json.name, '[.[] | select(.id < 100)]'),
-            run_jq_async(self.large_json.name, '[.[] | select(.active == true)]')
-        ]
-        
-        results = await asyncio.gather(*tasks)
+    def test_concurrent_processing(self):
+        async def run_queries():
+            return await asyncio.gather(
+                run_jq_async(self.large_json.name, '[.[] | select(.id > 400)]'),
+                run_jq_async(self.large_json.name, '[.[] | select(.id < 100)]'),
+                run_jq_async(self.large_json.name, '[.[] | select(.active == true)]'),
+            )
+
+        results = asyncio.run(run_queries())
         
         for stdout, stderr in results:
             assert stderr == ""
             data = json.loads(stdout)
             assert len(data) > 0
 
-    @pytest.mark.asyncio
-    async def test_run_jq_async_runtime_error(self):
+    def test_run_jq_async_runtime_error(self):
         single_json = tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False)
         try:
             json.dump({"name": "Alice", "age": 30}, single_json)
             single_json.close()
 
             with pytest.raises(ValueError) as excinfo:
-                await run_jq_async(single_json.name, '.name[]')
+                asyncio.run(run_jq_async(single_json.name, '.name[]'))
 
             assert "Error in jq filter" in str(excinfo.value)
             assert "Cannot iterate over string" in str(excinfo.value)
         finally:
             os.unlink(single_json.name)
 
-    @pytest.mark.asyncio
-    async def test_run_jq_async_reuses_cached_worker(self):
-        await _cleanup_async()
+    def test_async_jq_runner_accepts_concurrent_documents(self):
+        async def run_queries():
+            worker = await get_worker_async('.name')
+            assert await get_worker_async('.name') is worker
+            return await asyncio.gather(
+                worker.query({"name": "Alice"}), worker.query({"name": "Bob"})
+            )
 
-        stdout, stderr = await run_jq_async(
-            self.large_json.name, '[.[] | select(.id > 498)]'
-        )
-        assert stderr == ""
-        assert len(json.loads(stdout)) == 2
-
-        worker = await get_worker_async('[.[] | select(.id > 498)]')
-        first_pid = worker.proc.pid
-        assert worker.proc.returncode is None
-
-        stdout, stderr = await run_jq_async(
-            self.large_json.name, '[.[] | select(.id > 498)]'
-        )
-        assert stderr == ""
-        assert len(json.loads(stdout)) == 2
-
-        worker = await get_worker_async('[.[] | select(.id > 498)]')
-        assert worker.proc.pid == first_pid
-        assert worker.proc.returncode is None
-
-        await _cleanup_async()
+        assert asyncio.run(run_queries()) == ['"Alice"', '"Bob"']

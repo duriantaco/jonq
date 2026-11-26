@@ -101,7 +101,7 @@ def test_expression_with_inner_sum():
     r = generate_jq_filter(
         [("expression", "sum(items.price) * 2", "double_total")], None, None, None, None, None
     )
-    _has(r, ['"double_total"', "add", "* 2"])
+    _has(r, ['"double_total"', "add", "*", "2"])
 
 
 @pytest.mark.parametrize(

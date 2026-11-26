@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import re
 from typing import Optional
 from jonq.tokenizer import tokenize
@@ -13,9 +14,11 @@ from jonq.ast import (
     OrCondition,
 )
 from jonq.generator import generate_jq_condition
+from jonq.parser import _QUOTED_KEY, contains_aggregate, decode_quoted_key, parse_expression, parse_path
 from jonq.utils import _split_top_level
 
 _NUM_RE = re.compile(r"^[+-]?((\d+(\.\d*)?)|(\.\d+))([eE][+-]?\d+)?$")
+_FIELD_TOKEN = re.compile(rf"(?:{_QUOTED_KEY.pattern}|[\w.\[\]-])+")
 
 
 def tokenize_query(query: str) -> list[str]:
@@ -40,11 +43,19 @@ def is_balanced(tokens: list[str]) -> bool:
 
 
 def _normalize_quotes(s: str) -> str:
-    return re.sub(r"'([^']*)'", r'"\1"', s)
+    return _QUOTED_KEY.sub(
+        lambda match: json.dumps(decode_quoted_key(match.group()))
+        if match.group().startswith("'") else match.group(),
+        s,
+    )
 
 
 def _normalize_equals(s: str) -> str:
-    return re.sub(r"(?<![!<>=])\s=\s(?![=])", " == ", s)
+    return re.sub(
+        _QUOTED_KEY.pattern + r"|(?<![!<>=\S])(?:=\s+=|=)(?!\S)",
+        lambda match: match.group() if match.group().startswith(('"', "'")) else "==",
+        s,
+    )
 
 
 def _strip_outer_parens(s: str) -> str:
@@ -98,22 +109,40 @@ def _find_top_level_comparison_span(s: str):
     return -1, -1, ""
 
 
-def _expr_from_string(expr_str: str) -> Expression:
+def _expr_from_string(expr_str: str, *, field_position: bool = False) -> Expression:
     expr_str = expr_str.strip()
-    if expr_str.startswith('"') and expr_str.endswith('"'):
-        return Expression(ExprType.LITERAL, expr_str)
+    if not expr_str:
+        raise ValueError("Expected value in condition")
+    if _QUOTED_KEY.fullmatch(expr_str):
+        return Expression(ExprType.FIELD if field_position else ExprType.LITERAL, expr_str)
+    if expr_str.lower() in {"true", "false", "null"}:
+        return Expression(ExprType.LITERAL, expr_str.lower())
     if _NUM_RE.match(expr_str):
         return Expression(ExprType.LITERAL, expr_str)
     return Expression(ExprType.FIELD, expr_str)
 
 
-def parse_condition_string(cond_str: str):
+def parse_condition_string(cond_str: str, *, allow_alias_arithmetic: bool = False):
     s = _normalize_equals(_normalize_quotes(cond_str.strip()))
     s = _strip_outer_parens(s)
 
+    def parse_child(text: str):
+        return parse_condition_string(text, allow_alias_arithmetic=allow_alias_arithmetic)
+
+    def parse_operand(text: str, *, field_position: bool = False) -> Expression:
+        expr = _expr_from_string(text, field_position=field_position)
+        if expr.type == ExprType.FIELD:
+            if allow_alias_arithmetic and not _QUOTED_KEY.fullmatch(expr.value):
+                expr = parse_expression(expr.value)
+                if contains_aggregate(expr):
+                    raise ValueError("HAVING must refer to selected aggregate aliases")
+            elif not _FIELD_TOKEN.fullmatch(expr.value):
+                raise ValueError(f"Expected a field path or literal, got {expr.value!r}")
+        return expr
+
     left, right = _split_top_level(s, " or ")
     if left is not None:
-        return OrCondition(parse_condition_string(left), parse_condition_string(right))
+        return OrCondition(parse_child(left), parse_child(right))
 
     stripped = s.strip()
 
@@ -122,7 +151,7 @@ def parse_condition_string(cond_str: str):
         field = m.group(1).strip()
         return Condition(
             Expression(ExprType.BINARY_CONDITION, "!=", [
-                _expr_from_string(field),
+                parse_operand(field, field_position=True),
                 Expression(ExprType.LITERAL, "null"),
             ])
         )
@@ -131,32 +160,35 @@ def parse_condition_string(cond_str: str):
         field = m.group(1).strip()
         return Condition(
             Expression(ExprType.BINARY_CONDITION, "==", [
-                _expr_from_string(field),
+                parse_operand(field, field_position=True),
                 Expression(ExprType.LITERAL, "null"),
             ])
         )
 
     if stripped.lower().startswith("not "):
         inner = stripped[4:].strip()
-        return NotCondition(parse_condition_string(inner))
+        return NotCondition(parse_child(inner))
 
     m = re.match(r"^(.*?)\s+between\s+(.+?)\s+and\s+(.+?)\s*$", s, flags=re.IGNORECASE)
     if m:
         field, low, high = m.groups()
+        parse_operand(field, field_position=True)
         return BetweenCondition(field.strip(), low.strip(), high.strip())
 
     left, right = _split_top_level(s, " and ")
     if left is not None:
-        return AndCondition(parse_condition_string(left), parse_condition_string(right))
+        return AndCondition(parse_child(left), parse_child(right))
 
     m = re.match(r"^(.*?)\s+between\s+(\S+)\s+and\s+(\S+)\s*$", s, flags=re.IGNORECASE)
     if m:
         field, low, high = m.groups()
+        parse_operand(field, field_position=True)
         return BetweenCondition(field.strip(), low.strip(), high.strip())
 
     m = re.match(r"^(.+?)\s+in\s*\((.+)\)\s*$", s, flags=re.IGNORECASE)
     if m:
         field = m.group(1).strip()
+        parse_operand(field, field_position=True)
         values_str = m.group(2)
         values = []
         for v in values_str.split(","):
@@ -181,7 +213,7 @@ def parse_condition_string(cond_str: str):
                 ExprType.BINARY_CONDITION,
                 "like",
                 [
-                    _expr_from_string(field),
+                    parse_operand(field, field_position=True),
                     Expression(ExprType.LITERAL, f'"{pattern}"'),
                 ],
             )
@@ -190,7 +222,7 @@ def parse_condition_string(cond_str: str):
     m = re.match(r"^(.*?)\s+contains\s+(.+)$", s, flags=re.IGNORECASE)
     if m:
         field, value = m.groups()
-        field_expr = _expr_from_string(field.strip())
+        field_expr = parse_operand(field.strip(), field_position=True)
         value = value.strip()
         if (value.startswith('"') and value.endswith('"')) or (
             value.startswith("'") and value.endswith("'")
@@ -202,19 +234,20 @@ def parse_condition_string(cond_str: str):
             Expression(ExprType.BINARY_CONDITION, "contains", [field_expr, val_expr])
         )
 
-    i0, i1, op = _find_top_level_comparison_span(s)
+    comparison = f" {s} "
+    i0, i1, op = _find_top_level_comparison_span(comparison)
     if i0 != -1:
-        left = s[:i0].strip()
-        right = s[i1:].strip()
+        left = comparison[:i0].strip()
+        right = comparison[i1:].strip()
         return Condition(
             Expression(
                 ExprType.BINARY_CONDITION,
                 op,
-                [_expr_from_string(left), _expr_from_string(right)],
+                [parse_operand(left, field_position=True), parse_operand(right)],
             )
         )
 
-    return Condition(_expr_from_string(s))
+    return Condition(parse_operand(s))
 
 
 def parse_condition_for_from(tokens: list[str]) -> Optional[str]:
@@ -250,7 +283,49 @@ _SELECT_CLAUSES = _FILTER_CLAUSES | {"sort", "group", "having", "from", "limit"}
 _ALIAS_STOP_TOKENS = _SELECT_CLAUSES | {","}
 
 
+def _quoted_field(token: str) -> tuple[str, str]:
+    if not _QUOTED_KEY.fullmatch(token):
+        if _QUOTED_KEY.search(token):
+            elements = parse_path(token).elements
+            return token, elements[-1].value.replace(" ", "_")
+        return token, token.split(".")[-1].replace(" ", "_")
+    name = decode_quoted_key(token)
+    # Keep quote boundaries where they change the meaning of path syntax.
+    if name and name == name.strip() and name != "*" and not name.startswith("'") and not any(
+        character in name for character in '.[]"'
+    ):
+        token = name
+    return token, name.replace(" ", "_")
+
+
+def _join_quoted_path_tokens(tokens: list[str]) -> list[str]:
+    merged: list[str] = []
+    for token in tokens:
+        if merged:
+            previous = merged[-1]
+            if (previous.endswith(".") and _QUOTED_KEY.fullmatch(token)) or (
+                previous.endswith(('"', "'")) and token.startswith((".", "["))
+            ):
+                merged[-1] += token
+                continue
+        merged.append(token)
+    return merged
+
+
 def parse_query(tokens: list[str]) -> tuple:
+    fields, predicate, *clauses = parse_query_structure(tokens)
+    from_path = clauses[-2]
+    condition = (
+        generate_jq_condition(predicate, "array" if from_path else "root")
+        if predicate is not None
+        else None
+    )
+    return fields, condition, *clauses
+
+
+def parse_query_structure(tokens: list[str]) -> tuple:
+    """Parse a query while retaining the WHERE predicate for scope resolution."""
+    tokens = _join_quoted_path_tokens(tokens)
     if not tokens or tokens[0].lower() != "select":
         raise ValueError("Query must start with 'select'")
     i = 1
@@ -403,11 +478,9 @@ def parse_query(tokens: list[str]) -> tuple:
                 if not field_tokens:
                     raise ValueError("Expected field name")
                 if len(field_tokens) > 1 and all(
-                    t.isidentifier() for t in field_tokens
+                    t not in _ARITHMETIC_OPS and _FIELD_TOKEN.fullmatch(t) for t in field_tokens
                 ):
-                    raise ValueError(
-                        f"Unexpected token {field_tokens[1]!r} after field name"
-                    )
+                    raise ValueError(f"Expected a comma before {field_tokens[1]!r}")
                 alias = None
                 if i < len(tokens) and tokens[i] == "as":
                     i += 1
@@ -417,14 +490,8 @@ def parse_query(tokens: list[str]) -> tuple:
                     else:
                         raise ValueError("Expected alias after 'as'")
                 if len(field_tokens) == 1:
-                    field_token = field_tokens[0]
-                    if (field_token.startswith('"') and field_token.endswith('"')) or (
-                        field_token.startswith("'") and field_token.endswith("'")
-                    ):
-                        field_token = field_token[1:-1]
-                    field_path = field_token
-                    alias = alias or field_path.split(".")[-1].replace(" ", "_")
-                    fields.append(("field", field_path, alias))
+                    field_path, default_alias = _quoted_field(field_tokens[0])
+                    fields.append(("field", field_path, alias or default_alias))
                 else:
                     expression = " ".join(field_tokens)
                     alias = alias or f"expr_{len(fields) + 1}"
@@ -458,11 +525,9 @@ def parse_query(tokens: list[str]) -> tuple:
         ]:
             condition_tokens.append(tokens[i])
             i += 1
-        condition = (
-            parse_condition_for_from(condition_tokens)
-            if from_path
-            else parse_condition(condition_tokens)
-        )
+        if not condition_tokens:
+            raise ValueError("Expected a condition after 'where' or 'if'")
+        condition = parse_condition_string(" ".join(condition_tokens))
     group_by = None
     if i < len(tokens) and tokens[i].lower() == "group":
         i += 1
@@ -477,19 +542,19 @@ def parse_query(tokens: list[str]) -> tuple:
                 "limit",
             ]:
                 if tokens[i] == ",":
+                    if expecting_field:
+                        raise ValueError("Expected field before comma in 'group by'")
                     i += 1
                     expecting_field = True
                     continue
                 if expecting_field:
-                    field_token = tokens[i]
-                    if (field_token.startswith('"') and field_token.endswith('"')) or (
-                        field_token.startswith("'") and field_token.endswith("'")
-                    ):
-                        field_token = field_token[1:-1]
+                    field_token, _ = _quoted_field(tokens[i])
                     group_by_fields.append(field_token)
                     expecting_field = False
+                else:
+                    raise ValueError("Expected comma between 'group by' fields")
                 i += 1
-            if not group_by_fields:
+            if expecting_field:
                 raise ValueError("Expected field(s) after 'group by'")
             group_by = group_by_fields
         else:
@@ -503,6 +568,8 @@ def parse_query(tokens: list[str]) -> tuple:
         while i < len(tokens) and tokens[i].lower() not in ["sort", "from", "limit"]:
             having_tokens.append(tokens[i])
             i += 1
+        if not having_tokens:
+            raise ValueError("Expected a condition after 'having'")
         having = " ".join(having_tokens)
     if i < len(tokens) and tokens[i].lower() == "from":
         i += 1
@@ -516,6 +583,8 @@ def parse_query(tokens: list[str]) -> tuple:
     limit = None
     if i < len(tokens) and tokens[i].lower() == "sort":
         i += 1
+        if i == len(tokens) or tokens[i].lower() in _SELECT_CLAUSES:
+            raise ValueError("Expected field after 'sort'")
         if i < len(tokens):
             order_by = tokens[i]
             i += 1

@@ -10,10 +10,15 @@ import asyncio
 import time
 import subprocess
 import shlex
+from shutil import copyfileobj
 from collections import OrderedDict
+from contextlib import ExitStack, contextmanager, nullcontext
+from typing import TextIO
 
-from jonq.api import compile_query, execute_async
-from jonq.error_handler import _format_query_field, handle_error_with_context
+from jonq.api import _iter_stream_results, compile_query, execute_async
+from jonq.ast import PathType
+from jonq.error_handler import _shell_query_argument, handle_error_with_context
+from jonq.parser import parse_path
 from jonq.workbench import (
     build_profile,
     build_profile_from_data,
@@ -40,9 +45,11 @@ from jonq.constants import (
     SCHEMA_PATH_PREVIEW_ITEMS,
 )
 
-logger = logging.getLogger(__name__)
-
 _WORKBENCH_COMMANDS = {"profile", "diff", "check", "run"}
+_QUERY_STRUCTURAL_WORDS = {
+    "as", "distinct", "from", "group", "having", "if", "limit", "order", "select",
+    "sort", "where", "case", "true", "false", "null",
+}
 
 
 def _looks_like_ndjson(path: str) -> bool:
@@ -72,23 +79,67 @@ def _looks_like_ndjson(path: str) -> bool:
         return False
 
 
-def _slurp_ndjson(json_file):
-    if json_file == "-":
-        src = sys.stdin
-        close_needed = False
-    else:
-        src = open(json_file, "r", encoding="utf-8")
-        close_needed = True
-    try:
+def _slurp_ndjson(json_file, *, limit: int | None = None):
+    stream = nullcontext(sys.stdin) if json_file == "-" else open(json_file, encoding="utf-8")
+    with stream as src:
         parts = []
-        for raw in src:
+        for line_no, raw in enumerate(src, 1):
             line = raw.strip()
             if line:
+                try:
+                    json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(f"Invalid NDJSON at line {line_no}: {exc.msg}") from exc
                 parts.append(line)
+                if limit is not None and len(parts) >= limit:
+                    break
         return "[" + ",".join(parts) + "]"
-    finally:
-        if close_needed:
-            src.close()
+
+
+@contextmanager
+def _prepare_query_input(
+    source: str, *, ndjson: bool = False, streaming: bool = False, inspect_only: bool = False
+):
+    with ExitStack() as cleanup:
+        json_file = source
+        if source == "-":
+            if streaming:
+                json_file = _write_temporary_input(sys.stdin, cleanup)
+            else:
+                data = sys.stdin.read()
+                if not data.strip():
+                    raise ValueError("No JSON data on stdin.")
+                json_file = _write_temporary_input(data, cleanup)
+        elif source.startswith(("http://", "https://")):
+            json_file = _fetch_url(source)
+            cleanup.callback(os.unlink, json_file)
+        elif not os.path.exists(source) and any(char in source for char in "*?"):
+            json_file = _concat_glob(source)
+            cleanup.callback(os.unlink, json_file)
+
+        if os.path.isfile(json_file) and (
+            ndjson or source.lower().endswith((".ndjson", ".jsonl"))
+            or _looks_like_ndjson(json_file)
+        ):
+            if streaming:
+                raise ValueError("NDJSON with --stream is not supported. Use --follow for row-wise pipes.")
+            sample_limit = SCHEMA_PATH_SAMPLE_ROWS if inspect_only else None
+            json_file = _write_temporary_input(_slurp_ndjson(json_file, limit=sample_limit), cleanup)
+        yield json_file
+
+
+def _write_temporary_input(contents: str | TextIO, cleanup: ExitStack) -> str:
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json", delete=False) as fp:
+        cleanup.callback(os.unlink, fp.name)
+        if isinstance(contents, str):
+            fp.write(contents)
+        else:
+            copyfileobj(contents, fp)
+            if not fp.tell():
+                raise ValueError("No JSON data on stdin.")
+        return fp.name
 
 
 def _concat_glob(pattern: str) -> str:
@@ -249,6 +300,12 @@ def _add_path_record(path_map, path: str, value) -> None:
         entry["preview"] = preview
 
 
+def _schema_key(key: str) -> str:
+    if key.isascii() and key.isidentifier() and key.lower() not in _QUERY_STRUCTURAL_WORDS:
+        return key
+    return json.dumps(key, ensure_ascii=False)
+
+
 def _walk_schema_paths(value, path: str, path_map, depth: int) -> None:
     if depth > SCHEMA_PATH_MAX_DEPTH:
         return
@@ -256,7 +313,8 @@ def _walk_schema_paths(value, path: str, path_map, depth: int) -> None:
     if isinstance(value, dict):
         _add_path_record(path_map, path, value)
         for key, child in value.items():
-            child_path = f"{path}.{key}" if path else key
+            segment = _schema_key(key)
+            child_path = f"{path}.{segment}" if path else segment
             _walk_schema_paths(child, child_path, path_map, depth + 1)
         return
 
@@ -340,7 +398,32 @@ def _is_scalar_schema_info(info) -> bool:
 
 
 def _path_leaf(path: str) -> str:
-    return path.replace("[]", "").split(".")[-1].lower()
+    return parse_path(path).elements[-1].value.lower()
+
+
+def _schema_row_fields(path_map, *, root_array: bool = False):
+    scopes = {}
+    for path, info in path_map.items():
+        if not _is_scalar_schema_info(info):
+            continue
+        elements = parse_path(path).elements
+        array_positions = [i for i, element in enumerate(elements) if element.type == PathType.ARRAY]
+        if not array_positions:
+            scopes.setdefault("", {})[path] = info
+            continue
+
+        last_array = array_positions[-1]
+        scope_parts = ["[]"] if root_array else []
+        for index, element in enumerate(elements[:last_array + 1]):
+            name = _schema_key(element.value) if element.value else ""
+            if element.type == PathType.ARRAY and (index != last_array or len(array_positions) > 1):
+                name += "[]"
+            scope_parts.append(name)
+        scope = ".".join(scope_parts)
+        field = ".".join(_schema_key(element.value) for element in elements[last_array + 1:])
+        if scope and field:
+            scopes.setdefault(scope, {})[field] = info
+    return scopes
 
 
 def _pick_select_fields(paths: list[str], limit: int = 3) -> list[str]:
@@ -366,96 +449,62 @@ def _pick_select_fields(paths: list[str], limit: int = 3) -> list[str]:
 
 
 def _format_suggested_command(source: str, query: str, *options: str) -> str:
-    query_arg = f'"{query}"' if '"' not in query else shlex.quote(query)
-    parts = ["jonq", shlex.quote(source), query_arg, *options]
+    parts = ["jonq", shlex.quote(source), _shell_query_argument(query), *options]
     return " ".join(parts)
 
 
 def _query_for_mixed_array(query: str, selected: list[str], mixed_array: bool) -> str:
     if not mixed_array or not selected:
         return query
-    if _format_query_field(selected[0]) != selected[0]:
+    if '"' in selected[0]:
         return query
-    return f"{query} where {_format_query_field(selected[0])} is not null"
+    return f"{query} where {selected[0]} is not null"
 
 
-def _suggest_queries(source: str, path_map, *, mixed_array: bool = False) -> list[str]:
-    flat_scalars = [
-        path
-        for path, info in path_map.items()
-        if "[]" not in path and _is_scalar_schema_info(info)
-    ]
-    if not flat_scalars:
+def _suggest_queries(
+    source: str, path_map, *, root_kind: str = "array", mixed_array: bool = False
+) -> list[str]:
+    scopes = _schema_row_fields(path_map, root_array=root_kind == "array")
+    if not scopes:
         return []
 
+    ordered_scopes = sorted(scopes, key=bool, reverse=root_kind == "object")
     suggestions = []
-    selected = _pick_select_fields(flat_scalars)
-    if selected:
-        selected_query_fields = [_format_query_field(path) for path in selected]
-        suggestions.append(
-            _format_suggested_command(
-                source,
-                _query_for_mixed_array(
-                    f"select {', '.join(selected_query_fields)}", selected, mixed_array
-                ),
-                "-t",
-            )
-        )
+    for scope in ordered_scopes[:3]:
+        selected = _pick_select_fields(list(scopes[scope]))
+        query = f"select {', '.join(selected)}"
+        if scope:
+            query += f" from {scope}"
+        query = _query_for_mixed_array(query, selected, mixed_array and not scope)
+        suggestions.append(_format_suggested_command(source, query, "-t"))
 
-    raw_candidates = []
-    for leaf in ("name", "title", "email", "message", "id"):
-        raw_candidates.extend(path for path in flat_scalars if _path_leaf(path) == leaf)
-    raw_field = raw_candidates[0] if raw_candidates else flat_scalars[0]
-    suggestions.append(
-        _format_suggested_command(
-            source,
-            _query_for_mixed_array(
-                f"select {_format_query_field(raw_field)}", [raw_field], mixed_array
-            ),
-            "-r",
-        )
+    primary_scope = ordered_scopes[0]
+    from_clause = f" from {primary_scope}" if primary_scope else ""
+    primary_mixed = mixed_array and not primary_scope
+    primary_fields = scopes[primary_scope]
+    selected = _pick_select_fields(list(primary_fields))
+    raw_candidates = ("name", "title", "email", "message", "id")
+    raw_field = next(
+        (path for leaf in raw_candidates for path in primary_fields if _path_leaf(path) == leaf),
+        next(iter(primary_fields)),
     )
+    raw_query = _query_for_mixed_array(f"select {raw_field}{from_clause}", [raw_field], primary_mixed)
+    suggestions.append(_format_suggested_command(source, raw_query, "-r"))
 
-    bool_fields = [
-        path
-        for path in flat_scalars
-        if any(type_label == "bool" for type_label in path_map[path]["types"])
-    ]
-    if bool_fields and selected:
-        suggestions.append(
-            _format_suggested_command(
-                source,
-                f"select {', '.join(selected)} where {bool_fields[0]} = true",
-                "-t",
-            )
-        )
+    bool_field = next((path for path, info in primary_fields.items() if info["types"] == ["bool"]), None)
+    if bool_field:
+        value = primary_fields[bool_field]["preview"]
+        query = f"select {', '.join(selected)}{from_clause} where {bool_field} = {value}"
+        suggestions.append(_format_suggested_command(source, query, "-t"))
     else:
-        groupable_names = (
-            "status",
-            "type",
-            "level",
-            "city",
-            "country",
-            "category",
-            "kind",
-            "state",
-            "plan",
+        groupable_names = {"status", "type", "level", "city", "country", "category", "kind", "state", "plan"}
+        group_field = next(
+            (path for path, info in primary_fields.items() if _path_leaf(path) in groupable_names and "str" in info["types"]),
+            None,
         )
-        group_fields = [
-            path
-            for path in flat_scalars
-            if _path_leaf(path) in groupable_names
-            and any(type_label == "str" for type_label in path_map[path]["types"])
-        ]
-        if group_fields:
-            group_field = group_fields[0]
-            suggestions.append(
-                _format_suggested_command(
-                    source,
-                    f"select {_format_query_field(group_field)}, count(*) as count group by {_format_query_field(group_field)}",
-                    "-t",
-                )
-            )
+        if group_field:
+            query = f"select {group_field}, count(*) as count{from_clause} group by {group_field}"
+            suggestions.append(_format_suggested_command(source, query, "-t"))
 
     deduped = []
     for suggestion in suggestions:
@@ -473,9 +522,8 @@ def _sample_for_display(sample: list):
     return sample[0]
 
 
-def _print_schema(json_file: str, display_name: str | None = None) -> None:
-    is_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
-    c = _Colors(is_tty)
+def _print_schema(json_file: str, display_name: str | None = None, *, no_color: bool = False) -> None:
+    c = _Colors(_terminal_color_enabled(no_color))
     display_name = display_name or json_file
 
     root_kind, sample = _sample_json_for_schema(json_file)
@@ -527,7 +575,7 @@ def _print_schema(json_file: str, display_name: str | None = None) -> None:
     if len(sample_json) > SCHEMA_SAMPLE_TRUNCATE:
         print("  ...")
 
-    suggestions = _suggest_queries(display_name, path_map, mixed_array=mixed_array)
+    suggestions = _suggest_queries(display_name, path_map, root_kind=root_kind, mixed_array=mixed_array)
     if suggestions:
         print(f"\n{c.BOLD}Suggested queries:{c.NC}")
         for suggestion in suggestions:
@@ -573,7 +621,13 @@ def _setup_repl_readline(json_file: str) -> None:
         pass
 
     import atexit
-    atexit.register(lambda: readline.write_history_file(history_file))
+    def save_history():
+        try:
+            readline.write_history_file(history_file)
+        except OSError:
+            pass
+
+    atexit.register(save_history)
 
     # Build completion words from schema
     completions = _build_repl_completions(json_file)
@@ -619,13 +673,12 @@ def _build_repl_completions(json_file: str) -> list[str]:
     return keywords + field_names
 
 
-def _run_repl(json_file: str, options: dict) -> None:
-    is_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
-    c = _Colors(is_tty)
+async def _run_repl(json_file: str, options: dict, source_label: str) -> None:
+    c = _Colors(_terminal_color_enabled(options["no_color"]))
 
     _setup_repl_readline(json_file)
 
-    print(f"{c.BOLD}jonq interactive mode{c.NC} — querying {c.BOLD}{json_file}{c.NC}")
+    print(f"{c.BOLD}jonq interactive mode{c.NC} — querying {c.BOLD}{source_label}{c.NC}")
     print(f"{c.DIM}Type a query, or 'quit' to exit. Tab completes field names.{c.NC}")
     print(f"{c.DIM}Example: select name, age if age > 30{c.NC}\n")
 
@@ -638,18 +691,16 @@ def _run_repl(json_file: str, options: dict) -> None:
         if not query or query.lower() in ("quit", "exit", "q"):
             break
         try:
-            result = asyncio.run(_run_query(json_file, query, options))
-            if result:
-                print(result)
+            result = await _run_query(json_file, query, options, source_label=source_label)
+            _write_query_output(result, options)
         except SystemExit:
             pass
         except Exception as exc:
             print(f"Error: {exc}", file=sys.stderr)
 
 
-def _explain_query(compiled) -> str:
-    is_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
-    c = _Colors(is_tty)
+def _explain_query(compiled, *, color: bool = False) -> str:
+    c = _Colors(color)
     parts = []
     parts.append(f"{c.BOLD}Query:{c.NC} {compiled.query}")
     parts.append("")
@@ -720,29 +771,16 @@ def _json_to_yaml(json_text: str) -> str:
         return json_text
 
 
-def _json_to_jsonl(json_text: str) -> str:
+def _json_to_raw(json_text: str, *, terminate_lines: bool = False) -> str:
     try:
         data = json.loads(json_text)
     except (json.JSONDecodeError, TypeError):
         return json_text
 
-    if isinstance(data, list):
-        return "\n".join(
-            json.dumps(item, ensure_ascii=False, separators=(",", ":"))
-            for item in data
-        )
-    return json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-
-
-def _json_to_raw(json_text: str) -> str:
-    try:
-        data = json.loads(json_text)
-    except (json.JSONDecodeError, TypeError):
-        return json_text
-
-    if isinstance(data, list):
-        return "\n".join(_raw_line(item) for item in data)
-    return _raw_line(data)
+    rows = data if isinstance(data, list) else [data]
+    if terminate_lines:
+        return "".join(f"{_raw_line(item)}\n" for item in rows)
+    return "\n".join(_raw_line(item) for item in rows)
 
 
 def _raw_line(value) -> str:
@@ -895,56 +933,103 @@ complete -c jonq -l version -d 'Show version\''''
 
 async def _follow_stdin(query: str, options: dict) -> None:
     """Stream NDJSON from stdin, applying the query to each line."""
-    from jonq.api import compile_query as _compile
-    from jonq.executor import run_jq
+    import csv
+    import io
+    import shutil
 
-    is_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
-    c = _Colors(is_tty)
+    from jonq.api import _supports_chunk_streaming
 
-    compiled = _compile(query)
-    jq_filter = compiled.jq_filter
+    compiled = compile_query(query)
+    if options.get("show_jq") or options.get("explain"):
+        output = (
+            compiled.jq_filter if options.get("show_jq")
+            else _explain_query(compiled, color=_query_color_enabled(options))
+        )
+        _write_query_output(output, options)
+        return
+    if not _supports_chunk_streaming(compiled):
+        raise ValueError("--follow requires a row-wise query. Use a batch query for grouping, sorting, or aggregation.")
+    if shutil.which("jq") is None:
+        raise ValueError("jq is required. Install jq and make sure it is on PATH.")
 
-    print(f"{c.DIM}Following stdin — press Ctrl+C to stop{c.NC}", file=sys.stderr)
+    print("Following stdin — press Ctrl+C to stop", file=sys.stderr)
+    exec_format = "json" if options["format"] in ("table", "yaml") else options["format"]
+    csv_header = None
+    failed = False
 
     try:
-        for raw_line in sys.stdin:
+        for line_no, raw_line in enumerate(sys.stdin, 1):
             line = raw_line.strip()
             if not line:
                 continue
             try:
                 json.loads(line)
-            except json.JSONDecodeError:
-                continue
-
-            wrapped = f"[{line}]"
-            try:
-                stdout, stderr = run_jq(jq_filter, wrapped)
-                if stderr:
+                result = await execute_async(
+                    f"[{line}]", compiled, format=exec_format, limit=options["limit"], validate=False,
+                )
+                if not result.text or (exec_format == "json" and result.data in ([], None)):
                     continue
-                if stdout and stdout.strip():
-                    result = stdout.strip()
-                    if result in ("[]", "null", ""):
-                        continue
-                    if options["format"] == "table":
-                        from jonq.table_utils import json_to_table
-                        result = json_to_table(result, color=is_tty and not options.get("no_color"))
-                    elif options["format"] == "yaml":
-                        result = _json_to_yaml(result)
-                    elif options["format"] == "jsonl":
-                        result = _json_to_jsonl(result)
-                    elif options.get("raw_output"):
-                        result = _json_to_raw(result)
-                    elif is_tty and not options.get("no_color"):
-                        result = _pretty_json_string(result)
-                        result = _colorize_json(result)
-                    print(result, flush=True)
-            except Exception:
-                continue
+                if exec_format != "csv":
+                    _write_query_output(_query_result_text(result.text, options), options)
+                else:
+                    csv_text = io.StringIO(result.text, newline="")
+                    header = next(csv.reader(csv_text))
+                    if csv_header is None:
+                        csv_header = header
+                        sys.stdout.write(result.text)
+                    elif header != csv_header:
+                        raise ValueError("CSV columns changed. Select explicit fields to keep columns fixed.")
+                    else:
+                        sys.stdout.write(csv_text.read())
+                sys.stdout.flush()
+            except (ValueError, RuntimeError) as exc:
+                _print_log_error(line_no, str(exc))
+                failed = True
     except KeyboardInterrupt:
         pass
+    if failed:
+        sys.exit(1)
 
 
-async def _run_query(json_file: str, query: str, options: dict) -> str | None:
+def _query_color_enabled(options: dict) -> bool:
+    return not options.get("out") and _terminal_color_enabled(options.get("no_color", False))
+
+
+def _query_result_text(text: str, options: dict) -> str:
+    color = _query_color_enabled(options)
+
+    if not text:
+        return ""
+    if options["format"] == "table":
+        from jonq.table_utils import json_to_table
+
+        return json_to_table(text, color=color)
+    if options["format"] == "yaml":
+        return _json_to_yaml(text)
+    if options.get("raw_output"):
+        return _json_to_raw(text, terminate_lines=True)
+    if options["format"] == "json":
+        if options.get("pretty") or color:
+            text = _pretty_json_string(text)
+        if color:
+            text = _colorize_json(text)
+    return text
+
+
+def _write_query_output(text: str, options: dict) -> None:
+    if text and not text.endswith("\n"):
+        text += "\n"
+    out_path = options.get("out")
+    if out_path:
+        with open(out_path, "w", encoding="utf-8", newline="") as fp:
+            fp.write(text)
+    elif text:
+        sys.stdout.write(text)
+
+
+async def _run_query(
+    json_file: str, query: str, options: dict, *, source_label: str | None = None
+) -> str:
     t_start = time.monotonic()
     compiled = compile_query(query)
     t_parse = time.monotonic()
@@ -953,7 +1038,7 @@ async def _run_query(json_file: str, query: str, options: dict) -> str | None:
         return compiled.jq_filter
 
     if options.get("explain"):
-        return _explain_query(compiled)
+        return _explain_query(compiled, color=_query_color_enabled(options))
 
     exec_format = "json" if options["format"] in ("table", "yaml") else options["format"]
 
@@ -964,38 +1049,69 @@ async def _run_query(json_file: str, query: str, options: dict) -> str | None:
         streaming=options["streaming"],
         limit=options.get("limit"),
         validate=True,
+        source_label=source_label,
     )
     t_exec = time.monotonic()
 
-    if not result.text:
-        if options.get("show_time"):
-            _print_timing(t_start, t_parse, t_exec, time.monotonic())
-        return None
-
-    out_text = result.text
-
-    is_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
-
-    if options["format"] == "table":
-        from jonq.table_utils import json_to_table
-
-        use_color = is_tty and not options.get("no_color")
-        out_text = json_to_table(out_text, color=use_color)
-    elif options["format"] == "yaml":
-        out_text = _json_to_yaml(out_text)
-    elif options.get("raw_output"):
-        out_text = _json_to_raw(out_text)
-    elif options["format"] == "json":
-        if options.get("pretty") or (is_tty and not options.get("no_color")):
-            out_text = _pretty_json_string(out_text)
-        if is_tty and not options.get("no_color"):
-            out_text = _colorize_json(out_text)
-
-    t_format = time.monotonic()
+    out_text = _query_result_text(result.text, options)
     if options.get("show_time"):
-        _print_timing(t_start, t_parse, t_exec, t_format)
+        _print_timing(t_start, t_parse, t_exec, time.monotonic())
 
-    return out_text.strip()
+    return out_text
+
+
+async def _write_streaming_query(json_file: str, query: str, options: dict, *, source_label: str) -> None:
+    from tempfile import TemporaryFile
+
+    t_start = time.monotonic()
+    compiled = compile_query(query)
+    t_parse = time.monotonic()
+    raw = options["raw_output"]
+    json_array = options["format"] == "json" and not raw
+    color = json_array and _query_color_enabled(options)
+    pretty = json_array and (options["pretty"] or color)
+    limit = options["limit"]
+    count = 0
+
+    # Publish only after the input and all jq chunks succeed.
+    with TemporaryFile(mode="w+t", encoding="utf-8", newline="") as output:
+        if json_array:
+            output.write("[")
+        results = _iter_stream_results(json_file, compiled, source_label=source_label)
+        try:
+            async for rows in results:
+                if limit is not None:
+                    rows = rows[:max(0, limit - count)]
+                for row in rows:
+                    if raw:
+                        output.write(_raw_line(row) + "\n")
+                    elif pretty:
+                        rendered = json.dumps(row, ensure_ascii=False, indent=2)
+                        if color:
+                            rendered = _colorize_json(rendered)
+                        output.write((",\n  " if count else "\n  ") + rendered.replace("\n", "\n  "))
+                    else:
+                        rendered = json.dumps(row, ensure_ascii=False, separators=(",", ":"))
+                        if json_array:
+                            output.write(("," if count else "") + rendered)
+                        else:
+                            output.write(rendered + "\n")
+                    count += 1
+        finally:
+            await results.aclose()
+        if json_array:
+            output.write("\n]\n" if pretty and count else "]\n")
+        t_exec = time.monotonic()
+
+        output.seek(0)
+        if options["out"]:
+            with open(options["out"], "w", encoding="utf-8", newline="") as destination:
+                copyfileobj(output, destination)
+        else:
+            copyfileobj(output, sys.stdout)
+
+    if options["show_time"]:
+        _print_timing(t_start, t_parse, t_exec, time.monotonic())
 
 
 async def _watch_loop(json_file: str, query: str, options: dict) -> None:
@@ -1003,7 +1119,7 @@ async def _watch_loop(json_file: str, query: str, options: dict) -> None:
     c = _Colors(is_tty)
 
     last_mtime = 0.0
-    last_output = ""
+    last_output = None
     print(f"{c.DIM}Watching {json_file} — press Ctrl+C to stop{c.NC}")
 
     try:
@@ -1017,17 +1133,21 @@ async def _watch_loop(json_file: str, query: str, options: dict) -> None:
             if mtime != last_mtime:
                 last_mtime = mtime
                 try:
-                    result = await _run_query(json_file, query, options)
-                    output = result or ""
+                    with _prepare_query_input(
+                        json_file, ndjson=options["ndjson"], streaming=options["streaming"]
+                    ) as prepared_file:
+                        output = await _run_query(prepared_file, query, options, source_label=json_file)
                 except Exception as exc:
-                    output = f"Error: {exc}"
+                    handle_error_with_context(exc, json_file, query)
+                    await asyncio.sleep(WATCH_POLL_INTERVAL)
+                    continue
 
                 if output != last_output:
                     last_output = output
                     if is_tty:
                         sys.stdout.write(c.CLEAR_SCREEN)
                     print(f"{c.DIM}[{time.strftime('%H:%M:%S')}] {json_file}{c.NC}")
-                    print(output)
+                    _write_query_output(output, options)
 
             await asyncio.sleep(WATCH_POLL_INTERVAL)
     except (KeyboardInterrupt, asyncio.CancelledError):
@@ -1059,127 +1179,75 @@ async def _amain(argv: list[str] | None = None):
     if options.get("raw_output") and options["format"] != "json":
         parser.error("--raw/--raw-output can only be used with JSON output.")
 
-    if args.interactive:
-        json_file = args.interactive
-        if not os.path.exists(json_file):
-            print(f"File not found: {json_file}", file=sys.stderr)
-            sys.exit(1)
-        _run_repl(json_file, options)
-        return
-
     stdin_is_pipe = not sys.stdin.isatty()
-
-    if args.source is None and args.query is None:
-        if stdin_is_pipe:
-            parser.print_usage(sys.stderr)
-            print("Pipe detected but no query given. Usage: ... | jonq \"select ...\"", file=sys.stderr)
-            sys.exit(1)
-        parser.print_usage(sys.stderr)
-        print("Try 'jonq --help' for more information.", file=sys.stderr)
-        sys.exit(1)
-
-    if stdin_is_pipe and args.source is not None and args.query is None:
-        if not os.path.exists(args.source):
-            args.query = args.source
-            args.source = "-"
-
-    if args.source is None:
-        parser.print_usage(sys.stderr)
-        print("Try 'jonq --help' for more information.", file=sys.stderr)
-        sys.exit(1)
-
-    if args.query is None:
-        _show_schema_for_target(args.source)
-        return
-
-    json_file = args.source
+    source = args.interactive or args.source
     query = args.query
+    if source is None and stdin_is_pipe:
+        source = "-"
+    if source is None:
+        parser.print_usage(sys.stderr)
+        print("Try 'jonq --help' for more information.", file=sys.stderr)
+        sys.exit(1)
 
-    if options.get("follow"):
-        if json_file != "-" and not stdin_is_pipe:
-            print("--follow requires piped stdin. Usage: ... | jonq --follow \"select ...\"", file=sys.stderr)
-            sys.exit(1)
-        await _follow_stdin(query, options)
-        return
+    if (
+        stdin_is_pipe and not args.interactive and query is None
+        and source.lower().split(maxsplit=1)[:1] == ["select"]
+        and not os.path.exists(source)
+    ):
+        query, source = source, "-"
 
-    tmp_paths: list[str] = []
-
-    if json_file.startswith("http://") or json_file.startswith("https://"):
-        tmp_path = _fetch_url(json_file)
-        tmp_paths.append(tmp_path)
-        json_file = tmp_path
-
-    elif any(c in json_file for c in "*?") and json_file != "-":
-        tmp_path = _concat_glob(json_file)
-        tmp_paths.append(tmp_path)
-        json_file = tmp_path
-
-    elif json_file != "-" and os.path.isfile(json_file):
-        if options.get("ndjson") or _looks_like_ndjson(json_file):
-            if options.get("streaming"):
-                print(
-                    "NDJSON with --stream is not supported yet. Omit --stream for now."
-                )
-                sys.exit(2)
-            import tempfile
-
-            json_text = _slurp_ndjson(json_file)
-            fd, tmp_path = tempfile.mkstemp(prefix="jonq_ndjson_", suffix=".json")
-            with os.fdopen(fd, "w", encoding="utf-8") as _tmp:
-                _tmp.write(json_text)
-            tmp_paths.append(tmp_path)
-            json_file = tmp_path
-
-    if json_file == "-" and not tmp_paths:
-        import tempfile
-
-        data = sys.stdin.read()
-        fd, tmp_path = tempfile.mkstemp(prefix="jonq_stdin_", suffix=".json")
-        with os.fdopen(fd, "w", encoding="utf-8") as _tmp:
-            _tmp.write(data)
-        tmp_paths.append(tmp_path)
-        json_file = tmp_path
-
+    json_file = source
     try:
-        validate_input_file(json_file)
-
-        if options.get("watch"):
-            await _watch_loop(json_file, query, options)
+        if args.follow:
+            if source != "-" or not stdin_is_pipe or query is None:
+                parser.error('--follow requires piped stdin and a query, such as --follow "select *"')
+            if args.watch or args.streaming or args.out or args.interactive:
+                parser.error("--follow cannot be combined with --watch, --stream, --out or --interactive")
+            await _follow_stdin(query, options)
             return
 
-        result = await _run_query(json_file, query, options)
+        if args.watch and not args.interactive:
+            if query is None:
+                parser.error("--watch requires a query")
+            validate_input_file(source)
+            await _watch_loop(source, query, options)
+            return
 
-        if result:
-            out_path = options.get("out")
-            if out_path:
-                import re
+        inspect_only = query is None and not args.interactive
+        with _prepare_query_input(
+            source, ndjson=args.ndjson, streaming=args.streaming, inspect_only=inspect_only
+        ) as json_file:
+            if inspect_only:
+                _print_schema(json_file, display_name=source, no_color=args.no_color)
+                return
 
-                clean = re.sub(r"\033\[[0-9;]*m", "", result)
-                with open(out_path, "w", encoding="utf-8") as fp:
-                    fp.write(clean + ("\n" if not clean.endswith("\n") else ""))
+            validate_input_file(json_file)
+            if args.interactive:
+                await _run_repl(json_file, options, source)
+            elif (
+                args.streaming and options["format"] in {"json", "jsonl"}
+                and not options["explain"] and not options["show_jq"]
+                and (options["limit"] is None or options["limit"] >= 0)
+            ):
+                await _write_streaming_query(json_file, query, options, source_label=source)
             else:
-                print(result)
-
-    except Exception as e:
-        handle_error_with_context(e, json_file, query, None)
+                result = await _run_query(json_file, query, options, source_label=source)
+                _write_query_output(result, options)
+    except Exception as exc:
+        handle_error_with_context(exc, json_file, query)
         sys.exit(1)
-    finally:
-        for p in tmp_paths:
-            try:
-                os.remove(p)
-            except OSError:
-                logger.debug("Failed to remove temp file: %s", p)
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="jonq",
-        description="SQL-like query tool for JSON data",
+        description="Inspect JSON and run readable queries powered by jq.",
         epilog=(
-            "Examples:\n"
-            '  jonq data.json "select name, age if age > 30"\n'
-            '  jonq data.json "select name, age" -t\n'
+            "Common workflows\n"
             "  jonq data.json\n"
+            '  jonq response.json "select name, age from users" -t\n'
+            '  jonq data.json "select name, age if age > 30"\n'
+            "  cat data.json | jonq\n"
             "  jonq profile data.json\n"
             "  jonq diff old.json new.json\n"
             "  jonq check user_contract\n"
@@ -1336,6 +1404,19 @@ async def _run_workbench_command(argv: list[str]) -> None:
     except Exception as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
+
+
+def _terminal_color_enabled(no_color: bool) -> bool:
+    return (
+        not no_color
+        and "NO_COLOR" not in os.environ
+        and os.environ.get("TERM") != "dumb"
+        and sys.stdout.isatty()
+    )
+
+
+def _print_log_error(line_no: int, message: str) -> None:
+    print(f"Line {line_no}: {message}", file=sys.stderr)
 
 
 def _run_profile_command(argv: list[str]) -> None:
@@ -1598,38 +1679,10 @@ async def _run_named_query_command(argv: list[str]) -> None:
     if options.get("raw_output") and options["format"] != "json":
         raise ValueError("--raw/--raw-output can only be used with JSON output.")
 
-    validate_input_file(source)
-    result = await _run_query(source, query, options)
-    if result:
-        out_path = options.get("out")
-        if out_path:
-            import re
-
-            clean = re.sub(r"\033\[[0-9;]*m", "", result)
-            with open(out_path, "w", encoding="utf-8") as fp:
-                fp.write(clean + ("\n" if not clean.endswith("\n") else ""))
-        else:
-            print(result)
-
-
-def _show_schema_for_target(target: str) -> None:
-    if target.startswith("http://") or target.startswith("https://"):
-        tmp = _fetch_url(target)
-        try:
-            _print_schema(tmp, display_name=target)
-        finally:
-            os.remove(tmp)
-        return
-
-    if any(c in target for c in "*?"):
-        paths = sorted(globmod.glob(target))
-        if not paths:
-            print(f"No files matched: {target}", file=sys.stderr)
-            sys.exit(1)
-        _print_schema(paths[0])
-        return
-
-    _print_schema(target)
+    with _prepare_query_input(source) as json_file:
+        validate_input_file(json_file)
+        result = await _run_query(json_file, query, options, source_label=source)
+        _write_query_output(result, options)
 
 
 def print_help():

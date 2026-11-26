@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 import time
 import os
@@ -102,8 +103,7 @@ class TestJsonOptimization:
         finally:
             os.unlink(temp_path)
 
-    @pytest.mark.asyncio
-    async def test_stream_utils_integration_async(self, test_data):
+    def test_stream_utils_integration_async(self, test_data):
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as temp_file:
             temp_file.write(dumps(test_data["medium"]))
             temp_path = temp_file.name
@@ -116,7 +116,9 @@ class TestJsonOptimization:
                         item["id"] *= 2
                     return dumps(data)
             
-            result = await process_json_streaming_async(temp_path, process_chunk_async, chunk_size=20)
+            result = asyncio.run(
+                process_json_streaming_async(temp_path, process_chunk_async, chunk_size=20)
+            )
             
             processed_data = loads(result)
             assert len(processed_data) == len(test_data["medium"])
@@ -125,17 +127,18 @@ class TestJsonOptimization:
         finally:
             os.unlink(temp_path)
 
-    @pytest.mark.asyncio
-    async def test_iter_json_array_chunks_async_in_memory(self, test_data):
+    def test_iter_json_array_chunks_async_in_memory(self, test_data):
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as temp_file:
             temp_file.write(dumps(test_data["medium"]))
             temp_path = temp_file.name
 
         try:
-            chunks = []
-            async for chunk in iter_json_array_chunks_async(temp_path, chunk_size=20):
-                chunks.append(chunk)
+            async def collect_chunks():
+                return [
+                    chunk async for chunk in iter_json_array_chunks_async(temp_path, chunk_size=20)
+                ]
 
+            chunks = asyncio.run(collect_chunks())
             assert len(chunks) == 5
             first_chunk = loads(chunks[0])
             assert len(first_chunk) == 20

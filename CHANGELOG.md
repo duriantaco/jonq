@@ -7,6 +7,16 @@
 - **`jonq.yaml` workflows** for named queries and repeatable field/type/null/count checks.
 - **Profile output** with field presence, null count, missing count, type conflicts, and sample values.
 - **Shape diffing** for added, removed, changed, newly optional, and newly nullable fields.
+- **Inspect suggestions** find nested row arrays and show runnable `from` queries. Inspect accepts piped JSON and NDJSON files.
+
+### Changed
+- Selecting parent fields alongside unaggregated child values requires an explicit row source. Query independent child arrays separately.
+- Streaming reads local root-array JSON incrementally and still checks referenced fields. The CLI stages JSON, JSONL, and raw results on disk until processing succeeds.
+
+### Fixed
+- Preserve `false` and quoted keys in jq queries. Apply filters, sorting, and limits to the intended rows, and compare numeric thresholds against JSON numbers.
+- Keep query diagnostics on stderr and suggest repairs using the original input path or stdin. Repairs change field references and preserve literal values. Preserve raw value whitespace and clear stale CSV exports after successful empty queries.
+- Read complete jq output, handle subprocess errors, and preserve valid JSON when combining streamed chunks.
 
 ## [v0.3.4] - 2026-04-30
 

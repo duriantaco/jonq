@@ -11,7 +11,9 @@ def test_compile_query_returns_structured_result():
     assert isinstance(compiled, CompiledQuery)
     assert compiled.query == "select name if age > 25"
     assert compiled.sort_direction == "asc"
-    assert "select(.age" in compiled.jq_filter
+    assert query(
+        [{"name": "Alice", "age": 30}, {"name": "Bob", "age": "20"}], compiled
+    ) == [{"name": "Alice"}]
 
 
 def test_query_accepts_python_objects():

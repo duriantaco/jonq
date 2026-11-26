@@ -7,6 +7,8 @@ High-Level Python API (jonq.api)
 **compile_query(query)**
 
 Compile a jonq query string into a reusable ``CompiledQuery`` object.
+Each execution starts a fresh jq process. In streaming mode, jq runs once per
+chunk.
 
 - **Parameters:** ``query`` (str)
 - **Returns:** ``CompiledQuery``

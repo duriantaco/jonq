@@ -97,7 +97,8 @@ def test_main_file_not_found(capsys):
             main()
         assert excinfo.value.code == 1
     captured = capsys.readouterr()
-    assert "not found" in captured.out or "not a file" in captured.out
+    assert captured.out == ""
+    assert "not found" in captured.err
 
 
 def test_main_empty_file(tmp_path, capsys):
@@ -108,7 +109,8 @@ def test_main_empty_file(tmp_path, capsys):
             main()
         assert excinfo.value.code == 1
     captured = capsys.readouterr()
-    assert "empty" in captured.out
+    assert captured.out == ""
+    assert "empty" in captured.err
 
 
 def test_main_invalid_query(tmp_path, capsys):
@@ -119,7 +121,8 @@ def test_main_invalid_query(tmp_path, capsys):
             main()
         assert excinfo.value.code == 1
     captured = capsys.readouterr()
-    assert "select" in captured.out.lower()
+    assert captured.out == ""
+    assert "select" in captured.err.lower()
 
 
 def test_main_jq_execution_error(tmp_path, capsys):
@@ -131,7 +134,8 @@ def test_main_jq_execution_error(tmp_path, capsys):
                 main()
             assert excinfo.value.code == 1
     captured = capsys.readouterr()
-    assert "error" in captured.out.lower() or "Error" in captured.out
+    assert captured.out == ""
+    assert "error" in captured.err.lower()
 
 
 def test_main_version(capsys):

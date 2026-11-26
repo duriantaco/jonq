@@ -3,7 +3,7 @@ import os
 import json
 import tempfile
 from jonq.executor import run_jq
-from jonq.jq_worker_cli import get_worker, _cleanup
+from jonq.jq_worker_cli import get_worker
 
 def test_run_jq_success():
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp:
@@ -45,28 +45,9 @@ def test_run_jq_invalid_filter():
     finally:
         os.unlink(temp_path)
 
-def test_run_jq_reuses_cached_worker():
-    _cleanup()
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp:
-        json.dump({"name": "Alice", "age": 30}, temp)
-        temp_path = temp.name
+def test_jq_runner_accepts_repeated_documents():
+    worker = get_worker('.name')
 
-    try:
-        stdout, stderr = run_jq(temp_path, '.name')
-        assert '"Alice"' in stdout
-        assert stderr == ''
-
-        worker = get_worker('.name')
-        first_pid = worker.proc.pid
-        assert worker.proc.poll() is None
-
-        stdout, stderr = run_jq(temp_path, '.name')
-        assert '"Alice"' in stdout
-        assert stderr == ''
-
-        worker = get_worker('.name')
-        assert worker.proc.pid == first_pid
-        assert worker.proc.poll() is None
-    finally:
-        _cleanup()
-        os.unlink(temp_path)
+    assert worker.query({"name": "Alice"}) == '"Alice"'
+    assert get_worker('.name') is worker
+    assert worker.query({"name": "Bob"}) == '"Bob"'

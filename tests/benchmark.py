@@ -38,8 +38,8 @@ def run_benchmark():
         ("Very Large", 5, 15, 10)
     ]
     
-    print(f"{'Size':<12} {'Python Time':<15} {'Rust Time':<15} {'Speedup':<10}")
-    print("-" * 55)
+    print(f"{'Size':<12} {'Python Time':<15}")
+    print("-" * 28)
     
     for name, depth, width, array_size in test_sizes:
         data = generate_test_data(depth, width, array_size)
@@ -52,15 +52,7 @@ def run_benchmark():
             py_times.append(time.time() - start)
         py_avg = sum(py_times) / len(py_times)
         
-        rust_times = []
-        for _ in range(iterations):
-            start = time.time()
-            rust_times.append(time.time() - start)
-        rust_avg = sum(rust_times) / len(rust_times)
-        
-        speedup = py_avg / rust_avg if rust_avg > 0 else float('inf')
-        
-        print(f"{name:<12} {py_avg*1000:>8.2f} ms     {rust_avg*1000:>8.2f} ms     {speedup:>6.2f}x")
+        print(f"{name:<12} {py_avg*1000:>8.2f} ms")
         
         data_size = len(json.dumps(data))
         item_count = len(flatten_json_py(data))

@@ -78,3 +78,6 @@ extend-exclude = [
 
 [tool.ruff.lint]
 select = ["E9", "F"]
+
+[tool.pytest.ini_options]
+python_files = ["test_*.py", "*_test.py", "jq_*.py"]

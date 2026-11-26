@@ -1,94 +1,14 @@
-<div align="center">
-  <img src="docs/source/_static/jonq.png" alt="jonq - SQL-like JSON query tool for the command line" width="200"/>
+# jonq
 
-# jonq - readable JSON queries for the terminal
+<img src="docs/source/_static/jonq.png" alt="" width="96" align="right" />
 
-### A jq-powered CLI for inspecting, filtering, and reshaping JSON without memorizing jq syntax
+Inspect and reshape JSON with a jq-powered CLI. Explore unfamiliar payloads, write SQL-like queries, and export a table, CSV, or JSONL. You can also check JSON shape in CI.
 
-[![PyPI version](https://img.shields.io/pypi/v/jonq.svg)](https://pypi.org/project/jonq/)
-[![Python Versions](https://img.shields.io/pypi/pyversions/jonq.svg)](https://pypi.org/project/jonq/)
-[![CI tests](https://github.com/duriantaco/jonq/actions/workflows/tests.yml/badge.svg)](https://github.com/duriantaco/jonq/actions)
-[![Documentation Status](https://readthedocs.org/projects/jonq/badge/?version=latest)](https://jonq.readthedocs.io)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](License)
-[![Skylos Grade](https://img.shields.io/badge/Skylos-A%2B%20%28100%29-brightgreen)](https://github.com/duriantaco/skylos)
-</div>
-
----
-
-## Install
-
-jonq requires Python 3.9+ and the `jq` command-line tool.
-
-```bash
-pipx install jonq
-# or
-pip install jonq
-```
-
-Check that `jq` is available:
-
-```bash
-jq --version
-```
-
-## What jonq is
-
-`jonq` is a command-line JSON query tool for the messy first minutes with an API response, config file, generated JSON, or log payload.
-
-It lets you inspect an unfamiliar payload before writing a query:
-
-```bash
-jonq data.json
-```
-
-Then extract what you need with readable, SQL-like syntax:
-
-```bash
-jonq users.json "select name, age if age > 30" -t
-```
-
-Instead of writing the equivalent raw jq:
-
-```bash
-jq '.[] | select(.age > 30) | {name, age}' users.json
-```
-
-jonq compiles your query to jq and executes it with a reusable jq worker. It is useful when you need to understand JSON shape, extract fields, filter rows, flatten nested arrays, or turn JSON into table, CSV, JSONL, YAML, or raw scalar output.
-
-It also helps when you mistype fields:
-
-```text
-Unknown field(s): firts_name
-Did you mean: firts_name -> first_name?
-Try: jonq users.json "select first_name"
-```
-
-> jonq is not a database, ETL framework, or analytics engine. It is a JSON exploration and shaping tool for terminal workflows.
-
-## When to use it
-
-Use jonq when you need to:
-
-- inspect an API response, config file, generated JSON, or log payload
-- select and rename fields without remembering jq object syntax
-- filter JSON with readable conditions
-- query nested objects and arrays
-- profile field presence, nulls, and type conflicts
-- diff JSON shape changes across files or runs
-- run repeatable local checks from `jonq.yaml`
-- produce table, CSV, JSONL, YAML, raw scalar, or compact JSON output
-- run the same query in shell scripts, CI, or Python code
-- follow NDJSON logs line-by-line
-
-Use another tool when you need:
-
-- exact jq language control: use raw `jq`
-- Python expressions over JSON: use [`jello`](https://github.com/kellyjonbrazil/jello)
-- grep-friendly flattened assignment lines: use [`gron`](https://github.com/tomnomnom/gron)
-- joins, window functions, or relational analytics: use a database or analytics engine
-- production ETL, scheduling, or connectors: use an ETL system
+[Try from source](#from-source) · [JSON quick start](#quick-start) · [Documentation](https://jonq.readthedocs.io) · [PyPI releases](https://pypi.org/project/jonq/) · [CI](https://github.com/duriantaco/jonq/actions)
 
 ## From Source
+
+Use this checkout for the examples below. jonq requires Python 3.9+. SQL-like queries use the `jq` command-line tool.
 
 ```bash
 git clone https://github.com/duriantaco/jonq.git
@@ -96,18 +16,64 @@ cd jonq
 pip install -e .
 ```
 
-## Quick Start
+## Install
 
-Create a sample file:
+Install a published release from PyPI. For the current inspection workflow shown here, [install from source](#from-source).
 
 ```bash
-cat > users.json <<'JSON'
-[
-  {"id": 1, "name": "Alice", "age": 30, "city": "New York"},
-  {"id": 2, "name": "Bob", "age": 25, "city": "Los Angeles"},
-  {"id": 3, "name": "Charlie", "age": 35, "city": "Chicago"}
-]
+pipx install jonq
+# or
+pip install jonq
+```
+
+Check that `jq` is available before running SQL-like queries.
+
+```bash
+jq --version
+```
+
+## Quick Start
+
+Save a sample API response with users inside a `users` array.
+
+```bash
+cat > response.json <<'JSON'
+{
+  "meta": {"total": 3},
+  "users": [
+    {"id": 1, "name": "Alice", "age": 30, "city": "New York"},
+    {"id": 2, "name": "Bob", "age": 25, "city": "Los Angeles"},
+    {"id": 3, "name": "Charlie", "age": 35, "city": "Chicago"}
+  ]
+}
 JSON
+```
+
+Inspect the file or pipe the same JSON to find paths such as `users[].name` and a suggested query using `from users`.
+
+```bash
+jonq response.json
+cat response.json | jonq
+```
+
+Use `from users` to choose the array to query. Preview the result as a table, then save it as CSV.
+
+```bash
+jonq response.json "select age, name from users where age > 30" -t
+jonq response.json "select age, name from users where age > 30" --format csv --out older-users.csv
+```
+
+`older-users.csv` contains one matching row.
+
+```csv
+age,name
+35,Charlie
+```
+
+Create `users.json` for the examples that follow.
+
+```bash
+jonq response.json "select * from users" --out users.json
 ```
 
 Select fields:
@@ -121,6 +87,8 @@ Filter rows:
 ```bash
 jonq users.json "select name, age if age > 30"
 ```
+
+In a `where` filter, an ordered comparison against a number matches JSON number values. For example, `age > 30` skips missing ages and ages stored as strings.
 
 Print raw values for shell pipelines:
 
@@ -180,34 +148,54 @@ jonq users.json "select name, age sort age desc limit 2"
 
 ## Fields and Expressions
 
-Select nested fields with dot notation:
+Create a sample with nested fields, an array, and optional values.
 
 ```bash
-jonq users.json "select profile.email, profile.address.city"
+cat > details.json <<'JSON'
+[
+  {
+    "name": "Alice",
+    "nickname": null,
+    "notifications": false,
+    "profile": {"email": "alice@example.com", "address": {"city": "New York"}},
+    "orders": [{"order_id": 42, "item": "Monitor", "price": 150}]
+  }
+]
+JSON
 ```
 
-Select from nested arrays with `from`:
+Select nested fields with dot notation.
 
 ```bash
-jonq orders.json "select id, total from orders"
-jonq users.json "select order_id, price from [].orders if price > 100"
+jonq details.json "select profile.email, profile.address.city"
 ```
 
-Use array indexes:
+Select rows from the Quick Start response or from arrays inside each user.
 
 ```bash
-jonq users.json "select name, orders[0].item as first_order"
+jonq response.json "select id, name from users"
+jonq details.json "select order_id, price from [].orders if price > 100"
 ```
 
-Use functions and expressions:
+`from [].orders` makes each order a row. For a root array, use `from []` to select a parent field while expanding one child array. Query independent child arrays separately. [See the nested array syntax](SYNTAX.md#nested-arrays-with-from).
+
+Use an array index to select the first order.
+
+```bash
+jonq details.json "select name, orders[0].item as first_order"
+```
+
+Use functions and expressions to transform values or add a derived column.
 
 ```bash
 jonq users.json "select upper(name) as name, str(age) as age"
 jonq users.json "select name || ' (' || city || ')' as label"
 jonq users.json "select age * 2 + 3 as score"
-jonq users.json "select coalesce(nickname, name) as display"
+jonq details.json "select coalesce(nickname, name) as display, coalesce(notifications, true) as notifications"
 jonq users.json "select case when age > 30 then 'senior' else 'junior' end as segment"
 ```
+
+`coalesce` falls back on `null` or a missing field. It preserves the `false` value for `notifications`.
 
 Common functions:
 
@@ -222,7 +210,7 @@ Common functions:
 
 ## Output Formats
 
-JSON is the default:
+JSON is the default. Query results go to stdout and error messages go to stderr.
 
 ```bash
 jonq users.json "select name, age"
@@ -290,7 +278,14 @@ jonq 'logs/*.json' "select * if level = 'error'"
 NDJSON file:
 
 ```bash
+jonq app.ndjson
 jonq app.ndjson "select level, message if level = 'error'"
+```
+
+Use `--ndjson` to make the input format explicit when piping records.
+
+```bash
+cat app.ndjson | jonq --ndjson "select level, message"
 ```
 
 Follow live NDJSON from stdin:
@@ -401,11 +396,13 @@ jonq check --all
 
 ## Streaming and Watch Modes
 
-Streaming mode processes root-array JSON in chunks:
+Streaming mode reads a local root-array JSON file incrementally and runs the query in chunks.
 
 ```bash
 jonq large.json "select id, name if active = true" --stream
 ```
+
+Field checks still run before execution. The CLI stages JSON, JSONL, and raw results on disk and publishes them after successful processing. CSV, table, YAML, and Python API results are assembled in memory. An individual large record can still use substantial memory.
 
 Streaming is for row-wise queries. It intentionally rejects queries that require global input state, including `group by`, `sort`, `distinct`, `limit`, `count`, `sum`, `avg`, `min`, `max`, and `count(distinct ...)`.
 
@@ -520,7 +517,7 @@ jonq --completions fish > ~/.config/fish/completions/jonq.fish
 
 - jonq exposes a practical subset of jq, not the full jq language.
 - Streaming mode supports row-wise queries only.
-- Cross-file joins, window functions, and relational analytics are out of scope.
+- Joins, SQL window functions, and relational analytics are outside the query language.
 - URL fetch is a convenience feature, not a full HTTP client.
 - Very large files can still be slow if the query requires full-input state.
 
@@ -528,6 +525,7 @@ jonq --completions fish > ~/.config/fish/completions/jonq.fish
 
 - Full docs: https://jonq.readthedocs.io/en/latest/
 - Cookbook: https://jonq.readthedocs.io/en/latest/cookbook.html
+- Tool comparison: [jq, jello, gron, and other tools](docs/source/comparison.rst)
 - Syntax reference: [SYNTAX.md](SYNTAX.md)
 - Usage examples: [USAGE.md](USAGE.md)
 - Contributing: [CONTRIBUTIONS.md](CONTRIBUTIONS.md)
@@ -536,4 +534,4 @@ jonq --completions fish > ~/.config/fish/completions/jonq.fish
 
 jonq is licensed under the MIT License. See [License](License).
 
-jonq depends on the [jq command-line JSON processor](https://stedolan.github.io/jq/). jq is licensed under the MIT License and is not bundled with jonq.
+SQL-like queries use the [jq command-line JSON processor](https://stedolan.github.io/jq/), available separately under the MIT License.

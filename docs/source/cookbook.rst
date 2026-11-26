@@ -8,26 +8,44 @@ jonq is still a jq-powered exploration and extraction tool. If the task becomes 
 Inspect Unknown JSON First
 --------------------------
 
-When you do not know the shape yet, run jonq without a query:
+Inspect a saved API response to find the fields and the array that holds
+the rows. This sample includes metadata alongside the ``users`` array.
 
 .. code-block:: bash
 
-   jonq data.json
+   cat > response.json <<'JSON'
+   {
+     "meta": {"total": 2},
+     "users": [{"name": "Asha", "age": 29}, {"name": "Jules", "age": 35}]
+   }
+   JSON
+   jonq response.json
 
-Smart Inspect prints the root shape, discovered fields, sample values, a sample object, and suggested queries. This is usually the first step before writing a filter.
-
-Typical workflow:
-
-1. Inspect the payload.
-2. Copy one of the suggested queries.
-3. Narrow fields and filters.
-4. Switch output format once the query is correct.
+The inspector shows ``users[].name`` and suggests a query using
+``from users``. Use that clause to select the array, then filter and
+export the rows you need.
 
 .. code-block:: bash
 
-   jonq data.json "select id, name, status" -t
-   jonq data.json "select id, name, status if status = 'active'" -t
-   jonq data.json "select id, name, status if status = 'active'" --format csv > active.csv
+   jonq response.json "select age, name from users where age > 30" -t
+   jonq response.json "select age, name from users where age > 30" --format csv --out older-users.csv
+
+The CSV contains one row.
+
+.. code-block:: text
+
+   age,name
+   35,Jules
+
+Pipe JSON into ``jonq`` to inspect a response without saving it. NDJSON
+files can be inspected the same way as ordinary JSON files.
+
+.. code-block:: bash
+
+   cat response.json | jonq
+   jonq response.json "select * from users" --format jsonl --out users.ndjson
+   jonq users.ndjson
+   cat users.ndjson | jonq --ndjson "select name"
 
 Turn API JSON Into a Table
 --------------------------

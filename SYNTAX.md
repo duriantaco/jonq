@@ -56,6 +56,19 @@ select order_id, item, price from [].orders if price > 800
 select type, name from products
 ```
 
+For a root array, use `from []` to select both a parent field and values from
+one child array.
+
+```sql
+select name, orders[].item as ordered_item from []
+```
+
+In a mixed parent and child projection, filters apply to the parent. To
+filter by child fields, select the child rows with `from [].orders`. Query
+independent child arrays separately. Selecting an indexed value such as
+`orders[0].item` or an aggregate such as `count(orders)` keeps one row per
+parent.
+
 #### Fields with Special Characters
 Use quotes for fields with spaces or special characters:
 
@@ -74,6 +87,8 @@ select name, age if age > 30
 select name, age where age > 30
 select name, city if city = 'New York'
 ```
+
+In an ordered comparison using `>`, `<`, `>=`, or `<=`, a numeric literal requires the other operand to be a JSON number. For example, `age > 30` can match `35` but skips `"35"`, `null`, and missing ages.
 
 ### Supported Operators
 
@@ -292,7 +307,8 @@ select name, case when status = 'active' then 'yes' else 'no' end as is_active
 
 ## COALESCE
 
-Return the first non-null value:
+Return the first non-null value. A missing field counts as null, and `false` is preserved.
+
 ```bash
 select coalesce(nickname, name) as display_name
 select coalesce(a, b, c) as first_available

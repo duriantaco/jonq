@@ -4,6 +4,8 @@ echo "=== JONQ CAPABILITIES TEST ==="
 echo "Testing capabilities across complex nested structures"
 echo
 
+failures=0
+
 run_test() {
   local description=$1
   local command=$2
@@ -18,13 +20,15 @@ run_test() {
   if [ $status -eq 0 ] && [ -n "$output" ]; then
     result="PASS"
   else
-    result="FAIL: $(echo $output | head -n 1)"
+    result="FAIL"
+    printf '%s\n' "$output" | head -n 1
   fi
 
   if [ "$result" == "$expected_result" ]; then
     echo "RESULT: $result (Expected)"
   else
     echo "RESULT: $result (Unexpected - Expected $expected_result)"
+    failures=$((failures + 1))
   fi
   echo "----------------------------------------"
 }
@@ -69,12 +73,12 @@ run_test "Group by with count (nested.json)" 'jonq json_test_files/nested.json "
 run_test "Group by with avg (nested.json)" 'jonq json_test_files/nested.json "select profile.address.city, avg(profile.age) as avg_age group by profile.address.city"'
 run_test "Group by with multiple aggregations (nested.json)" 'jonq json_test_files/nested.json "select profile.address.city, count(*) as user_count, avg(profile.age) as avg_age group by profile.address.city"'
 
-echo "=== KNOWN LIMITATIONS ==="
-# these tests are supposed to fail
-run_test "String comparison (expected to fail)" 'jonq json_test_files/nested.json "select name if name == \"Alice\""' "FAIL"
+echo "=== SYNTAX BOUNDARIES ==="
+run_test "String comparison" 'jonq json_test_files/nested.json "select name if name == \"Alice\""'
 run_test "Complex expressions (expected to fail)" 'jonq json_test_files/nested.json "select name if profile.age * 2 > 50"' "FAIL"
 run_test "Function in condition (expected to fail)" 'jonq json_test_files/nested.json "select name if count(orders) > 1"' "FAIL"
 run_test "Multi-field sorting (expected to fail)" 'jonq json_test_files/nested.json "select name, profile.age sort profile.age, profile.address.city"' "FAIL"
 run_test "Having with different aggregate (expected to fail)" 'jonq json_test_files/nested.json "select profile.address.city, min(profile.age) as min_age group by profile.address.city having count(*) > 0"' "FAIL"
 
 echo "=== TEST COMPLETE ==="
+exit "$((failures > 0))"

@@ -5,6 +5,7 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+failures=0
 
 test_query() {
     local test_name="$1"
@@ -17,7 +18,7 @@ test_query() {
     output=$(jonq "$json_file" "$query" 2>&1)
     status=$?
     
-    if [ $status -eq 0 ] && ! [[ "$output" == *"Error"* ]]; then
+    if [ $status -eq 0 ]; then
         echo -e "${GREEN}PASS${NC}"
         echo "Output preview:"
         echo "$output" | head -n 5
@@ -29,6 +30,7 @@ test_query() {
         echo -e "${RED}FAIL${NC}"
         echo "Error details:"
         echo "$output"
+        failures=$((failures + 1))
         return 1
     fi
 }
@@ -55,3 +57,4 @@ test_query "CONTAINS operator" "json_test_files/nested.json" "select order_id, i
 test_query "Array handling" "json_test_files/nested.json" "select name, count(orders) as order_count"
 
 echo "====== TEST SUMMARY ======"
+exit "$((failures > 0))"

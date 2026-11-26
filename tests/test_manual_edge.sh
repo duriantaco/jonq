@@ -6,7 +6,8 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-JSON_PATH="/Users/oha/jonq/tests/json_test_files"
+cd -- "$(dirname -- "$0")" || exit 1
+JSON_PATH="json_test_files"
 
 # Initialize counters
 total_tests=0
@@ -87,15 +88,15 @@ complex_json_edge_cases=(
   "jonq $JSON_PATH/complex.json \"select company.subsidiaries[].headquarters.country, avg(company.subsidiaries[].employees) as avg_employees, sum(company.subsidiaries[].financials.revenue) as total_revenue group by company.subsidiaries[].headquarters.country\""
   "jonq $JSON_PATH/complex.json \"select company.subsidiaries[].headquarters.country, count(*) as count, avg(company.subsidiaries[].financials.profit) as avg_profit group by company.subsidiaries[].headquarters.country having avg_profit > 10000000\""
   "jonq $JSON_PATH/complex.json \"select type, count(*) as count, min(versions[].pricing.monthly) as min_price, max(versions[].pricing.monthly) as max_price, avg(versions[].pricing.monthly) as avg_price group by type from products[]\""
-  "jonq $JSON_PATH/complex.json \"select type, avg(versions[].pricing.yearly) as avg_yearly, avg(versions[].pricing.monthly) as avg_monthly group by type from products[] having avg_yearly > 2000\""
+  "jonq $JSON_PATH/complex.json \"select type, avg(versions[].pricing.yearly) as avg_yearly, avg(versions[].pricing.monthly) as avg_monthly from products[] group by type having avg_yearly > 2000\""
   "jonq $JSON_PATH/complex.json \"select products[].customers[].industry, count(*) as count group by products[].customers[].industry\""
   "jonq $JSON_PATH/complex.json \"select products[].customers[].industry, count(*) as count group by products[].customers[].industry having count > 1\""
   "jonq $JSON_PATH/complex.json \"select sum(products[].versions[].pricing.monthly) as total_monthly, avg(products[].versions[].pricing.monthly) as avg_monthly, count(products[].versions[]) as version_count\""
   "jonq $JSON_PATH/complex.json \"select avg(products[].versions[].pricing.yearly / 12) as yearly_monthly_ratio\""
-  "jonq $JSON_PATH/complex.json \"select type, avg(versions[].pricing.yearly / 12) as yearly_monthly_ratio group by type from products[] having yearly_monthly_ratio > 200\""
+  "jonq $JSON_PATH/complex.json \"select type, avg(versions[].pricing.yearly / 12) as yearly_monthly_ratio from products[] group by type having yearly_monthly_ratio > 200\""
   "jonq $JSON_PATH/complex.json \"select products[].name, count(products[].versions[]) as version_count, count(products[].customers[]) as customer_count\""
   "jonq $JSON_PATH/complex.json \"select type, avg(versions[].pricing.monthly) as avg_price group by type sort avg_price desc from products[]\""
-  "jonq $JSON_PATH/complex.json \"select launched, avg(versions[].pricing.monthly) as avg_monthly_price group by launched from products[] having avg_monthly_price > 200\""
+  "jonq $JSON_PATH/complex.json \"select launched, avg(versions[].pricing.monthly) as avg_monthly_price from products[] group by launched having avg_monthly_price > 200\""
   "jonq $JSON_PATH/complex.json \"select max(products[].versions[].pricing.monthly) - min(products[].versions[].pricing.monthly) as price_range\""
   "jonq $JSON_PATH/complex.json \"select name from products[] if versions[].pricing.monthly > 200 and customers[].industry == 'Manufacturing'\""
   "jonq $JSON_PATH/complex.json \"select id, name from products[] if versions[].pricing.monthly > 200 and versions[].pricing.yearly < 3000\""
@@ -128,6 +129,7 @@ done
 
 # Print final test summary
 print_summary
+exit "$((failed_tests > 0))"
 
 echo "-----------------------------------------"
 echo "Test script completed"

@@ -5,6 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+failures=0
 
 run_test() {
   local command="$1"
@@ -12,18 +13,19 @@ run_test() {
   echo -e "${BLUE}===== Testing: $command =====${NC}"
   
   # Execute the command
-  eval "$command" > /tmp/jonq_output 2>&1
+  output=$(eval "$command" 2>&1)
   status=$?
   
   # Check the output
-  if [ $status -eq 0 ] && [ -s /tmp/jonq_output ]; then
+  if [ $status -eq 0 ] && [ -n "$output" ]; then
     echo -e "${GREEN}PASS${NC}"
     echo "Output preview:"
-    head -n 5 /tmp/jonq_output
+    printf '%s\n' "$output" | head -n 5
   else
     echo -e "${RED}FAIL${NC}"
     echo "Error details:"
-    cat /tmp/jonq_output
+    printf '%s\n' "$output"
+    failures=$((failures + 1))
   fi
   echo "----------------------------------------"
 }
@@ -47,9 +49,10 @@ echo "=== TESTING COMPLEX ARRAY ACCESS FIX ==="
 run_test "jonq json_test_files/complex.json \"select products[].versions[].version, products[].versions[].pricing.monthly\""
 
 echo "=== TESTING GROUPING WITH ARRAY FIX ==="
-run_test "jonq json_test_files/complex.json \"select type, avg(versions[].pricing.monthly) as avg_price group by type from products[]\""
+run_test "jonq json_test_files/complex.json \"select type, avg(versions[].pricing.monthly) as avg_price from products[] group by type\""
 
 echo "=== TESTING COMPLEX HAVING CONDITION FIX ==="
-run_test "jonq json_test_files/complex.json \"select type, avg(versions[].pricing.monthly) as avg_monthly, count(*) as count group by type having avg_monthly > 200 and count > 0 from products[]\""
+run_test "jonq json_test_files/complex.json \"select type, avg(versions[].pricing.monthly) as avg_monthly, count(*) as count from products[] group by type having avg_monthly > 200 and count > 0\""
 
 echo "=== TEST COMPLETE ==="
+exit "$((failures > 0))"

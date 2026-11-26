@@ -3,6 +3,15 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Iterator
 from decimal import Decimal, InvalidOperation
 import json
+import os
+from shlex import quote
+
+
+def input_line_command(source: str | None, line: int) -> str | None:
+    """Suggest a shell command for opening one physical line of a named input."""
+    if os.name != "posix" or not source or source == "-" or not source.isprintable():
+        return None
+    return f"sed -n '{line}p' < {quote(source)}"
 
 
 class EventReader:

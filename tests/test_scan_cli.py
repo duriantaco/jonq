@@ -1,6 +1,7 @@
 from decimal import Decimal
 import json
 import os
+from pathlib import Path
 import subprocess
 import sys
 
@@ -71,9 +72,16 @@ def test_scan_leads_use_inclusive_timestamps_and_original_evidence_lines():
     assert {record["details"]["state"] for record in lead["records"]} == {"REJ", "S0"}
     assert text.returncode == 0, text.stderr
     assert b"Scan leads to review (1)" in text.stdout
+    assert (
+        b"192.0.2.10 tried to connect to 3 different addresses on TCP port 22 within 60 seconds."
+        in text.stdout
+    )
+    assert b"Expected activity is unverified." in text.stdout
     assert b"on the same TCP port" in text.stdout
     assert b"Input line 1" in text.stdout
     assert b"no reply observed (Zeek S0)" in text.stdout
+    assert text.stdout.index(b"Input line 1") < text.stdout.index(b"Review threshold")
+    assert b"sed -n" not in text.stdout
 
 
 def test_scan_leads_require_distinct_failed_peers_on_the_same_tcp_port(tmp_path):
@@ -103,6 +111,35 @@ def test_scan_leads_require_distinct_failed_peers_on_the_same_tcp_port(tmp_path)
     default_report = json.loads(default.stdout)
     assert default_report["fanout"][0]["unique_destinations"] == 6
     assert "scan_leads" not in default_report
+
+
+def test_scan_text_distinguishes_no_connections_no_candidates_and_below_threshold():
+    established = encode_events([zeek_connection(100, "198.51.100.1", 22, "SF")])
+    unanswered = encode_events([zeek_connection(100, "198.51.100.1", 22, "S0")])
+    cases = [
+        (b"", b"No in-scope connections to assess."),
+        (established, b"No TCP records with a destination port and either a rejection or no observed reply."),
+        (unanswered, b"No scan leads reached 2 distinct destinations on the same TCP port within 1 second"),
+    ]
+    for data, message in cases:
+        result = run_connections(
+            "--scan-leads", "--min-destinations", "2", "--window", "1", data=data, output_format="text",
+        )
+        assert result.returncode == 0, result.stderr
+        assert message in result.stdout
+        assert b"sed -n" not in result.stdout
+
+
+def test_benign_retry_scan_text_explains_what_to_check():
+    source = Path(__file__).parent / "json_test_files" / "benign_health_check_retries.ndjson"
+    result = run_connections(str(source), "--scan-leads", output_format="text")
+
+    assert result.returncode == 0, result.stderr
+    assert b"192.0.2.40 tried to connect to 12 different addresses on TCP port 443 within 60 seconds." in result.stdout
+    assert b"Expected activity is unverified." in result.stdout
+    assert b"Input line 3" in result.stdout
+    if os.name == "posix":
+        assert b"sed -n '3p' < " in result.stdout
 
 
 def test_scan_leads_keep_valid_evidence_when_an_input_line_is_malformed():

@@ -12,6 +12,35 @@ CONNECTIONS = ["connections", str(FIXTURES / "zeek_conn.ndjson")]
 TRIAGE = ["triage", str(FIXTURES / "suricata_eve.ndjson")]
 
 
+@pytest.mark.parametrize(("argv", "phrases"), [
+    (["--help"], ("jonq triage eve.ndjson", "jonq connections conn.ndjson --scan-leads")),
+    (
+        ["triage", "--help"],
+        ("event_type=alert", "alert.signature_id", "event_type=firewall", "piped stdin by default"),
+    ),
+    (
+        ["connections", "--help"],
+        (
+            "Zeek conn.log in JSON mode",
+            "event_type=flow",
+            "dest_ip",
+            "default: 60",
+            "sed -n '1p' tests/json_test_files/zeek_conn.ndjson",
+        ),
+    ),
+])
+def test_log_help_shows_input_formats_and_examples(argv, phrases, capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        main(argv)
+
+    captured = capsys.readouterr()
+    assert exit_info.value.code == 0
+    assert captured.err == ""
+    text = " ".join(captured.out.split())
+    for phrase in phrases:
+        assert phrase in text
+
+
 def simulate_terminal(monkeypatch):
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
     monkeypatch.setenv("TERM", "xterm-256color")

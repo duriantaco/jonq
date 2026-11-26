@@ -12,7 +12,7 @@ from typing import Literal
 from jonq.connection_evidence import ConnectionDetails, connection_details
 from jonq.constants import _Colors
 from jonq.fanout import FanoutPeak, find_fanout
-from jonq.ndjson import EventReader
+from jonq.ndjson import EventReader, input_line_command
 from jonq.networks import canonical_ip, is_in_networks
 from jonq.scan_leads import ScanLead, find_scan_leads, is_scan_observation
 from jonq.table_utils import render_table
@@ -332,42 +332,50 @@ def format_connections(
     return "\n".join(lines)
 
 
-def format_scan_report(report: ScanReport, *, color: bool = False) -> str:
+def format_scan_report(report: ScanReport, *, color: bool = False, source: str | None = None) -> str:
     colors = _Colors(color)
-    lines = [
-        f"{colors.BOLD}jonq{colors.NC} {colors.CYAN}// scan leads{colors.NC}",
-        f"{report.connections} connections, {report.out_of_scope} out of scope, "
-        f"{report.ignored_records} other records, {report.invalid_lines} invalid lines",
-        f"{report.candidate_records} TCP records with rejection or no reply observed",
-    ]
+    lines = [f"{colors.BOLD}jonq{colors.NC} {colors.CYAN}// scan leads{colors.NC}"]
     if report.invalid_lines:
         lines.append("Partial report. See line diagnostics on stderr.")
 
-    threshold = (
-        f"{report.min_destinations} distinct destinations on the same TCP port "
-        f"in {report.window_seconds} seconds"
-    )
-    if not report.scan_leads:
-        return "\n".join([*lines, "", f"No scan leads reached {threshold} in the valid records."])
-
+    duration = f"{report.window_seconds} " + ("second" if report.window_seconds == 1 else "seconds")
+    threshold = f"{report.min_destinations} distinct destinations on the same TCP port within {duration}"
+    lines.append("")
+    if not report.connections:
+        lines.append("No in-scope connections to assess.")
+    elif not report.candidate_records:
+        lines.append("No TCP records with a destination port and either a rejection or no observed reply.")
+    elif not report.scan_leads:
+        lines.append(f"No scan leads reached {threshold} in the valid records.")
+    else:
+        lines.extend([
+            f"{colors.BOLD}{colors.CYAN}Scan leads to review ({len(report.scan_leads)}){colors.NC}",
+            "Expected activity is unverified. Compare each lead with the device's normal jobs and destinations.",
+        ])
+        for index, lead in enumerate(report.scan_leads[:_TEXT_SCAN_LEADS]):
+            lines.extend([
+                "",
+                f"  {colors.BOLD_YELLOW}{lead.src_ip}{colors.NC} tried to connect to "
+                f"{lead.unique_destinations} different addresses on TCP port {lead.dest_port} "
+                f"within {duration}.",
+            ])
+            service = ServiceEvidence("tcp", lead.dest_port, lead.outcomes)
+            lines.extend(_format_evidence(
+                PeakEvidence([service], lead.records), set(), colors, source=source if index == 0 else None,
+            ))
+            lines.append(f"    Observed {_format_time(lead.window_start)} to {_format_time(lead.window_end)}")
+            lines.append("    Destinations " + _preview_destinations(lead.destinations))
+        remaining = len(report.scan_leads) - _TEXT_SCAN_LEADS
+        if remaining > 0:
+            lines.append(f"  {remaining} more scan leads in --format json.")
     lines.extend([
         "",
-        f"{colors.BOLD}{colors.CYAN}Scan leads to review ({len(report.scan_leads)}){colors.NC}",
-        f"Review threshold {threshold}",
+        "Scan review counts TCP attempts with a recorded port and either a rejection or no observed reply.",
+        f"Review threshold {threshold}.",
+        f"{report.candidate_records:,} TCP records eligible for scan review",
+        f"{report.connections:,} connections, {report.out_of_scope:,} out of scope, "
+        f"{report.ignored_records:,} other records, {report.invalid_lines:,} invalid lines",
     ])
-    for lead in report.scan_leads[:_TEXT_SCAN_LEADS]:
-        lines.extend([
-            "",
-            f"  {colors.BOLD_YELLOW}Review {lead.src_ip}{colors.NC} · TCP/{lead.dest_port} · "
-            f"{lead.unique_destinations} distinct destinations",
-            f"    {_format_time(lead.window_start)} to {_format_time(lead.window_end)}",
-        ])
-        service = ServiceEvidence("tcp", lead.dest_port, lead.outcomes)
-        lines.extend(_format_evidence(PeakEvidence([service], lead.records), set(), colors))
-        lines.append("    Destinations " + _preview_destinations(lead.destinations))
-    remaining = len(report.scan_leads) - _TEXT_SCAN_LEADS
-    if remaining > 0:
-        lines.append(f"  {remaining} more scan leads in --format json.")
     return "\n".join(lines)
 
 
@@ -426,7 +434,7 @@ def _preview_destinations(destinations: list[str]) -> str:
 
 
 def _format_evidence(
-    evidence: PeakEvidence, new_destinations: set[str], colors: _Colors
+    evidence: PeakEvidence, new_destinations: set[str], colors: _Colors, *, source: str | None = None,
 ) -> list[str]:
     priority = {"no_reply": 0, "rejected": 1, "established": 2, "unknown": 3}
     record = min(evidence.records, key=lambda row: (
@@ -441,6 +449,9 @@ def _format_evidence(
         f"    {colors.BOLD_YELLOW}Input line {record.line}{colors.NC} · {record.dest_ip} · "
         f"{_service_label(details.protocol, details.dest_port)} · {outcome}"
     ]
+    command = input_line_command(source, record.line)
+    if command:
+        lines.append(f"    {command}")
     displayed_services = 3
     for service in evidence.services[:displayed_services]:
         label = _service_label(service.protocol, service.dest_port)

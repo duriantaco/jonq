@@ -1255,8 +1255,8 @@ def _build_parser() -> argparse.ArgumentParser:
             "  jonq diff old.json new.json\n"
             "  jonq check user_contract\n"
             "  jonq run active_users\n"
-            "  jonq triage events.ndjson\n"
-            "  jonq connections conn.log --scan-leads\n"
+            "  jonq triage eve.ndjson\n"
+            "  jonq connections conn.ndjson --scan-leads\n"
             "  jonq -i data.json\n"
             '  curl api.example.com/data | jonq "select id, name"\n'
             "  tail -f app.log | jonq --follow \"select level, msg if level = 'error'\"\n"
@@ -1420,10 +1420,27 @@ def _run_triage_command(argv: list[str]) -> None:
 
     parser = argparse.ArgumentParser(
         prog="jonq triage",
-        description="Summarize recorded alerts and repeated firewall denials from NDJSON.",
+        description="Summarize recorded Suricata EVE alerts and repeated firewall denials from NDJSON.",
+        epilog=(
+            "Input records\n"
+            "  Use one JSON object per line.\n"
+            "  EVE alerts use event_type=alert with alert.signature_id or alert.signature.\n"
+            "  Firewall records use event_type=firewall, src_ip, and an action such as deny.\n"
+            "\n"
+            "Examples\n"
+            "  jonq triage eve.ndjson\n"
+            "  jonq triage - --format json < firewall.ndjson"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("source", nargs="?", default="-", help="Local NDJSON file or '-' for stdin")
-    parser.add_argument("-f", "--format", choices=("text", "json"), default="text")
+    parser.add_argument(
+        "source", nargs="?", default="-",
+        help="Local NDJSON file or '-' for stdin (piped stdin by default)",
+    )
+    parser.add_argument(
+        "-f", "--format", choices=("text", "json"), default="text",
+        help="Report format (text by default)",
+    )
     parser.add_argument("--no-color", action="store_true", help="Disable terminal colors")
     parser.add_argument(
         "--min-denials", type=int, default=DEFAULT_MIN_DENIALS,
@@ -1441,7 +1458,7 @@ def _run_triage_command(argv: list[str]) -> None:
     if args.format == "json":
         print(json.dumps(asdict(report), indent=2))
     else:
-        print(format_triage(report, color=_terminal_color_enabled(args.no_color)))
+        print(format_triage(report, color=_terminal_color_enabled(args.no_color), source=args.source))
     if report.invalid_lines:
         sys.exit(1)
 
@@ -1455,10 +1472,30 @@ def _run_connections_command(argv: list[str]) -> None:
 
     parser = argparse.ArgumentParser(
         prog="jonq connections",
-        description="Summarize IP conversations and rolling destination counts from network logs.",
+        description="Summarize IP conversations and rolling destination counts from Zeek JSON or Suricata EVE.",
+        epilog=(
+            "Input records\n"
+            "  Use one JSON object per line.\n"
+            "  Zeek conn.log in JSON mode uses ts (Unix seconds), id.orig_h, and id.resp_h.\n"
+            "  EVE uses event_type=flow, src_ip, dest_ip, and flow.start or timestamp\n"
+            "  with a time zone.\n"
+            "\n"
+            "Examples\n"
+            "  jonq connections conn.ndjson --scan-leads\n"
+            "  From the Jonq repository root, try the fixture and inspect its cited line.\n"
+            "  jonq connections tests/json_test_files/zeek_conn.ndjson --scan-leads --min-destinations 2\n"
+            "  sed -n '1p' tests/json_test_files/zeek_conn.ndjson"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("source", nargs="?", default="-", help="Local NDJSON file or '-' for stdin")
-    parser.add_argument("-f", "--format", choices=("text", "json"), default="text")
+    parser.add_argument(
+        "source", nargs="?", default="-",
+        help="Local NDJSON file or '-' for stdin (piped stdin by default)",
+    )
+    parser.add_argument(
+        "-f", "--format", choices=("text", "json"), default="text",
+        help="Report format (text by default)",
+    )
     parser.add_argument("--no-color", action="store_true", help="Disable terminal colors")
     parser.add_argument(
         "--window", type=int, default=DEFAULT_WINDOW_SECONDS, metavar="SECONDS",
@@ -1466,7 +1503,10 @@ def _run_connections_command(argv: list[str]) -> None:
     )
     parser.add_argument(
         "--min-destinations", type=int, default=DEFAULT_MIN_DESTINATIONS, metavar="N",
-        help=f"Minimum distinct destination IPs to report (default: {DEFAULT_MIN_DESTINATIONS})",
+        help=(
+            "Minimum distinct destination IPs per source, or per source and TCP port "
+            f"with --scan-leads (default: {DEFAULT_MIN_DESTINATIONS})"
+        ),
     )
     parser.add_argument(
         "--src-cidr", action="append", default=[], metavar="IP_OR_CIDR",
@@ -1532,7 +1572,7 @@ def _run_connections_command(argv: list[str]) -> None:
             payload["baseline"] = asdict(comparison)
         print(json.dumps(payload, indent=2, default=float))
     elif args.scan_leads:
-        print(format_scan_report(report, color=_terminal_color_enabled(args.no_color)))
+        print(format_scan_report(report, color=_terminal_color_enabled(args.no_color), source=args.source))
     else:
         print(format_connections(report, comparison, color=_terminal_color_enabled(args.no_color)))
     if report.invalid_lines or (comparison and comparison.invalid_lines):

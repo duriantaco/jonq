@@ -1,0 +1,144 @@
+{
+  "profile": {
+    "window_seconds": 60,
+    "min_destinations": 10,
+    "target_detail": "PartOfAHorizontalPortScan"
+  },
+  "cases": [
+    {
+      "id": "benign-retries",
+      "dataset": "Synthetic HTTPS health check retries",
+      "fixture": "json_test_files/benign_health_check_retries.ndjson",
+      "format": "ndjson",
+      "src_cidr": ["192.0.2.40"],
+      "sha256": "2585bd42ab1942be598332a3ac13f3059c25ddaefca4914fe4cac75d050b0b1f",
+      "expected": {
+        "scoped_labels": {"target": 0, "benign": 17},
+        "candidate_records": 14,
+        "assessment": {
+          "windows": [{"dest_port": 443, "unique_destinations": 12, "first_input_line": 3}]
+        },
+        "scan_assessment": {
+          "eligible_target_groups": 0,
+          "selected_windows": {"benign_only": 1},
+          "observed_scope_seconds": 3600,
+          "benign_only_leads_per_observed_hour": 1,
+          "first_displayed_evidence_labels": {"benign": 1}
+        }
+      }
+    },
+    {
+      "id": "muhstik",
+      "dataset": "IoT-23 Muhstik 3-1",
+      "filename": "muhstik.zeek",
+      "format": "zeek",
+      "url": "https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-IoT-Malware-Capture-3-1/bro/conn.log.labeled",
+      "src_cidr": ["192.168.2.5"],
+      "sha256": "9851009bbca03e15089fa1a356dd4b5eee4a98161a51703626058a0b507f50d0",
+      "expected": {
+        "scoped_labels": {"target": 145597},
+        "candidate_records": 147921,
+        "assessment": {
+          "windows": [
+            {"dest_port": 22, "unique_destinations": 68, "distinct_target_destinations": 67, "first_input_line": 11912}
+          ]
+        },
+        "scan_assessment": {
+          "eligible_target_groups": 1,
+          "eligible_target_groups_with_selected_target_window": 1,
+          "selected_windows": {"target_threshold_met": 1, "benign_only": 0},
+          "first_displayed_evidence_labels": {"target": 1}
+        }
+      }
+    },
+    {
+      "id": "mirai",
+      "dataset": "IoT-23 Mirai 34-1",
+      "filename": "mirai.zeek",
+      "format": "zeek",
+      "url": "https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-IoT-Malware-Capture-34-1/bro/conn.log.labeled",
+      "src_cidr": ["192.168.1.195"],
+      "sha256": "d69e49b2aae8c1bd33286936531658202dec47d989f0439bad3f8be180467a6e",
+      "expected": {
+        "scoped_labels": {"target": 122},
+        "candidate_records": 5417,
+        "assessment": {"windows": []},
+        "scan_assessment": {
+          "eligible_target_groups": 0,
+          "eligible_target_group_coverage": null,
+          "known_target_groups_below_threshold": 1
+        }
+      }
+    },
+    {
+      "id": "echo",
+      "dataset": "IoT-23 Amazon Echo 5-1",
+      "filename": "echo.zeek",
+      "format": "zeek",
+      "url": "https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-Honeypot-Capture-5-1/bro/conn.log.labeled",
+      "src_cidr": ["192.168.2.3"],
+      "sha256": "f36db06e7d6ba7364e932a5b003f75835e004b320d70019e8a2f0ba8685d9262",
+      "expected": {
+        "scoped_labels": {"target": 0, "benign": 979},
+        "candidate_records": 0,
+        "assessment": {"windows": []}
+      }
+    },
+    {
+      "id": "hue",
+      "dataset": "IoT-23 Philips Hue 4-1",
+      "filename": "hue.zeek",
+      "format": "zeek",
+      "url": "https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-Honeypot-Capture-4-1/bro/conn.log.labeled",
+      "src_cidr": ["192.168.1.132"],
+      "sha256": "aebe40ea0e03b120265a5c7bc140dd9b0d3fe2fce65559e84776b7dd5360e71e",
+      "expected": {
+        "scoped_labels": {"target": 0, "benign": 452},
+        "candidate_records": 0,
+        "assessment": {"windows": []}
+      }
+    },
+    {
+      "id": "hide-and-seek",
+      "dataset": "IoT-23 Hide and Seek 1-1, first 4 MiB",
+      "filename": "hide-and-seek.prefix",
+      "format": "zeek",
+      "url": "https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-IoT-Malware-Capture-1-1/bro/conn.log.labeled",
+      "prefix_bytes": 4194304,
+      "src_cidr": [],
+      "sha256": "c6de9cb404cd1501762ea405f0d83c6b442d116906899f195f0647a8401f78e3",
+      "expected": {
+        "scoped_labels": {"target": 15806, "benign": 12619},
+        "candidate_records": 16946,
+        "assessment": {
+          "windows": [
+            {"dest_port": 23, "distinct_target_destinations": 32, "first_input_line": 382},
+            {"dest_port": 8080, "distinct_target_destinations": 19, "first_input_line": 11215},
+            {"dest_port": 2323, "distinct_target_destinations": 16, "first_input_line": 5264},
+            {"dest_port": 9527, "distinct_target_destinations": 10, "first_input_line": 1354}
+          ]
+        },
+        "scan_assessment": {
+          "eligible_target_groups": 4,
+          "eligible_target_groups_with_selected_target_window": 4,
+          "selected_windows": {"target_threshold_met": 4, "benign_only": 0},
+          "first_displayed_evidence_labels": {"target": 4}
+        }
+      }
+    },
+    {
+      "id": "somfy",
+      "dataset": "IoT-23 Somfy 7-1, first-start capture",
+      "filename": "somfy-first.zeek",
+      "format": "zeek",
+      "url": "https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-Honeypot-Capture-7-1/Somfy-01/bro/conn.log.labeled",
+      "src_cidr": [],
+      "sha256": "fb37fb38393c48b064d3afd373b075ffe31063d4924a2df1c5d13fc490b830cc",
+      "expected": {
+        "scoped_labels": {"target": 0, "benign": 130},
+        "candidate_records": 0,
+        "assessment": {"windows": []}
+      }
+    }
+  ]
+}

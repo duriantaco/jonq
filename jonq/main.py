@@ -13,6 +13,7 @@ import shlex
 from shutil import copyfileobj
 from collections import OrderedDict
 from contextlib import ExitStack, contextmanager, nullcontext
+from dataclasses import asdict
 from typing import TextIO
 
 from jonq.api import _iter_stream_results, compile_query, execute_async
@@ -45,7 +46,7 @@ from jonq.constants import (
     SCHEMA_PATH_PREVIEW_ITEMS,
 )
 
-_WORKBENCH_COMMANDS = {"profile", "diff", "check", "run"}
+_WORKBENCH_COMMANDS = {"profile", "diff", "check", "run", "triage", "connections", "mcp"}
 _QUERY_STRUCTURAL_WORDS = {
     "as", "distinct", "from", "group", "having", "if", "limit", "order", "select",
     "sort", "where", "case", "true", "false", "null",
@@ -855,7 +856,7 @@ def _generate_completions(shell: str) -> str:
 _jonq_completions() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local opts="-i -f -t -r -s -n -o -p -w --format --table --raw --raw-output --stream --ndjson --limit --out --jq --explain --time --pretty --watch --follow --no-color --version --help --completions"
-    local commands="profile diff check run"
+    local commands="profile diff check run triage connections mcp"
     local keywords="select if where from group by having sort asc desc limit distinct and or not in like between contains as case when then else end is null coalesce count sum avg min max upper lower length round abs ceil floor int float str type keys values trim todate fromdate date tojson fromjson"
 
     if [[ "${cur}" == -* ]]; then
@@ -891,7 +892,7 @@ _jonq() {
         '--no-color:No color'
         '--completions:Shell completions'
     )
-    commands=(profile diff check run)
+    commands=(profile diff check run triage connections mcp)
     keywords=(select if where from group by having sort asc desc limit distinct and or not in like between contains as case when then else end is null coalesce count sum avg min max upper lower length round abs ceil floor int float str type keys values trim todate fromdate)
 
     if [[ "${words[2]}" == -* ]]; then
@@ -927,6 +928,9 @@ complete -c jonq -n '__fish_use_subcommand' -a 'profile' -d 'Profile JSON fields
 complete -c jonq -n '__fish_use_subcommand' -a 'diff' -d 'Diff JSON profiles'
 complete -c jonq -n '__fish_use_subcommand' -a 'check' -d 'Run JSON checks'
 complete -c jonq -n '__fish_use_subcommand' -a 'run' -d 'Run named query'
+complete -c jonq -n '__fish_use_subcommand' -a 'triage' -d 'Review network event logs'
+complete -c jonq -n '__fish_use_subcommand' -a 'connections' -d 'Summarize network connections'
+complete -c jonq -n '__fish_use_subcommand' -a 'mcp' -d 'Serve local network log tools'
 complete -c jonq -l version -d 'Show version\''''
     return ""
 
@@ -1241,7 +1245,7 @@ async def _amain(argv: list[str] | None = None):
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="jonq",
-        description="Inspect JSON and run readable queries powered by jq.",
+        description="Inspect JSON, run readable queries powered by jq, and review saved network logs.",
         epilog=(
             "Common workflows\n"
             "  jonq data.json\n"
@@ -1252,7 +1256,10 @@ def _build_parser() -> argparse.ArgumentParser:
             "  jonq diff old.json new.json\n"
             "  jonq check user_contract\n"
             "  jonq run active_users\n"
+            "  jonq triage eve.ndjson\n"
+            "  jonq connections conn.ndjson --scan-leads\n"
             "  jonq -i data.json\n"
+            "  jonq mcp --log-root ./logs\n"
             '  curl api.example.com/data | jonq "select id, name"\n'
             "  tail -f app.log | jonq --follow \"select level, msg if level = 'error'\"\n"
             '  jonq data.json "select *" --watch\n'
@@ -1397,6 +1404,14 @@ async def _run_workbench_command(argv: list[str]) -> None:
             await _run_check_command(argv[1:])
         elif command == "run":
             await _run_named_query_command(argv[1:])
+        elif command == "triage":
+            _run_triage_command(argv[1:])
+        elif command == "connections":
+            _run_connections_command(argv[1:])
+        elif command == "mcp":
+            from jonq.mcp import run_mcp
+
+            run_mcp(argv[1:])
         else:
             raise ValueError(f"Unknown command: {command}")
     except SystemExit:
@@ -1404,6 +1419,178 @@ async def _run_workbench_command(argv: list[str]) -> None:
     except Exception as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
+
+
+def _run_triage_command(argv: list[str]) -> None:
+    from jonq.triage import DEFAULT_MIN_DENIALS, analyze_events, format_triage
+
+    parser = argparse.ArgumentParser(
+        prog="jonq triage",
+        description="Summarize recorded Suricata EVE alerts and repeated firewall denials from NDJSON.",
+        epilog=(
+            "Input records\n"
+            "  Use one JSON object per line.\n"
+            "  EVE alerts use event_type=alert with alert.signature_id or alert.signature.\n"
+            "  Firewall records use event_type=firewall, src_ip, and an action such as deny.\n"
+            "\n"
+            "Examples\n"
+            "  jonq triage eve.ndjson\n"
+            "  jonq triage - --format json < firewall.ndjson"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "source", nargs="?", default="-",
+        help="Local NDJSON file or '-' for stdin (piped stdin by default)",
+    )
+    parser.add_argument(
+        "-f", "--format", choices=("text", "json"), default="text",
+        help="Report format (text by default)",
+    )
+    parser.add_argument("--no-color", action="store_true", help="Disable terminal colors")
+    parser.add_argument(
+        "--min-denials", type=int, default=DEFAULT_MIN_DENIALS,
+        help=f"Minimum denials per source IP across the input (default: {DEFAULT_MIN_DENIALS})",
+    )
+    args = parser.parse_args(argv)
+    if args.min_denials < 1:
+        parser.error("--min-denials must be positive")
+
+    with _open_log_input(args.source, parser) as lines:
+        report = analyze_events(
+            lines, min_denials=args.min_denials, report_error=_print_log_error
+        )
+
+    if args.format == "json":
+        print(json.dumps(asdict(report), indent=2))
+    else:
+        print(format_triage(report, color=_terminal_color_enabled(args.no_color), source=args.source))
+    if report.invalid_lines:
+        sys.exit(1)
+
+
+def _run_connections_command(argv: list[str]) -> None:
+    from jonq.connections import (
+        DEFAULT_MIN_DESTINATIONS, DEFAULT_WINDOW_SECONDS, analyze_connections, compare_baseline,
+        format_connections, format_scan_report,
+    )
+    from jonq.networks import parse_networks
+
+    parser = argparse.ArgumentParser(
+        prog="jonq connections",
+        description="Summarize IP conversations and rolling destination counts from Zeek JSON or Suricata EVE.",
+        epilog=(
+            "Input records\n"
+            "  Use one JSON object per line.\n"
+            "  Zeek conn.log in JSON mode uses ts (Unix seconds), id.orig_h, and id.resp_h.\n"
+            "  EVE uses event_type=flow, src_ip, dest_ip, and flow.start or timestamp\n"
+            "  with a time zone.\n"
+            "\n"
+            "Examples\n"
+            "  jonq connections conn.ndjson --scan-leads\n"
+            "  From the Jonq repository root, try the fixture and inspect its cited line.\n"
+            "  jonq connections tests/json_test_files/zeek_conn.ndjson --scan-leads --min-destinations 2\n"
+            "  sed -n '1p' tests/json_test_files/zeek_conn.ndjson"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "source", nargs="?", default="-",
+        help="Local NDJSON file or '-' for stdin (piped stdin by default)",
+    )
+    parser.add_argument(
+        "-f", "--format", choices=("text", "json"), default="text",
+        help="Report format (text by default)",
+    )
+    parser.add_argument("--no-color", action="store_true", help="Disable terminal colors")
+    parser.add_argument(
+        "--window", type=int, default=DEFAULT_WINDOW_SECONDS, metavar="SECONDS",
+        help=f"Rolling interval in seconds (default: {DEFAULT_WINDOW_SECONDS})",
+    )
+    parser.add_argument(
+        "--min-destinations", type=int, default=DEFAULT_MIN_DESTINATIONS, metavar="N",
+        help=(
+            "Minimum distinct destination IPs per source, or per source and TCP port "
+            f"with --scan-leads (default: {DEFAULT_MIN_DESTINATIONS})"
+        ),
+    )
+    parser.add_argument(
+        "--src-cidr", action="append", default=[], metavar="IP_OR_CIDR",
+        help="Keep connections from any specified source network or IP. Repeatable.",
+    )
+    parser.add_argument(
+        "--dst-cidr", action="append", default=[], metavar="IP_OR_CIDR",
+        help="Keep connections to any specified destination network or IP. Repeatable.",
+    )
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument(
+        "--baseline", metavar="FILE",
+        help="Compare qualifying sources with a reference NDJSON export.",
+    )
+    modes.add_argument(
+        "--scan-leads", action="store_true",
+        help="Review same-port TCP attempts with rejection or no reply observed.",
+    )
+    args = parser.parse_args(argv)
+    if args.window < 1:
+        parser.error("--window must be a positive number of seconds")
+    if args.min_destinations < 2:
+        parser.error("--min-destinations must be at least 2")
+    if args.baseline == "-":
+        parser.error("--baseline requires a local NDJSON file")
+    try:
+        src_networks = parse_networks(args.src_cidr)
+        dst_networks = parse_networks(args.dst_cidr)
+    except ValueError as exc:
+        parser.error(f"invalid IP or CIDR filter: {exc}")
+
+    scope = {
+        "window_seconds": args.window,
+        "src_networks": src_networks,
+        "dst_networks": dst_networks,
+    }
+    with _open_log_input(args.source, parser) as lines:
+        report = analyze_connections(
+            lines,
+            min_destinations=args.min_destinations,
+            report_error=_print_log_error,
+            scan_leads_only=args.scan_leads,
+            **scope,
+        )
+
+    comparison = None
+    if args.baseline is not None:
+        with open(args.baseline, "rb") as lines:
+            reference = analyze_connections(
+                lines,
+                min_destinations=1,
+                include_evidence=False,
+                report_error=lambda line, message: print(
+                    f"Baseline line {line}: {message}", file=sys.stderr
+                ),
+                **scope,
+            )
+        comparison = compare_baseline(report, reference)
+
+    if args.format == "json":
+        payload = asdict(report)
+        if comparison is not None:
+            payload["baseline"] = asdict(comparison)
+        print(json.dumps(payload, indent=2, default=float))
+    elif args.scan_leads:
+        print(format_scan_report(report, color=_terminal_color_enabled(args.no_color), source=args.source))
+    else:
+        print(format_connections(report, comparison, color=_terminal_color_enabled(args.no_color)))
+    if report.invalid_lines or (comparison and comparison.invalid_lines):
+        sys.exit(1)
+
+
+def _open_log_input(source: str, parser: argparse.ArgumentParser):
+    if source != "-":
+        return open(source, "rb")
+    if sys.stdin.isatty():
+        parser.error("provide a file or pipe NDJSON to stdin")
+    return nullcontext(sys.stdin.buffer)
 
 
 def _terminal_color_enabled(no_color: bool) -> bool:

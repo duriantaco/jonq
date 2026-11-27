@@ -38,6 +38,8 @@ Key Features
 - **Diff**: ``jonq diff old.json new.json`` to catch shape drift
 - **Checks**: ``jonq check`` with inline assertions or named checks from ``jonq.yaml``
 - **Named queries**: ``jonq run NAME`` from ``jonq.yaml``
+- **Network log reports**: :ref:`network-log-reports` for recorded alerts, firewall denials, and connection activity with original input evidence
+- **MCP server**: :doc:`mcp` for network log tools scoped to a local log directory
 - **Interactive REPL**: ``jonq -i data.json`` with tab completion and history
 - **Follow mode**: ``--follow`` to stream NDJSON line-by-line
 - **Streaming mode**: ``--stream`` for row-wise root-array queries
@@ -59,6 +61,7 @@ Key Features
    comparison
    examples
    api
+   mcp
    contribution
 
 Indices and tables

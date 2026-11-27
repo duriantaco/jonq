@@ -61,6 +61,9 @@ The entry point for the jonq command-line tool.
 
    jonq <source> "<query>" [--format json|jsonl|csv|table|yaml] [--raw] [--stream] [--watch] [--jq] [--explain] [--pretty] [--no-color] [--ndjson] [--limit N] [--out PATH] [--version]
 
+See :ref:`network-log-reports` for the ``triage`` and ``connections``
+subcommands and :doc:`mcp` for the MCP server.
+
 Query Parser (jonq.query_parser)
 --------------------------------
 

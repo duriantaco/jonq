@@ -1,0 +1,6 @@
+{"ts":1700000080.75,"uid":"synthetic-1","id.orig_h":"192.0.2.10","id.orig_p":51001,"id.resp_h":"198.51.100.12","id.resp_p":443,"proto":"tcp","conn_state":"S0"}
+{"ts":1700000030.5,"uid":"synthetic-2","id.orig_h":"192.0.2.10","id.orig_p":51002,"id.resp_h":"198.51.100.10","id.resp_p":443,"proto":"tcp","conn_state":"SF"}
+{"ts":1700000020.75,"uid":"synthetic-3","id.orig_h":"192.0.2.10","id.orig_p":51003,"id.resp_h":"198.51.100.11","id.resp_p":443,"proto":"tcp","conn_state":"S0"}
+{"ts":1700000040,"uid":"synthetic-4","id.orig_h":"192.0.2.10","id.orig_p":51004,"id.resp_h":"198.51.100.10","id.resp_p":443,"proto":"tcp","conn_state":"SF"}
+{"ts":1700000050,"uid":"synthetic-5","id.orig_h":"198.51.100.10","id.orig_p":51005,"id.resp_h":"192.0.2.10","id.resp_p":443,"proto":"tcp","conn_state":"SF"}
+{"ts":1699999800,"uid":"synthetic-6","id.orig_h":"192.0.2.10","id.orig_p":51006,"id.resp_h":"198.51.100.99","id.resp_p":443,"proto":"tcp","conn_state":"SF"}

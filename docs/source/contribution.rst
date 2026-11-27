@@ -42,6 +42,21 @@ jonq uses pytest for testing. To run tests:
 Run the full test suite before opening a pull request. If you change only
 documentation, build the Sphinx docs as well.
 
+Replay Scan Leads
+-----------------
+
+The bundled benign case models HTTPS health-check retries across twelve peers.
+It should produce one benign-only lead. Run it from the repository root.
+
+.. code-block:: bash
+
+   python tests/replay_scan_leads.py --case benign-retries --runs 1
+
+The `contributor guide <https://github.com/duriantaco/jonq/blob/main/CONTRIBUTIONS.md#replay-the-scan-lead-accuracy-cases>`_
+lists the recorded cases, expected results, and how to prepare local
+copies. The replay verifies capture hashes and scores labels after running
+the detector on its event-only input.
+
 Pre-Commit Hooks
 -----------------
 
